@@ -1,6 +1,6 @@
 # ADR 0001: Core reference schema for exchanges, companies and listings
 
-- Status: Accepted
+- Status: Accepted. The `listing` table is superseded by ADR 0003; `exchange` and `company` stand.
 - Date: 2026-11-20
 
 ## Decision
