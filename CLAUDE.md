@@ -64,7 +64,9 @@ The original pyvalue is kept as a read-only reference, checked out beside this r
 - Use views to pre-compose common joins or projections without duplicating data.
 
 ### Schema Evolution
-Whenever features are added or code is refactored, re-evaluate the schema. If the design can be improved, plan and apply the necessary migrations — do not silently preserve a bad design because it already exists. Once the persistence layer exists, record where migrations live in `docs/architecture.md`, add new migrations there in order, and call out any impact on the local database.
+Whenever features are added or code is refactored, re-evaluate the schema. If the design can be improved, plan and apply the necessary migrations — do not silently preserve a bad design because it already exists.
+
+Migrations live in `src/pyvalue/db/migrations/`, one numbered SQL file each (ADR 0007). To change the schema, add the next numbered file, update the table's file under `docs/database/` in the same commit, and call out any impact on the local database. Never edit a migration that has been applied: its checksum is recorded, and `pyvalue db migrate` refuses a database whose applied migrations no longer match their files.
 
 ### SQL Style
 - Write correct SQL first; optimise second.
@@ -93,11 +95,13 @@ When proposing schema changes, always include:
 - Re-evaluate the structure after significant changes. If a better layout has become clear, reorganise — a clean structure is worth the churn.
 
 ### Current Layout
-The package is a skeleton until the architecture is agreed. Update this list in the same commit as any structural change.
+Update this list in the same commit as any structural change. `docs/architecture.md` describes the components and the rules between them.
 
-- `src/pyvalue/`: the package. It exposes only the version so far.
-- `tests/`: pytest suite, mirroring the source tree under `tests/unit/`, `tests/regression/`, and `tests/integration/`.
-- `docs/`: substantive documentation (see the **Documentation** section); `docs/adr/` holds the architecture decision records.
+- `src/pyvalue/`: the package.
+  - `db/`: the database. Connections, the migration run, and the migration files under `db/migrations/`. The only package that imports `sqlite3` or contains SQL.
+  - `cli/`: the `pyvalue` command. Thin commands that call the components.
+- `tests/`: pytest suite, mirroring the source tree under `tests/unit/`, `tests/regression/`, and `tests/integration/`. Shared fixtures are in `tests/conftest.py`.
+- `docs/`: substantive documentation (see the **Documentation** section); `docs/architecture.md` is the design, `docs/adr/` holds the architecture decision records, and `docs/database/` has one file per table.
 - `data/`: local artifacts such as the database (gitignored).
 - `private/`: local config and API keys (`private/config.toml`, gitignored).
 
@@ -105,6 +109,7 @@ The package is a skeleton until the architecture is agreed. Update this list in 
 - Use the `pyvalue-next` conda environment (Python 3.14) for all project commands. Never install this package into the legacy project's `pyvalue` environment.
 - `conda run -n pyvalue-next sh -c 'UV_PROJECT_ENVIRONMENT="$CONDA_PREFIX" uv sync --locked --extra dev'`: install the editable package and its development tools at the exact versions in `uv.lock` (Python >=3.14). `UV_PROJECT_ENVIRONMENT` points uv at the conda environment; without it uv creates its own `.venv`. The sync is exact: it also removes packages that are not in the lock, and it fails if `uv.lock` is out of date with `pyproject.toml`.
 - `conda run -n pyvalue-next pytest`: run the test suite.
+- `conda run -n pyvalue-next pyvalue db migrate`: create `data/pyvalue.db`, or bring it up to the latest schema. Re-run the install command above first if the `pyvalue` command is missing.
 - **Dependency versions are locked.** `pyproject.toml` declares the version ranges pyvalue is compatible with; `uv.lock` records the exact version and hashes of every direct and transitive dependency the project is tested with. Never pin with `==` in `pyproject.toml`, and never edit `uv.lock` by hand.
   - After changing any dependency in `pyproject.toml`, run `conda run -n pyvalue-next uv lock` and commit `uv.lock` in the same change.
   - `conda run -n pyvalue-next uv lock --upgrade` (or `--upgrade-package <name>`) moves to newer versions. An upgrade is a deliberate change with its own commit: re-run the install command above, then the full quality gate, before committing.

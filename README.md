@@ -2,7 +2,7 @@
 
 A value-investing toolkit with a curated global stock universe, data-quality checks on fundamentals, and quality-at-a-reasonable-price screening.
 
-> **Status: under construction.** This repository (`pyvalue-next`) is the ground-up successor to the original pyvalue (0.1.0). It holds the project skeleton only, and takes over the `pyvalue` name once its first phase is complete.
+> **Status: under construction.** This repository (`pyvalue-next`) is the ground-up successor to the original pyvalue (0.1.0). So far it can create its database; the stock universe comes next. It takes over the `pyvalue` name once its first phase is complete.
 
 ## Disclaimer
 
@@ -19,3 +19,15 @@ UV_PROJECT_ENVIRONMENT="$CONDA_PREFIX" uv sync --locked --extra dev
 ```
 
 This installs the exact dependency versions recorded in `uv.lock`. `python -m pip install -e ".[dev]"` also works without uv, but it resolves the newest versions the ranges in `pyproject.toml` allow.
+
+## Usage
+
+Create the database, or bring an existing one up to the latest schema:
+
+```bash
+pyvalue db migrate
+```
+
+The database is `data/pyvalue.db` in the folder you run the command from. `--db PATH` points it elsewhere. Running the command again is harmless: it applies only what is missing.
+
+The design is described in [`docs/architecture.md`](docs/architecture.md), the tables in [`docs/database/`](docs/database/README.md), and the decisions behind both in [`docs/adr/`](docs/adr/).
