@@ -68,6 +68,35 @@ Whenever features are added or code is refactored, re-evaluate the schema. If th
 
 Migrations live in `src/pyvalue/db/migrations/`, one numbered SQL file each (ADR 0007). To change the schema, add the next numbered file, update the table's file under `docs/database/` in the same commit, and call out any impact on the local database. Never edit a migration that has been applied: its checksum is recorded, and `pyvalue db migrate` refuses a database whose applied migrations no longer match their files.
 
+### Database Access
+All reading and writing of the database goes through the `pyvalue.db` package. The design pattern is **Repository with Unit of Work**: one repository class per table holds every statement for that table, and a unit of work owns the connection and the transaction. The decision and its reasons are in ADR 0008.
+
+- **One home.** Only `pyvalue.db` imports `sqlite3`, holds a connection, or contains SQL. No other package builds a query, not even a `SELECT`. A test enforces the import rule (`tests/unit/test_architecture_rules.py`).
+- **One repository class per table.** Each table has exactly one class in `pyvalue.db` that owns it, named after the table: `CompanyRepository` for `company`. Every statement that inserts, updates or deletes rows of a table is a method of its repository and of nothing else, so the answer to "what can change this table?" is one class.
+- **Reads go through repositories too.** A query lives in the repository of the table whose rows it returns. A query that joins several tables lives in the repository of the table it is mainly about, or reads a view.
+- **Methods say what, not how.** Name a method after what the caller wants (`find_by_isin`, `add`, `set_lei`). It takes and returns ids and typed values. It never takes SQL, a `WHERE` fragment or a column name from its caller, and there is no general `execute` for other packages to use.
+- **Typed, immutable records.** A repository returns frozen dataclasses defined in `pyvalue.db`, one per table, or plain values. It never returns a tuple, a `sqlite3.Row` or a cursor.
+- **A unit of work owns the transaction.** A component asks `pyvalue.db` for a unit of work, reaches the repositories through it, and leaves it. Everything done inside is committed together, or rolled back together if an exception escapes. All repositories of one unit of work share its connection. A repository never begins, commits or rolls back, and a component never sees a connection.
+- **Components decide, repositories store.** A business rule (which company a holdings line belongs to, whether a listing may be filled) lives in the component that owns it. A repository does what its method name says and nothing more. The schema's constraints remain the last line of defence, and a violated constraint reaches the component as a `pyvalue.db` error, never as a raw `sqlite3` one.
+- **Schema statements belong to migrations.** No repository creates, alters or drops anything.
+- **Tests use the same door.** A test of a component works through a unit of work on a temporary migrated database. Only the tests of `pyvalue.db` itself use `sqlite3` directly.
+
+What a component looks like under this rule (an illustration; the class and method names are settled when the first repository is written):
+
+```python
+with database.unit_of_work() as work:
+    company = work.companies.find_by_lei(lei) or work.companies.add(name=name, lei=lei)
+    work.instruments.add(company_id=company.company_id, isin=isin)
+# Both rows are committed here, or neither is.
+```
+
+When adding or changing database access, flag — and correct — any of these:
+- SQL, a connection or a `sqlite3` import outside `pyvalue.db`
+- A second class that writes a table which already has a repository
+- A repository method that commits, or a component that manages a transaction by hand
+- A repository method that returns raw rows, or accepts SQL from its caller
+- A business decision made inside a repository
+
 ### SQL Style
 - Write correct SQL first; optimise second.
 - Never use `SELECT *` in production code — name every column explicitly.
@@ -98,7 +127,7 @@ When proposing schema changes, always include:
 Update this list in the same commit as any structural change. `docs/architecture.md` describes the components and the rules between them.
 
 - `src/pyvalue/`: the package.
-  - `db/`: the database. Connections, the migration run, and the migration files under `db/migrations/`. The only package that imports `sqlite3` or contains SQL.
+  - `db/`: the database. Connections, the migration run, and the migration files under `db/migrations/`. The only package that imports `sqlite3` or contains SQL; its repository classes and unit of work are the only way in (see **Database Access**).
   - `cli/`: the `pyvalue` command. Thin commands that call the components.
 - `tests/`: pytest suite, mirroring the source tree under `tests/unit/`, `tests/regression/`, and `tests/integration/`. Shared fixtures are in `tests/conftest.py`.
 - `docs/`: substantive documentation (see the **Documentation** section); `docs/architecture.md` is the design, `docs/adr/` holds the architecture decision records, and `docs/database/` has one file per table.

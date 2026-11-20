@@ -8,7 +8,7 @@ Only what has been agreed is described as designed. Everything else is listed as
 
 | Component | Package | What it does | Status |
 |---|---|---|---|
-| Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built |
+| Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections and migrations. Repositories and the unit of work are added with the first component that needs them |
 | Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate` |
 | Universe load | `pyvalue.universe` | Reads the three SEC holdings filings into `company` and `instrument` (ADR 0004, ADR 0006) | Planned |
 | Listings | `pyvalue.listings` | Looks up provider listings, applies the automatic rule and the decisions file (ADR 0005) | Planned |
@@ -37,14 +37,18 @@ flowchart LR
 
 An arrow means "calls". Nothing calls back up the arrows.
 
+The pattern for database access is Repository with Unit of Work (ADR 0008). The working rules, with what to flag in review, are in the **Database Access** section of [`CLAUDE.md`](../CLAUDE.md).
+
 ## Rules
 
 | Rule | What it means |
 |---|---|
-| One home for database access | Only `pyvalue.db` imports `sqlite3` or contains SQL. Every other package calls functions of `pyvalue.db`. A test enforces the import rule. |
+| One home for database access | Only `pyvalue.db` imports `sqlite3`, holds a connection or contains SQL. A test enforces the import rule. |
+| One repository class per table | Each table has one class in `pyvalue.db` that owns it. Every statement that reads or changes the table is a method of that class, and it returns typed, immutable records. |
+| A unit of work owns the transaction | A component asks `pyvalue.db` for a unit of work and reaches the repositories through it. What it does inside is committed together or rolled back together. Repositories never commit, and components never see a connection. |
 | Ids downstream | Code past the entry point works with row ids. An ISIN, a ticker or an exchange code is turned into an id once, at the boundary where it comes in. |
 | Dependencies point one way | Command line, then components, then database. The database package knows nothing about the others. |
-| Transactions are explicit | Connections are opened without implicit transactions. Code that writes begins and commits its own. |
+| Transactions are explicit | Connections are opened without implicit transactions, so nothing is committed except where a unit of work, or the migration run, says so. |
 | Foreign keys are always on | Every connection is opened with enforcement on, and opening fails if SQLite cannot enforce them. |
 
 ## The universe, as designed
