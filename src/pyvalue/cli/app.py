@@ -77,6 +77,10 @@ def _universe_load(arguments: argparse.Namespace) -> int:
     )
     print(f"Legal-entity identifiers filled in: {result.leis_filled:,}")
     print(
+        f"Decisions on legal-entity identifiers used: {result.decisions_used:,}, "
+        f"which corrected {result.leis_corrected:,} companies"
+    )
+    print(
         f"The database now holds {result.companies:,} companies and "
         f"{result.instruments:,} instruments"
     )

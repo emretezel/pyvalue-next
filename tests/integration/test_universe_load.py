@@ -12,8 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from pyvalue.db import Company, Database, Instrument
+from pyvalue.db import Company, Database, Instrument, migrate
 from pyvalue.universe import load_universe
+from pyvalue.universe.lei_decisions import read_lei_decisions
 
 pytestmark = pytest.mark.integration
 
@@ -24,6 +25,8 @@ _ZETA: str = "549300ZETA0000000008"
 _THETA: str = "549300THETA000000051"
 _KAPPA: str = "549300KAPPA000000078"
 _NU: str = "549300NU000000000098"
+_THETA_DECIDED: str = "549300THET2000000069"
+_IOTA_DECIDED: str = "549300SIGMA000000049"
 
 _EXPECTED_COMPANIES: tuple[Company, ...] = (
     Company(1, "ALPHA CORP", _ALPHA),
@@ -161,3 +164,77 @@ def test_a_second_run_changes_nothing_and_writes_the_same_files(
         second.output.lines_not_loaded.read_bytes(),
         second.output.cases_for_agent.read_bytes(),
     ) == first_files
+
+
+# --- With the sample decisions (ADR 0010) ------------------------------------------------
+
+# What the two sample decisions change: Theta carries the identifier DFAX files,
+# and Iota, which had none, carries its own.
+_EXPECTED_COMPANIES_AFTER_DECISIONS: tuple[Company, ...] = tuple(
+    {6: Company(6, "THETA AG", _THETA_DECIDED), 7: Company(7, "IOTA KK", _IOTA_DECIDED)}.get(
+        company.company_id, company
+    )
+    for company in _EXPECTED_COMPANIES
+)
+
+_CASES_HEADER: bytes = (
+    b"fund,line,reason,isin,issuer_name,line_lei,company_id,company_name,company_lei,"
+    b"lei_owner_company_id,lei_owner_company_name\n"
+)
+
+
+def test_the_shipped_decisions_concern_none_of_the_sample_securities(
+    database: Database, filings_dir: Path, tmp_path: Path
+) -> None:
+    """By default the load applies the package's own file, which is about real securities."""
+    outcome = load_universe(
+        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
+    )
+
+    assert outcome.result.decisions_used == 0
+    assert len(outcome.result.agent_cases) == 2
+
+
+def test_the_sample_decisions_settle_both_cases(
+    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+) -> None:
+    """A database built with the decisions has the decided identifiers and no open case."""
+    decisions = read_lei_decisions(nport_samples / "decisions" / "lei.csv")
+
+    outcome = load_universe(
+        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched, decisions
+    )
+
+    assert _tables(database) == (_EXPECTED_COMPANIES_AFTER_DECISIONS, _EXPECTED_INSTRUMENTS)
+    result = outcome.result
+    assert (result.decisions_used, result.leis_corrected) == (2, 0)
+    assert result.agent_cases == ()
+    assert outcome.output.cases_for_agent.read_bytes() == _CASES_HEADER
+    # The lines that are not loaded have nothing to do with the decisions.
+    assert (
+        outcome.output.lines_not_loaded.read_bytes()
+        == (nport_samples / "expected" / "lines_not_loaded.csv").read_bytes()
+    )
+
+
+def test_decisions_applied_later_give_the_database_a_rebuild_would_give(
+    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+) -> None:
+    """Corrected in place or built from scratch, the rows are the same."""
+    decisions = read_lei_decisions(nport_samples / "decisions" / "lei.csv")
+    # In place: loaded before the decisions existed, as the real database was.
+    load_universe(database, filings_dir, tmp_path / "first", _never_asked, _never_fetched, ())
+    corrected = load_universe(
+        database, filings_dir, tmp_path / "second", _never_asked, _never_fetched, decisions
+    )
+    # From scratch: a second database that sees the decisions from the start.
+    migrate(tmp_path / "scratch.db")
+    scratch = Database(tmp_path / "scratch.db")
+    load_universe(scratch, filings_dir, tmp_path / "third", _never_asked, _never_fetched, decisions)
+
+    assert _tables(database) == _tables(scratch)
+    assert _tables(database) == (_EXPECTED_COMPANIES_AFTER_DECISIONS, _EXPECTED_INSTRUMENTS)
+    # One identifier was replaced (Theta) and one given for the first time (Iota).
+    assert (corrected.result.leis_corrected, corrected.result.leis_filled) == (1, 1)
+    assert corrected.result.agent_cases == ()
+    assert corrected.output.cases_for_agent.read_bytes() == _CASES_HEADER

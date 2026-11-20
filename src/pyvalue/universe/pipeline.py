@@ -5,12 +5,13 @@ This is the one function the command line calls (ADR 0009).
 Author: Emre Tezel
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from pyvalue.db import Database
 from pyvalue.universe.filings import PINNED_FILINGS, PinnedFiling, read_pinned_filing
+from pyvalue.universe.lei_decisions import LeiDecision, packaged_lei_decisions
 from pyvalue.universe.load import FundHoldings, LoadResult, load_holdings
 from pyvalue.universe.output import OutputFiles, write_output
 from pyvalue.universe.sec import Fetch, download_filing, fetch_from_sec
@@ -43,6 +44,7 @@ def load_universe(
     output_dir: Path,
     user_agent: Callable[[], str],
     fetch: Fetch = fetch_from_sec,
+    decisions: Sequence[LeiDecision] | None = None,
 ) -> UniverseLoad:
     """Load the pinned filings into the database.
 
@@ -55,16 +57,23 @@ def load_universe(
             only if a filing has to be downloaded, so a run on files that are
             already there needs no setting.
         fetch: What performs a download. Tests pass their own.
+        decisions: The decisions on legal-entity identifiers to apply.
+            Defaults to the ones shipped with the package (ADR 0010); tests
+            pass their own.
 
     Returns:
         What was downloaded, what the load did and where its output is.
 
     Raises:
         FilingError: If a filing cannot be downloaded or is not the pinned one.
-        UniverseError: If the load cannot handle a line, or the output cannot
-            be written.
+        UniverseError: If the decisions file is invalid, the load cannot handle
+            a line, or the output cannot be written.
         DatabaseError: If the database is not ready or refuses a row.
     """
+    # Read before anything is fetched: a broken decisions file should stop the
+    # run at once, not after three downloads.
+    if decisions is None:
+        decisions = packaged_lei_decisions()
     downloaded: list[PinnedFiling] = []
     funds: list[FundHoldings] = []
     for pinned in PINNED_FILINGS:
@@ -74,7 +83,7 @@ def load_universe(
             downloaded.append(pinned)
         funds.append(FundHoldings(ticker=pinned.ticker, lines=read_pinned_filing(path, pinned)))
 
-    result = load_holdings(database, funds)
+    result = load_holdings(database, funds, decisions)
     # Written only after the load is saved, so the files never describe a load
     # that was rolled back.
     output = write_output(result, output_dir)

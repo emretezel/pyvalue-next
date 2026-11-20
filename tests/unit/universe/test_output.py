@@ -60,6 +60,8 @@ def _result(
         joined_by_lei=0,
         joined_by_name=0,
         leis_filled=0,
+        leis_corrected=0,
+        decisions_used=0,
         companies=0,
         instruments=0,
         not_loaded=not_loaded,

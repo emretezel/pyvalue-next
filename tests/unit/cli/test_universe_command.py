@@ -55,6 +55,7 @@ def test_load_fills_the_database_and_says_what_it_did(
         "Added: 14 companies and 16 instruments",
         "Joined to an existing company: 1 by legal-entity identifier, 1 by name",
         "Legal-entity identifiers filled in: 1",
+        "Decisions on legal-entity identifiers used: 0, which corrected 0 companies",
         "The database now holds 14 companies and 16 instruments",
         f"Lines not loaded are listed in {Path('data') / 'universe' / 'lines_not_loaded.csv'}",
         f"Cases for the agent: 2, listed in {Path('data') / 'universe' / 'cases_for_agent.csv'}",

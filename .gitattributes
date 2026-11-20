@@ -5,3 +5,7 @@
 # The sample filings and the expected load output are compared byte for byte by the
 # tests, so their line endings must not depend on the platform either.
 tests/fixtures/** text eol=lf
+
+# The decision files are read row by row and shipped inside the package; keep them
+# the same on every platform too.
+src/pyvalue/universe/decisions/*.csv text eol=lf

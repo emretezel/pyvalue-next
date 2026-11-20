@@ -44,10 +44,11 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
-# Ship the PEP 561 marker so type checkers treat pyvalue as a typed package, and
-# the migration files so an installed copy can create and upgrade its database.
+# Ship the PEP 561 marker so type checkers treat pyvalue as a typed package, the
+# migration files so an installed copy can create and upgrade its database, and
+# the decision files so it builds the same universe (ADR 0010).
 [tool.setuptools.package-data]
-pyvalue = ["py.typed", "db/migrations/*.sql"]
+pyvalue = ["py.typed", "db/migrations/*.sql", "universe/decisions/*.csv"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

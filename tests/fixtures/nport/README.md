@@ -53,3 +53,14 @@ The files are named by ticker. A test copies them into a temporary folder under 
 | 14 | Omicron Ltd | A receipt by label only; the company has no other line | Company 14 |
 
 In total: 31 lines, 14 companies, 16 instruments, 11 lines not loaded, 2 cases for the agent. The expected output files are in `expected/`.
+
+## Sample decisions
+
+`decisions/lei.csv` holds two decisions on legal-entity identifiers (ADR 0010) that settle the two cases above. Tests pass it to the load explicitly; the load's own decisions file concerns real securities and matches nothing here.
+
+| Security | Decided identifier | Effect |
+|---|---|---|
+| `DE00000T0019` (Theta AG) | The one DFAX files | Company 6 carries it instead of the one VXUS files |
+| `JP300000I006` (Iota KK) | An identifier neither fund files | Company 7, which had none, carries it |
+
+With these decisions the load reports no case.

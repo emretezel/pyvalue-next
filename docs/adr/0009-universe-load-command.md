@@ -1,6 +1,6 @@
 # ADR 0009: The universe load is a command that reads pinned filings
 
-- Status: Accepted
+- Status: Accepted. The open point on how an agent's answer reaches the database is settled by ADR 0010.
 - Date: 2026-11-20
 
 ## Decision

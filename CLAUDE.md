@@ -134,7 +134,7 @@ Update this list in the same commit as any structural change. `docs/architecture
 
 - `src/pyvalue/`: the package.
   - `db/`: the database. `Database` and the unit of work, one module per table with its record and repository, connections, the migration run, and the migration files under `db/migrations/`. The only package that imports `sqlite3` or contains SQL; its repository classes and unit of work are the only way in (see **Database Access**).
-  - `universe/`: the universe load. Downloads the three pinned SEC holdings filings, reads them, and fills `company` and `instrument` by the rules of ADR 0006 and ADR 0009.
+  - `universe/`: the universe load. Downloads the three pinned SEC holdings filings, reads them, and fills `company` and `instrument` by the rules of ADR 0006 and ADR 0009. `universe/decisions/lei.csv` holds the decisions on legal-entity identifiers that overrule the filings (ADR 0010).
   - `cli/`: the `pyvalue` command. Thin commands that call the components.
   - `config.py`: reads `private/config.toml`. Never puts a value from that file into a message.
   - `errors.py`: `PyvalueError`, the base of every error a person can fix. The command line prints such an error as one line.
@@ -149,6 +149,7 @@ Update this list in the same commit as any structural change. `docs/architecture
 - `conda run -n pyvalue-next pytest`: run the test suite.
 - `conda run -n pyvalue-next pyvalue db migrate`: create `data/pyvalue.db`, or bring it up to the latest schema. Re-run the install command above first if the `pyvalue` command is missing.
 - `conda run -n pyvalue-next pyvalue universe load`: fill `company` and `instrument` from the three pinned SEC filings. The first run downloads them into `data/sec/` and needs the `[sec] user_agent` line in `private/config.toml`; later runs need neither. Running it again adds nothing. The filings are pinned in `src/pyvalue/universe/filings.py`.
+- **To correct a company's legal-entity identifier**, add a row to `src/pyvalue/universe/decisions/lei.csv` (ISIN, identifier, company name, date, evidence) and run the load again. Never change the identifier in the database by hand: a rebuild would lose it. Decide every security of the company that carries the wrong identifier, not only the one that was reported (ADR 0010).
 - **Dependency versions are locked.** `pyproject.toml` declares the version ranges pyvalue is compatible with; `uv.lock` records the exact version and hashes of every direct and transitive dependency the project is tested with. Never pin with `==` in `pyproject.toml`, and never edit `uv.lock` by hand.
   - After changing any dependency in `pyproject.toml`, run `conda run -n pyvalue-next uv lock` and commit `uv.lock` in the same change.
   - `conda run -n pyvalue-next uv lock --upgrade` (or `--upgrade-package <name>`) moves to newer versions. An upgrade is a deliberate change with its own commit: re-run the install command above, then the full quality gate, before committing.

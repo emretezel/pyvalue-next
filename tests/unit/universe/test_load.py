@@ -9,17 +9,19 @@ Author: Emre Tezel
 """
 
 from dataclasses import replace
+from datetime import date
 from pathlib import Path
 
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from pyvalue.db import Company, ConstraintError, Database, DatabaseError, Instrument
+from pyvalue.db import Company, ConstraintError, Database, DatabaseError, Instrument, migrate
 from pyvalue.universe import (
     AgentCaseReason,
     FundHoldings,
     HoldingLine,
+    LeiDecision,
     LoadResult,
     NotLoadedReason,
     UniverseError,
@@ -31,6 +33,7 @@ from pyvalue.universe.load import name_key
 _ALPHA_LEI: str = "549300ALPHA000000003"
 _DELTA_LEI: str = "549300DELTA000000010"
 _THETA_LEI: str = "549300THETA000000051"
+_KAPPA_LEI: str = "549300KAPPA000000078"
 _ISIN_1: str = "US00000A0014"
 _ISIN_2: str = "US00000A0022"
 _ISIN_3: str = "GB00000D0016"
@@ -66,6 +69,17 @@ def _fund(ticker: str, *lines: HoldingLine) -> FundHoldings:
     return FundHoldings(
         ticker=ticker,
         lines=tuple(replace(line, number=number) for number, line in enumerate(lines, start=1)),
+    )
+
+
+def _decision(isin: str, lei: str) -> LeiDecision:
+    """Build a decision that the security's issuer has the given identifier."""
+    return LeiDecision(
+        isin=isin,
+        lei=lei,
+        company="Sample Co",
+        decided_on=date(2026, 11, 20),
+        evidence="Made up for a test",
     )
 
 
@@ -757,6 +771,343 @@ def test_no_funds_is_a_load_that_does_nothing(database: Database) -> None:
         0,
         0,
     )
+
+
+# --- Decisions on legal-entity identifiers (ADR 0010) -------------------------------------
+
+
+def _disputed_funds() -> list[FundHoldings]:
+    """Return two funds that file different identifiers for one security."""
+    return [
+        _fund("VXUS", _line("THETA AG", _ISIN_5, lei=_THETA_LEI)),
+        _fund("DFAX", _line("Theta AG", _ISIN_5, lei=_ALPHA_LEI)),
+    ]
+
+
+def test_without_a_decision_the_dispute_is_a_case(database: Database) -> None:
+    """The starting point of every test below: the first fund's identifier, and a case."""
+    result = load_holdings(database, _disputed_funds())
+
+    assert _companies(database) == (Company(1, "THETA AG", _THETA_LEI),)
+    assert len(result.agent_cases) == 1
+    assert (result.decisions_used, result.leis_corrected) == (0, 0)
+
+
+def test_on_an_empty_database_the_decided_identifier_is_the_one_loaded(
+    database: Database,
+) -> None:
+    """Both funds' lines are read as carrying it, so there is nothing to dispute."""
+    result = load_holdings(database, _disputed_funds(), [_decision(_ISIN_5, _ALPHA_LEI)])
+
+    assert _companies(database) == (Company(1, "THETA AG", _ALPHA_LEI),)
+    assert result.agent_cases == ()
+    assert (result.decisions_used, result.leis_corrected) == (1, 0)
+
+
+def test_a_decision_may_side_with_the_first_fund(database: Database) -> None:
+    """Then the database was right all along, and only the case goes away."""
+    load_holdings(database, _disputed_funds())
+
+    result = load_holdings(database, _disputed_funds(), [_decision(_ISIN_5, _THETA_LEI)])
+
+    assert _companies(database) == (Company(1, "THETA AG", _THETA_LEI),)
+    assert result.agent_cases == ()
+    assert (result.decisions_used, result.leis_corrected) == (1, 0)
+
+
+def test_a_decision_may_name_an_identifier_no_fund_filed(database: Database) -> None:
+    """The register can know better than both funds."""
+    result = load_holdings(database, _disputed_funds(), [_decision(_ISIN_5, _KAPPA_LEI)])
+
+    assert _companies(database) == (Company(1, "THETA AG", _KAPPA_LEI),)
+    assert result.agent_cases == ()
+
+
+def test_a_decision_corrects_a_company_that_is_already_loaded(database: Database) -> None:
+    """Applying a decision is running the load again; the stored name is kept."""
+    load_holdings(database, _disputed_funds())
+
+    result = load_holdings(database, _disputed_funds(), [_decision(_ISIN_5, _ALPHA_LEI)])
+
+    assert _companies(database) == (Company(1, "THETA AG", _ALPHA_LEI),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_5),)
+    assert result.agent_cases == ()
+    assert (result.leis_corrected, result.leis_filled) == (1, 0)
+    assert (result.companies_added, result.instruments_added) == (0, 0)
+
+
+def test_a_correction_is_made_once(database: Database) -> None:
+    """A second run with the same decisions finds nothing left to correct."""
+    load_holdings(database, _disputed_funds())
+    decisions = [_decision(_ISIN_5, _ALPHA_LEI)]
+    load_holdings(database, _disputed_funds(), decisions)
+
+    again = load_holdings(database, _disputed_funds(), decisions)
+
+    assert _companies(database) == (Company(1, "THETA AG", _ALPHA_LEI),)
+    assert (again.leis_corrected, again.leis_filled) == (0, 0)
+    assert again.agent_cases == ()
+    assert again.decisions_used == 1
+
+
+def test_a_decision_gives_an_identifier_to_a_company_that_has_none(database: Database) -> None:
+    """That counts as filling in, not as correcting."""
+    funds = [_fund("VXUS", _line("IOTA KK", _ISIN_5, lei="N/A"))]
+    load_holdings(database, funds)
+
+    result = load_holdings(database, funds, [_decision(_ISIN_5, _KAPPA_LEI)])
+
+    assert _companies(database) == (Company(1, "IOTA KK", _KAPPA_LEI),)
+    assert (result.leis_filled, result.leis_corrected) == (1, 0)
+
+
+def test_a_decided_new_security_joins_the_company_that_has_the_identifier(
+    database: Database,
+) -> None:
+    """The decision replaces the filed identifier before the company is looked for."""
+    result = load_holdings(
+        database,
+        [
+            _fund(
+                "VXUS",
+                _line("DELTA PLC", _ISIN_3, lei=_DELTA_LEI),
+                _line("Delta Holdings", _ISIN_4, lei=_THETA_LEI),
+            )
+        ],
+        [_decision(_ISIN_4, _DELTA_LEI)],
+    )
+
+    assert _companies(database) == (Company(1, "DELTA PLC", _DELTA_LEI),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3), Instrument(2, 1, _ISIN_4))
+    assert result.joined_by_lei == 1
+
+
+def test_a_sibling_security_with_the_old_identifier_is_reported_in_the_same_run(
+    database: Database,
+) -> None:
+    """Decisions come first, so the sibling is compared with the corrected identifier."""
+    funds = [
+        _fund(
+            "VXUS",
+            # The sibling comes before the decided security, as the B share of
+            # Guangdong Electric Power does in the real filing.
+            _line("THETA AG", _ISIN_1, lei=_THETA_LEI, title="THETA AG-B"),
+            _line("THETA AG", _ISIN_5, lei=_THETA_LEI, title="THETA AG-A"),
+        ),
+        _fund("DFAX", _line("Theta AG", _ISIN_5, lei=_ALPHA_LEI)),
+    ]
+    load_holdings(database, funds)
+    decisions = [_decision(_ISIN_5, _ALPHA_LEI)]
+
+    first = load_holdings(database, funds, decisions)
+    second = load_holdings(database, funds, decisions)
+
+    assert _companies(database) == (Company(1, "THETA AG", _ALPHA_LEI),)
+    (case,) = first.agent_cases
+    assert (case.fund, case.line.number, case.line.isin) == ("VXUS", 1, _ISIN_1)
+    assert case.reason is AgentCaseReason.DIFFERENT_LEI
+    assert second.agent_cases == first.agent_cases
+
+
+def test_deciding_the_sibling_too_closes_the_case(database: Database) -> None:
+    """ADR 0010: decide every security of the company that carries the wrong identifier."""
+    funds = [
+        _fund(
+            "VXUS",
+            _line("THETA AG", _ISIN_1, lei=_THETA_LEI, title="THETA AG-B"),
+            _line("THETA AG", _ISIN_5, lei=_THETA_LEI, title="THETA AG-A"),
+        ),
+        _fund("DFAX", _line("Theta AG", _ISIN_5, lei=_ALPHA_LEI)),
+    ]
+    load_holdings(database, funds)
+
+    result = load_holdings(
+        database, funds, [_decision(_ISIN_5, _ALPHA_LEI), _decision(_ISIN_1, _ALPHA_LEI)]
+    )
+
+    assert _companies(database) == (Company(1, "THETA AG", _ALPHA_LEI),)
+    assert result.agent_cases == ()
+    assert (result.decisions_used, result.leis_corrected) == (2, 1)
+
+
+def test_a_database_corrected_in_place_equals_one_built_from_scratch(
+    database: Database, tmp_path: Path
+) -> None:
+    """The decisions are an input of the load, so both ways give the same rows."""
+    funds = [
+        _fund(
+            "VXUS",
+            _line("DELTA PLC", _ISIN_3, lei=_DELTA_LEI),
+            _line("THETA AG", _ISIN_1, lei=_THETA_LEI, title="THETA AG-B"),
+            _line("THETA AG", _ISIN_5, lei=_THETA_LEI, title="THETA AG-A"),
+            _line("IOTA KK", _ISIN_4),
+        ),
+        _fund(
+            "DFAX",
+            _line("Theta AG", _ISIN_5, lei=_ALPHA_LEI),
+            _line("Iota KK", _ISIN_4, lei=_DELTA_LEI),
+        ),
+    ]
+    decisions = [
+        _decision(_ISIN_5, _ALPHA_LEI),
+        _decision(_ISIN_1, _ALPHA_LEI),
+        _decision(_ISIN_4, _KAPPA_LEI),
+    ]
+    # Corrected in place: loaded without decisions first, as the real database was.
+    load_holdings(database, funds)
+    corrected = load_holdings(database, funds, decisions)
+    # Built from scratch: a second database that sees the decisions from the start.
+    scratch_path = tmp_path / "scratch.db"
+    migrate(scratch_path)
+    scratch = Database(scratch_path)
+    built = load_holdings(scratch, funds, decisions)
+
+    assert _companies(database) == _companies(scratch)
+    assert _instruments(database) == _instruments(scratch)
+    assert _companies(database) == (
+        Company(1, "DELTA PLC", _DELTA_LEI),
+        Company(2, "THETA AG", _ALPHA_LEI),
+        Company(3, "IOTA KK", _KAPPA_LEI),
+    )
+    assert corrected.agent_cases == built.agent_cases == ()
+
+
+def test_a_decided_identifier_that_another_company_has_is_not_taken(database: Database) -> None:
+    """Two rows would become one company; merging rows is not the load's to do."""
+    funds = [
+        _fund(
+            "VXUS",
+            _line("DELTA PLC", _ISIN_3, lei=_DELTA_LEI),
+            _line("THETA AG", _ISIN_5, lei=_THETA_LEI),
+        )
+    ]
+    load_holdings(database, funds)
+    decisions = [_decision(_ISIN_5, _DELTA_LEI)]
+
+    first = load_holdings(database, funds, decisions)
+    second = load_holdings(database, funds, decisions)
+
+    assert _companies(database) == (
+        Company(1, "DELTA PLC", _DELTA_LEI),
+        Company(2, "THETA AG", _THETA_LEI),
+    )
+    (case,) = first.agent_cases
+    assert case.reason is AgentCaseReason.DIFFERENT_LEI
+    assert case.company == Company(2, "THETA AG", _THETA_LEI)
+    assert case.lei_owner == Company(1, "DELTA PLC", _DELTA_LEI)
+    assert first.leis_corrected == 0
+    assert second.agent_cases == first.agent_cases
+
+
+def test_a_decided_identifier_another_company_has_is_not_filled_in_either(
+    database: Database,
+) -> None:
+    """The same refusal for a company that has no identifier yet."""
+    funds = [
+        _fund(
+            "VXUS",
+            _line("DELTA PLC", _ISIN_3, lei=_DELTA_LEI),
+            _line("IOTA KK", _ISIN_5),
+        )
+    ]
+    load_holdings(database, funds)
+
+    result = load_holdings(database, funds, [_decision(_ISIN_5, _DELTA_LEI)])
+
+    assert _companies(database)[1] == Company(2, "IOTA KK", None)
+    (case,) = result.agent_cases
+    assert case.reason is AgentCaseReason.LEI_BELONGS_TO_ANOTHER_COMPANY
+    assert case.lei_owner == Company(1, "DELTA PLC", _DELTA_LEI)
+
+
+def test_decisions_that_contradict_each_other_apply_the_first_and_report_the_second(
+    database: Database,
+) -> None:
+    """Two issuers for the securities of one company row: the row is not split."""
+    funds = [
+        _fund(
+            "VXUS",
+            _line("THETA AG", _ISIN_1, lei=_THETA_LEI),
+            _line("THETA AG", _ISIN_5, lei=_THETA_LEI),
+        )
+    ]
+    load_holdings(database, funds)
+    decisions = [_decision(_ISIN_1, _ALPHA_LEI), _decision(_ISIN_5, _KAPPA_LEI)]
+
+    first = load_holdings(database, funds, decisions)
+    second = load_holdings(database, funds, decisions)
+
+    assert _companies(database) == (Company(1, "THETA AG", _ALPHA_LEI),)
+    (case,) = first.agent_cases
+    assert (case.line.isin, case.reason) == (_ISIN_5, AgentCaseReason.DIFFERENT_LEI)
+    assert first.leis_corrected == 1
+    assert second.leis_corrected == 0
+    assert second.agent_cases == first.agent_cases
+
+
+def test_after_a_correction_the_old_identifier_starts_a_company_of_its_own(
+    database: Database,
+) -> None:
+    """ADR 0010: a line that still files the old identifier for a new security is not joined."""
+    load_holdings(database, _disputed_funds())
+    funds = [
+        *_disputed_funds(),
+        _fund("VTI", _line("Theta Old Co", _ISIN_1, lei=_THETA_LEI)),
+    ]
+
+    load_holdings(database, funds, [_decision(_ISIN_5, _ALPHA_LEI)])
+
+    assert _companies(database) == (
+        Company(1, "THETA AG", _ALPHA_LEI),
+        Company(2, "Theta Old Co", _THETA_LEI),
+    )
+
+
+def test_the_receipt_rule_uses_the_decided_identifier(database: Database) -> None:
+    """A receipt filed with a wrong identifier is still recognised as its company's."""
+    funds = [
+        _fund(
+            "VXUS",
+            _line("ZETA LTD", _ISIN_3, lei=_ALPHA_LEI),
+            _line("ZETA DEPOSITARY CO", _RECEIPT_ISIN, lei=_THETA_LEI, title="ZETA ADR"),
+        )
+    ]
+
+    result = load_holdings(database, funds, [_decision(_RECEIPT_ISIN, _ALPHA_LEI)])
+
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3),)
+    assert _not_loaded(result) == [("VXUS", 2, NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED)]
+
+
+def test_a_decision_for_a_security_no_fund_holds_changes_nothing(database: Database) -> None:
+    """A fund may drop a security; its decision stays in the file and is simply unused."""
+    result = load_holdings(database, _disputed_funds(), [_decision(_ISIN_1, _KAPPA_LEI)])
+
+    assert _companies(database) == (Company(1, "THETA AG", _THETA_LEI),)
+    assert result.decisions_used == 0
+    assert len(result.agent_cases) == 1
+
+
+def test_a_decision_does_not_make_a_line_loadable(database: Database) -> None:
+    """Debt stays out whatever is decided about its issuer."""
+    result = load_holdings(
+        database,
+        [_fund("VXUS", _line("SAMPLE TREASURY", _ISIN_1, category="DBT"))],
+        [_decision(_ISIN_1, _KAPPA_LEI)],
+    )
+
+    assert _companies(database) == ()
+    assert result.decisions_used == 0
+
+
+def test_two_decisions_for_one_security_are_refused(database: Database) -> None:
+    """A security has one issuer; the load does not pick between two answers."""
+    decisions = [_decision(_ISIN_5, _ALPHA_LEI), _decision(_ISIN_5, _KAPPA_LEI)]
+
+    with pytest.raises(UniverseError, match="two decisions are about the same ISIN"):
+        load_holdings(database, _disputed_funds(), decisions)
+
+    assert _companies(database) == ()
 
 
 # --- Comparing names ---------------------------------------------------------------------
