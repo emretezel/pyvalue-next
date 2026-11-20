@@ -17,6 +17,11 @@ license = "Apache-2.0"
 license-files = ["LICENSE"]
 # No runtime dependencies yet: the package is a skeleton until the architecture
 # is agreed (see CLAUDE.md). Add each one here when its first import lands.
+#
+# Everything declared here and in the extras below is a compatibility range,
+# not a pin. The exact versions the project is tested with, transitive
+# dependencies included, live in uv.lock. After changing a requirement, run
+# `uv lock` and commit the regenerated lock in the same change.
 dependencies = []
 
 [project.optional-dependencies]

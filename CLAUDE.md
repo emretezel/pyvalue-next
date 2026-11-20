@@ -103,9 +103,12 @@ The package is a skeleton until the architecture is agreed. Update this list in 
 
 ## Build, Test, and Development Commands
 - Use the `pyvalue-next` conda environment (Python 3.14) for all project commands. Never install this package into the legacy project's `pyvalue` environment.
-- `conda run -n pyvalue-next python -m pip install -e ".[dev]"`: install the editable package with its development tools (Python >=3.14).
+- `conda run -n pyvalue-next sh -c 'UV_PROJECT_ENVIRONMENT="$CONDA_PREFIX" uv sync --locked --extra dev'`: install the editable package and its development tools at the exact versions in `uv.lock` (Python >=3.14). `UV_PROJECT_ENVIRONMENT` points uv at the conda environment; without it uv creates its own `.venv`. The sync is exact: it also removes packages that are not in the lock, and it fails if `uv.lock` is out of date with `pyproject.toml`.
 - `conda run -n pyvalue-next pytest`: run the test suite.
-- **Packaging is a first-class concern.** `pyproject.toml` must always be sufficient on its own to: (a) build a distributable package, (b) carry the project version, (c) install pyvalue for end users (`pip install .`), and (d) install it in development mode for contributors (`pip install -e .[dev]`). Do not introduce setup steps that live outside the project metadata file.
+- **Dependency versions are locked.** `pyproject.toml` declares the version ranges pyvalue is compatible with; `uv.lock` records the exact version and hashes of every direct and transitive dependency the project is tested with. Never pin with `==` in `pyproject.toml`, and never edit `uv.lock` by hand.
+  - After changing any dependency in `pyproject.toml`, run `conda run -n pyvalue-next uv lock` and commit `uv.lock` in the same change.
+  - `conda run -n pyvalue-next uv lock --upgrade` (or `--upgrade-package <name>`) moves to newer versions. An upgrade is a deliberate change with its own commit: re-run the install command above, then the full quality gate, before committing.
+- **Packaging is a first-class concern.** `pyproject.toml` must always be sufficient on its own to: (a) build a distributable package, (b) carry the project version, (c) install pyvalue for end users (`pip install .`), and (d) install it in development mode for contributors (`pip install -e .[dev]`). Do not introduce setup steps that live outside the project metadata file. `uv.lock` is derived from `pyproject.toml` and adds reproducibility on top of it; a plain `pip install` must keep working without the lock.
 
 ## Coding Style & Naming Conventions
 
@@ -146,7 +149,7 @@ Pyvalue computes numerical metrics over a screened universe; the same discipline
 
 ## Quality Gate
 
-Every commit must pass all four quality-gate tools with **zero errors** before being pushed, opening a PR, or marking work done. Run them in the `pyvalue-next` conda env:
+Every commit must pass all five quality-gate checks with **zero errors** before being pushed, opening a PR, or marking work done. Run them in the `pyvalue-next` conda env:
 
 | Tool | Command |
 |---|---|
@@ -154,6 +157,7 @@ Every commit must pass all four quality-gate tools with **zero errors** before b
 | Lint | `conda run -n pyvalue-next ruff check .` |
 | Type check | `conda run -n pyvalue-next mypy src/ tests/` |
 | Tests | `conda run -n pyvalue-next pytest` |
+| Lock | `conda run -n pyvalue-next uv lock --check` |
 
 ### Universal rule
 The whole codebase must be clean — "the file I touched is clean" is not enough. Pre-existing errors are not an excuse to introduce new ones; if you find them, fix them.
@@ -166,6 +170,9 @@ The whole codebase must be clean — "the file I touched is clean" is not enough
 - All code must pass `ruff format` and `ruff check` with no suppressions, except where a suppression has an explicit, documented reason in the surrounding comment.
 - Import order is enforced by ruff — do not reorder manually.
 - The lint rule set is pinned in `pyproject.toml`. Widening or narrowing it is a deliberate decision, not a side effect of a tool upgrade.
+
+### Lock
+- `uv lock --check` fails when `uv.lock` no longer matches the requirements in `pyproject.toml`. Fix it by running `conda run -n pyvalue-next uv lock` and committing the regenerated lock with the change that caused it.
 
 ## Commit & Pull Request Guidelines
 - Commit messages are concise, imperative, and often scoped (e.g., `universe: add holdings import`, `docs: add ADR 0001`). Keep subjects short and omit trailing periods.
@@ -183,4 +190,4 @@ The whole codebase must be clean — "the file I touched is clean" is not enough
 ## Configuration & Data Notes
 - Store credentials in `private/config.toml` (for example `[eodhd].api_key`); never commit secrets.
 - `data/` holds local artifacts (the database, vendor payloads, logs, screen outputs) and is never committed.
-- If you import a new third-party package, add it to `pyproject.toml` under `[project].dependencies`.
+- If you import a new third-party package, add it to `pyproject.toml` under `[project].dependencies` and re-lock with `uv lock` in the same commit.

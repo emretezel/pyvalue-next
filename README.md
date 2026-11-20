@@ -10,10 +10,12 @@ This project is provided for educational and informational purposes only and doe
 
 ## Installation
 
-Requires Python 3.14 or newer. The original pyvalue installs a package with the same name, so give this project its own environment.
+Requires Python 3.14 or newer and [uv](https://docs.astral.sh/uv/). The original pyvalue installs a package with the same name, so give this project its own environment.
 
 ```bash
 conda create -n pyvalue-next python=3.14
 conda activate pyvalue-next
-python -m pip install -e ".[dev]"
+UV_PROJECT_ENVIRONMENT="$CONDA_PREFIX" uv sync --locked --extra dev
 ```
+
+This installs the exact dependency versions recorded in `uv.lock`. `python -m pip install -e ".[dev]"` also works without uv, but it resolves the newest versions the ranges in `pyproject.toml` allow.
