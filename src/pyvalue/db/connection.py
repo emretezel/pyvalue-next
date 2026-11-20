@@ -4,20 +4,21 @@ Every connection pyvalue uses is opened here, so the two properties the schema
 relies on are set in one place: foreign keys are enforced, and transactions are
 explicit.
 
+Only the migration run and the unit of work call ``connect``. No other package
+ever holds a connection (ADR 0008).
+
 Author: Emre Tezel
 """
 
 import sqlite3
 from pathlib import Path
 
+from pyvalue.db.errors import DatabaseError
+
 # Relative on purpose: the database belongs to the folder pyvalue is run from
 # (the repository checkout), and `data/` is never committed. A command that
 # needs another file takes an explicit path.
 DEFAULT_DATABASE_PATH: Path = Path("data") / "pyvalue.db"
-
-
-class DatabaseError(Exception):
-    """The database could not be opened or used as pyvalue requires."""
 
 
 def connect(path: Path) -> sqlite3.Connection:

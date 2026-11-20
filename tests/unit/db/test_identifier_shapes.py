@@ -18,7 +18,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from pyvalue.db import connect, migrate
+from pyvalue.db import migrate
+from pyvalue.db.connection import connect
 
 # The documented shapes, written independently of the SQL.
 _MIC: re.Pattern[str] = re.compile(r"[A-Z0-9]{4}")

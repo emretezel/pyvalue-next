@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from pyvalue.db import DEFAULT_DATABASE_PATH, DatabaseError, connect
+from pyvalue.db import DEFAULT_DATABASE_PATH, DatabaseError
+from pyvalue.db.connection import connect
 
 
 def test_default_path_is_relative_to_the_working_folder() -> None:

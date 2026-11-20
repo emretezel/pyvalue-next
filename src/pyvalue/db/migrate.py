@@ -17,7 +17,8 @@ from datetime import UTC, datetime
 from importlib import resources
 from pathlib import Path
 
-from pyvalue.db.connection import DatabaseError, connect
+from pyvalue.db.connection import connect
+from pyvalue.db.errors import DatabaseError
 
 # The one piece of schema that is not in a migration file: it has to exist
 # before migration 1 can be recorded. Keep it identical to the appendix of
@@ -198,6 +199,14 @@ def _recorded(connection: sqlite3.Connection) -> list[tuple[int, str, str]]:
     return [(int(version), str(name), str(checksum)) for version, name, checksum in rows]
 
 
+def _has_history(connection: sqlite3.Connection) -> bool:
+    """Say whether the database has the migration history table."""
+    row = connection.execute(
+        "SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'schema_migration'"
+    ).fetchone()
+    return row is not None
+
+
 def _refuse_foreign_database(connection: sqlite3.Connection, path: Path) -> None:
     """Refuse a database that has content but no migration history.
 
@@ -205,10 +214,7 @@ def _refuse_foreign_database(connection: sqlite3.Connection, path: Path) -> None
     database reached through a mistyped path. Creating the history table in it
     would already be a change to somebody else's data.
     """
-    has_history = connection.execute(
-        "SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'schema_migration'"
-    ).fetchone()
-    if has_history is not None:
+    if _has_history(connection):
         return
     has_content = connection.execute("SELECT 1 FROM sqlite_schema LIMIT 1").fetchone()
     if has_content is not None:
@@ -344,3 +350,32 @@ def migrate(path: Path, migrations: Sequence[Migration] | None = None) -> Migrat
         raise MigrationError(f"cannot migrate {path}: {error}") from error
     finally:
         connection.close()
+
+
+def require_current_schema(connection: sqlite3.Connection, path: Path) -> None:
+    """Refuse a database that is not at the schema version this pyvalue needs.
+
+    The unit of work calls this before it hands out repositories: their SQL is
+    written for the latest schema, so on an older database it would fail in the
+    middle of a component's work, or worse, half succeed.
+
+    Args:
+        connection: An open connection to the database.
+        path: Where the database is, for the message.
+
+    Raises:
+        MigrationError: If the database is newer than this copy of pyvalue, or
+            one of its applied migrations no longer matches its file.
+        DatabaseError: If the database is behind, or was never migrated.
+    """
+    known = packaged_migrations()
+    try:
+        recorded = _recorded(connection) if _has_history(connection) else []
+    except sqlite3.Error as error:
+        raise DatabaseError(f"cannot read the schema version of {path}: {error}") from error
+    _verify_history(recorded, known)
+    if len(recorded) < len(known):
+        raise DatabaseError(
+            f"{path} is at schema version {len(recorded)}, but this pyvalue needs version "
+            f"{len(known)}; run `pyvalue db migrate`"
+        )

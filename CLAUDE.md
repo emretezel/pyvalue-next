@@ -81,14 +81,20 @@ All reading and writing of the database goes through the `pyvalue.db` package. T
 - **Schema statements belong to migrations.** No repository creates, alters or drops anything.
 - **Tests use the same door.** A test of a component works through a unit of work on a temporary migrated database. Only the tests of `pyvalue.db` itself use `sqlite3` directly.
 
-What a component looks like under this rule (an illustration; the class and method names are settled when the first repository is written):
+- **One door.** Other packages import from `pyvalue.db` itself, never from a module inside it. They get `Database`, the records and the errors; `connect` is not exported. A test enforces it.
+- **Only methods that are called.** A repository gets a method, with its test, when a component first needs it. Do not add `find_by_...` methods in advance.
+
+What a component looks like under this rule:
 
 ```python
+database = Database(path)
 with database.unit_of_work() as work:
-    company = work.companies.find_by_lei(lei) or work.companies.add(name=name, lei=lei)
+    company = work.companies.add(name=name, lei=lei)
     work.instruments.add(company_id=company.company_id, isin=isin)
 # Both rows are committed here, or neither is.
 ```
+
+`unit_of_work()` refuses a missing database and one that is not at the latest schema version. One module per table holds the record and its repository (`db/company.py`: `Company`, `CompanyRepository`), and the `Repository` base class turns every `sqlite3` error into a `pyvalue.db` one.
 
 When adding or changing database access, flag — and correct — any of these:
 - SQL, a connection or a `sqlite3` import outside `pyvalue.db`
@@ -127,9 +133,12 @@ When proposing schema changes, always include:
 Update this list in the same commit as any structural change. `docs/architecture.md` describes the components and the rules between them.
 
 - `src/pyvalue/`: the package.
-  - `db/`: the database. Connections, the migration run, and the migration files under `db/migrations/`. The only package that imports `sqlite3` or contains SQL; its repository classes and unit of work are the only way in (see **Database Access**).
+  - `db/`: the database. `Database` and the unit of work, one module per table with its record and repository, connections, the migration run, and the migration files under `db/migrations/`. The only package that imports `sqlite3` or contains SQL; its repository classes and unit of work are the only way in (see **Database Access**).
+  - `universe/`: the universe load. Downloads the three pinned SEC holdings filings, reads them, and fills `company` and `instrument` by the rules of ADR 0006 and ADR 0009.
   - `cli/`: the `pyvalue` command. Thin commands that call the components.
-- `tests/`: pytest suite, mirroring the source tree under `tests/unit/`, `tests/regression/`, and `tests/integration/`. Shared fixtures are in `tests/conftest.py`.
+  - `config.py`: reads `private/config.toml`. Never puts a value from that file into a message.
+  - `errors.py`: `PyvalueError`, the base of every error a person can fix. The command line prints such an error as one line.
+- `tests/`: pytest suite, mirroring the source tree under `tests/unit/`, `tests/regression/`, and `tests/integration/`. Shared fixtures are in `tests/conftest.py`; checked-in sample data is under `tests/fixtures/`.
 - `docs/`: substantive documentation (see the **Documentation** section); `docs/architecture.md` is the design, `docs/adr/` holds the architecture decision records, and `docs/database/` has one file per table.
 - `data/`: local artifacts such as the database (gitignored).
 - `private/`: local config and API keys (`private/config.toml`, gitignored).
@@ -139,6 +148,7 @@ Update this list in the same commit as any structural change. `docs/architecture
 - `conda run -n pyvalue-next sh -c 'UV_PROJECT_ENVIRONMENT="$CONDA_PREFIX" uv sync --locked --extra dev'`: install the editable package and its development tools at the exact versions in `uv.lock` (Python >=3.14). `UV_PROJECT_ENVIRONMENT` points uv at the conda environment; without it uv creates its own `.venv`. The sync is exact: it also removes packages that are not in the lock, and it fails if `uv.lock` is out of date with `pyproject.toml`.
 - `conda run -n pyvalue-next pytest`: run the test suite.
 - `conda run -n pyvalue-next pyvalue db migrate`: create `data/pyvalue.db`, or bring it up to the latest schema. Re-run the install command above first if the `pyvalue` command is missing.
+- `conda run -n pyvalue-next pyvalue universe load`: fill `company` and `instrument` from the three pinned SEC filings. The first run downloads them into `data/sec/` and needs the `[sec] user_agent` line in `private/config.toml`; later runs need neither. Running it again adds nothing. The filings are pinned in `src/pyvalue/universe/filings.py`.
 - **Dependency versions are locked.** `pyproject.toml` declares the version ranges pyvalue is compatible with; `uv.lock` records the exact version and hashes of every direct and transitive dependency the project is tested with. Never pin with `==` in `pyproject.toml`, and never edit `uv.lock` by hand.
   - After changing any dependency in `pyproject.toml`, run `conda run -n pyvalue-next uv lock` and commit `uv.lock` in the same change.
   - `conda run -n pyvalue-next uv lock --upgrade` (or `--upgrade-package <name>`) moves to newer versions. An upgrade is a deliberate change with its own commit: re-run the install command above, then the full quality gate, before committing.
@@ -223,5 +233,6 @@ The whole codebase must be clean — "the file I touched is clean" is not enough
 
 ## Configuration & Data Notes
 - Store credentials in `private/config.toml` (for example `[eodhd].api_key`); never commit secrets.
-- `data/` holds local artifacts (the database, vendor payloads, logs, screen outputs) and is never committed.
+- The SEC contact string is `[sec].user_agent` in the same file. It names a person: send it only as the `User-Agent` header to `www.sec.gov`, and never print it, log it or put it in an error message.
+- `data/` holds local artifacts (the database, the downloaded filings under `data/sec/`, the load output under `data/universe/`, vendor payloads, logs, screen outputs) and is never committed.
 - If you import a new third-party package, add it to `pyproject.toml` under `[project].dependencies` and re-lock with `uv lock` in the same commit.

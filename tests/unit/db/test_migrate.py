@@ -12,13 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from pyvalue.db import (
-    MigrationError,
-    connect,
-    load_migrations,
-    migrate,
-    packaged_migrations,
-)
+from pyvalue.db import MigrationError, load_migrations, migrate, packaged_migrations
+from pyvalue.db.connection import connect
 
 # A parent table and a child that references it, with one valid row each.
 _PARENT_AND_CHILD: str = """

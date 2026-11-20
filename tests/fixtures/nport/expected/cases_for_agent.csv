@@ -1,0 +1,3 @@
+fund,line,reason,isin,issuer_name,line_lei,company_id,company_name,company_lei,lei_owner_company_id,lei_owner_company_name
+DFAX,4,different_lei,DE00000T0019,Theta AG,549300THET2000000069,6,THETA AG,549300THETA000000051,,
+DFAX,5,lei_belongs_to_another_company,JP300000I006,Iota KK,549300DELTA000000010,7,IOTA KK,,3,DELTA PLC

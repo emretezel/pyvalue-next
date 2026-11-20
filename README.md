@@ -2,7 +2,7 @@
 
 A value-investing toolkit with a curated global stock universe, data-quality checks on fundamentals, and quality-at-a-reasonable-price screening.
 
-> **Status: under construction.** This repository (`pyvalue-next`) is the ground-up successor to the original pyvalue (0.1.0). So far it can create its database; the stock universe comes next. It takes over the `pyvalue` name once its first phase is complete.
+> **Status: under construction.** This repository (`pyvalue-next`) is the ground-up successor to the original pyvalue (0.1.0). So far it can create its database and load the companies and securities of its stock universe; exchange listings come next. It takes over the `pyvalue` name once its first phase is complete.
 
 ## Disclaimer
 
@@ -29,5 +29,20 @@ pyvalue db migrate
 ```
 
 The database is `data/pyvalue.db` in the folder you run the command from. `--db PATH` points it elsewhere. Running the command again is harmless: it applies only what is missing.
+
+Fill the stock universe with the companies and securities held by three broad index funds (VTI, VXUS and DFAX):
+
+```bash
+pyvalue universe load
+```
+
+The first run downloads the funds' holdings filings from the SEC into `data/sec/`. The SEC asks automated clients to identify themselves, so put your contact details into `private/config.toml` first:
+
+```toml
+[sec]
+user_agent = "Your Name your@email.address"
+```
+
+The command lists what it did not load in `data/universe/`. Running it again adds nothing.
 
 The design is described in [`docs/architecture.md`](docs/architecture.md), the tables in [`docs/database/`](docs/database/README.md), and the decisions behind both in [`docs/adr/`](docs/adr/).

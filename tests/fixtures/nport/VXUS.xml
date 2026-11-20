@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A made-up sample in the shape of an SEC N-PORT filing. The series id and
+     the holdings date are those of the pinned filing; every company, identifier
+     and amount is made up. See tests/fixtures/nport/README.md. -->
+<edgarSubmission xmlns="http://www.sec.gov/edgar/nport" xmlns:com="http://www.sec.gov/edgar/common">
+  <headerData>
+    <submissionType>NPORT-P</submissionType>
+  </headerData>
+  <formData>
+    <genInfo>
+      <regName>SAMPLE STAR FUNDS</regName>
+      <seriesName>SAMPLE TOTAL INTERNATIONAL STOCK FUND</seriesName>
+      <seriesId>S000002932</seriesId>
+      <repPdDate>2026-07-31</repPdDate>
+    </genInfo>
+    <fundInfo>
+      <netAssets>1000000.00</netAssets>
+    </fundInfo>
+    <invstOrSecs>
+      <invstOrSec>
+        <name>DELTA PLC</name>
+        <lei>549300DELTA000000010</lei>
+        <title>DELTA PLC</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="GB00000D0016"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <currencyConditional curCd="GBP" exchangeRt="1.25000000"/>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>EPSILON SA</name>
+        <lei>N/A</lei>
+        <title>EPSILON SA</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="FR00000E0013"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <currencyConditional curCd="EUR" exchangeRt="1.25000000"/>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>ZETA LTD</name>
+        <lei>549300ZETA0000000008</lei>
+        <title>ZETA LTD ADR</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="US00000Z0015"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>ZETA LTD</name>
+        <lei>549300ZETA0000000008</lei>
+        <title>ZETA LTD</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="KYG0000Z0015"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <currencyConditional curCd="HKD" exchangeRt="1.25000000"/>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>ETA HOLDINGS LTD</name>
+        <lei>N/A</lei>
+        <title>ETA HOLDINGS LTD SPONSORED ADR</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="US00000H0017"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>SAMPLE TREASURY</name>
+        <lei>N/A</lei>
+        <title>TREASURY BILL</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="US00000T0013"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>DBT</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>SAMPLE BANK NA</name>
+        <lei>N/A</lei>
+        <title>FX FORWARD USD/EUR</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <other otherDesc="Internal" value="FWD-1"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>DFE</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>THETA AG</name>
+        <lei>549300THETA000000051</lei>
+        <title>THETA AG</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="DE00000T0019"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <currencyConditional curCd="EUR" exchangeRt="1.25000000"/>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>IOTA KK</name>
+        <lei>N/A</lei>
+        <title>IOTA KK</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="JP300000I006"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <currencyConditional curCd="JPY" exchangeRt="1.25000000"/>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>LAMBDA BHD</name>
+        <lei>N/A</lei>
+        <title>LAMBDA BHD</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="MYL0000L0012"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <currencyConditional curCd="MYR" exchangeRt="1.25000000"/>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+    </invstOrSecs>
+  </formData>
+</edgarSubmission>

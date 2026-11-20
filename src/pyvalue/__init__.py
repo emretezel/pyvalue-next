@@ -1,8 +1,8 @@
 """pyvalue: a value-investing toolkit.
 
 The package will provide a curated global stock universe, data-quality checks
-on fundamental data, and quality-at-a-reasonable-price screening. It is a
-skeleton until the architecture is agreed (see ``CLAUDE.md``), so this module
+on fundamental data, and quality-at-a-reasonable-price screening. The
+components built so far are described in ``docs/architecture.md``. This module
 exposes only the package version.
 
 Author: Emre Tezel

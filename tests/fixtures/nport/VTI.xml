@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A made-up sample in the shape of an SEC N-PORT filing. The series id and
+     the holdings date are those of the pinned filing; every company, identifier
+     and amount is made up. See tests/fixtures/nport/README.md. -->
+<edgarSubmission xmlns="http://www.sec.gov/edgar/nport" xmlns:com="http://www.sec.gov/edgar/common">
+  <headerData>
+    <submissionType>NPORT-P</submissionType>
+  </headerData>
+  <formData>
+    <genInfo>
+      <regName>SAMPLE US FUNDS</regName>
+      <seriesName>SAMPLE TOTAL US STOCK FUND</seriesName>
+      <seriesId>S000002848</seriesId>
+      <repPdDate>2026-06-30</repPdDate>
+    </genInfo>
+    <fundInfo>
+      <netAssets>1000000.00</netAssets>
+    </fundInfo>
+    <invstOrSecs>
+      <invstOrSec>
+        <name>ALPHA CORP</name>
+        <lei>549300ALPHA000000003</lei>
+        <title>ALPHA CORP</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="US00000A0014"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>ALPHA CORP</name>
+        <lei>549300ALPHA000000003</lei>
+        <title>ALPHA CORP PFD SER A</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="US00000A0022"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EP</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>BETA INC</name>
+        <lei>N/A</lei>
+        <title>BETA INC</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="US00000B0013"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>Beta  Inc</name>
+        <lei>N/A</lei>
+        <title>BETA INC CL B</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <isin value="US00000B0021"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>GAMMA THERAPEUTICS INC</name>
+        <lei>N/A</lei>
+        <title>GAMMA THERAPEUTICS INC CVR</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <other otherDesc="Internal" value="GAMMA-CVR"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>EC</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>CHICAGO MERCANTILE EXCHANGE</name>
+        <lei>N/A</lei>
+        <title>E-MINI S&amp;P 500 FUTURE</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <ticker value="ESU6"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>DE</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+      <invstOrSec>
+        <name>SAMPLE CASH MANAGEMENT FUND</name>
+        <lei>N/A</lei>
+        <title>SAMPLE CASH MANAGEMENT FUND</title>
+        <cusip>000000000</cusip>
+        <identifiers>
+          <other otherDesc="Internal" value="CASH-1"/>
+        </identifiers>
+        <balance>1000.00000000</balance>
+        <units>NS</units>
+        <curCd>USD</curCd>
+        <valUSD>25000.00</valUSD>
+        <pctVal>0.010000000000</pctVal>
+        <payoffProfile>Long</payoffProfile>
+        <assetCat>STIV</assetCat>
+        <issuerCat>CORP</issuerCat>
+        <invCountry>US</invCountry>
+      </invstOrSec>
+    </invstOrSecs>
+  </formData>
+</edgarSubmission>

@@ -1,6 +1,6 @@
 # ADR 0006: Holdings are loaded straight into `company` and `instrument`
 
-- Status: Accepted
+- Status: Accepted. Two points left open here, where the load output goes and punctuation in name comparison, are settled by ADR 0009.
 - Date: 2026-11-20
 
 ## Decision
