@@ -34,7 +34,6 @@ The original pyvalue is kept as a read-only reference, checked out beside this r
 ### Workflow
 - Enter plan mode for any non-trivial task. Use plan mode for verification and review work, not only for building.
 - Don't create feature branches. Always work on `main` unless the user explicitly instructs otherwise.
-- Keep `CLAUDE.md` and `AGENTS.md` byte-identical. Whenever you update one, update the other in the same change.
 
 ### Design & Elegance
 - **Pick the right pattern up front.** Before implementing, identify the most appropriate design pattern and apply sound object-oriented (or functional, where idiomatic) principles.
