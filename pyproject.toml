@@ -1,0 +1,69 @@
+[build-system]
+# setuptools 77 is the first release that reads the SPDX `license` string and
+# `license-files` used below.
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyvalue"
+# 1.x marks the ground-up successor. The legacy project stays at 0.1.0, so the
+# two can never be confused in a log, a report or `pip list`.
+version = "1.0.0.dev0"
+description = "A value-investing toolkit with a curated global stock universe, data-quality checks on fundamentals, and quality-at-a-reasonable-price screening."
+readme = "README.md"
+requires-python = ">=3.14"
+authors = [{ name = "Emre Tezel" }]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+# No runtime dependencies yet: the package is a skeleton until the architecture
+# is agreed (see CLAUDE.md). Add each one here when its first import lands.
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.0",
+    "ruff>=0.16",
+    "mypy>=1.19",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Ship the PEP 561 marker so type checkers treat pyvalue as a typed package.
+[tool.setuptools.package-data]
+pyvalue = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# --strict-markers: a mistyped marker is an error, not a silently unselected test.
+# --import-mode=importlib: test files need no __init__.py and may share a
+# basename across tests/unit, tests/regression and tests/integration.
+addopts = "-ra --strict-markers --import-mode=importlib"
+markers = [
+    "slow: takes long enough to skip during quick local runs",
+    "integration: exercises the pipeline end to end on the checked-in fixture dataset",
+    "regression: pins a fixed bug; fails on the buggy code and passes on the fix",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+# The rule set is pinned explicitly so the gate cannot drift with ruff's release
+# defaults (ruff 0.16 widened them to roughly 415 rules, which broke the legacy
+# project's gate without a code change). `I` is what makes "import order is
+# enforced by ruff" true.
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "ANN"]
+
+[tool.mypy]
+python_version = "3.14"
+files = ["src", "tests"]
+strict = true
+ignore_missing_imports = false
+warn_unreachable = true
