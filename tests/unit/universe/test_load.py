@@ -519,6 +519,87 @@ def test_a_receipt_is_not_loaded_when_its_company_is_there_by_name(database: Dat
     assert _not_loaded(result) == [("DFAX", 1, NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED)]
 
 
+def test_a_receipt_is_matched_by_the_name_its_own_fund_files_for_the_share(
+    database: Database,
+) -> None:
+    """ADR 0014: the stored name is the first fund's spelling; the second fund's counts too.
+
+    The case of Woori Financial. Two funds hold the home share and spell the
+    company differently, the second fund files its own spelling on the
+    receipt, and no line carries an identifier. Before ADR 0014 the receipt
+    was loaded as a second company.
+    """
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line("Woori Financial Group Inc", _ISIN_3)),
+            _fund(
+                "DFAX",
+                _line("Woori Financial Group Inc.", _ISIN_3),
+                _line("Woori Financial Group Inc.", _RECEIPT_ISIN, category="OTHER", label="ADR"),
+            ),
+        ],
+    )
+
+    # The stored name is still the first fund's spelling.
+    assert _companies(database) == (Company(1, "Woori Financial Group Inc", None),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3),)
+    assert _not_loaded(result) == [("DFAX", 2, NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED)]
+    assert (result.receipts_kept, result.receipts_not_loaded) == (0, 1)
+
+
+def test_a_fund_s_own_spelling_counts_even_when_it_names_another_legal_form(
+    database: Database,
+) -> None:
+    """ADR 0014, the case of BeOne Medicines: "Ltd" in one fund, "AG" in the other.
+
+    The first fund's line carries the identifier, so the company is found by
+    it; the second fund's lines carry none, and only its name ties the
+    receipt to the share.
+    """
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line("BeOne Medicines Ltd", _ISIN_3, lei=_ALPHA_LEI)),
+            _fund(
+                "DFAX",
+                _line("BeOne Medicines AG", _ISIN_3),
+                _line("BeOne Medicines AG", _RECEIPT_ISIN, category="OTHER", label="ADR"),
+            ),
+        ],
+    )
+
+    assert _companies(database) == (Company(1, "BeOne Medicines Ltd", _ALPHA_LEI),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3),)
+    assert _not_loaded(result) == [("DFAX", 2, NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED)]
+
+
+def test_a_receipt_whose_name_no_ordinary_line_carries_is_still_loaded(
+    database: Database,
+) -> None:
+    """The limit of ADR 0014: a spelling that appears on the receipt only ties it to nothing.
+
+    Punctuation counts when names are compared (ADR 0009), so the full stop
+    alone keeps the two apart when the second fund does not hold the share.
+    """
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line("Woori Financial Group Inc", _ISIN_3)),
+            _fund(
+                "DFAX",
+                _line("Woori Financial Group Inc.", _RECEIPT_ISIN, category="OTHER", label="ADR"),
+            ),
+        ],
+    )
+
+    assert _companies(database) == (
+        Company(1, "Woori Financial Group Inc", None),
+        Company(2, "Woori Financial Group Inc.", None),
+    )
+    assert (result.receipts_kept, result.receipts_not_loaded) == (1, 0)
+
+
 def test_a_receipt_is_loaded_when_its_company_has_no_other_line(database: Database) -> None:
     """Then the receipt is the company, as for a Chinese company listed only in New York."""
     result = load_holdings(

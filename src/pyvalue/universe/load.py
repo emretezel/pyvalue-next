@@ -575,7 +575,8 @@ def load_holdings(
     The steps are those of ADR 0006: lines that are debt, derivatives or
     without a valid ISIN are left out; ordinary securities are loaded in the
     order of the funds; a depositary receipt is loaded only when no ordinary
-    line of this run belongs to a company with its identifier or its name.
+    line of this run belongs to a company with its identifier or its name, or
+    carries its name itself (ADR 0014).
 
     Decisions overrule the filings, on legal-entity identifiers (ADR 0010)
     and on company names (ADR 0012): first the company of every decided
@@ -667,6 +668,12 @@ def load_holdings(
         own_share_names = {
             name_key(placer.company(company_id).name) for company_id in own_share_companies
         }
+        # The stored name is one fund's spelling. Another fund's line for the
+        # same share joined by its ISIN, and its spelling was dropped, yet
+        # that fund files the very same spelling on the company's receipt. So
+        # every name an ordinary line carries counts as a name of its company
+        # (ADR 0014).
+        own_share_names.update(candidate.key for candidate in lines.ordinary)
 
         # Step 5: a receipt stands in for its company only when the company
         # has no line of its own.
