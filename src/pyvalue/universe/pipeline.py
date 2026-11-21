@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pyvalue.db import Database
+from pyvalue.universe.exclusions import Exclusion, packaged_exclusions
 from pyvalue.universe.filings import PINNED_FILINGS, PinnedFiling, read_pinned_filing
 from pyvalue.universe.lei_decisions import LeiDecision, packaged_lei_decisions
 from pyvalue.universe.load import FundHoldings, LoadResult, load_holdings
@@ -47,6 +48,7 @@ def load_universe(
     fetch: Fetch = fetch_from_sec,
     lei_decisions: Sequence[LeiDecision] | None = None,
     name_decisions: Sequence[NameDecision] | None = None,
+    exclusions: Sequence[Exclusion] | None = None,
 ) -> UniverseLoad:
     """Load the pinned filings into the database.
 
@@ -65,6 +67,9 @@ def load_universe(
         name_decisions: The decisions on company names to apply. Defaults
             to the ones shipped with the package (ADR 0012); tests pass
             their own.
+        exclusions: The securities to keep out of the universe. Defaults
+            to the ones shipped with the package (ADR 0013); tests pass
+            their own.
 
     Returns:
         What was downloaded, what the load did and where its output is.
@@ -81,6 +86,8 @@ def load_universe(
         lei_decisions = packaged_lei_decisions()
     if name_decisions is None:
         name_decisions = packaged_name_decisions()
+    if exclusions is None:
+        exclusions = packaged_exclusions()
     downloaded: list[PinnedFiling] = []
     funds: list[FundHoldings] = []
     for pinned in PINNED_FILINGS:
@@ -90,7 +97,7 @@ def load_universe(
             downloaded.append(pinned)
         funds.append(FundHoldings(ticker=pinned.ticker, lines=read_pinned_filing(path, pinned)))
 
-    result = load_holdings(database, funds, lei_decisions, name_decisions)
+    result = load_holdings(database, funds, lei_decisions, name_decisions, exclusions)
     # Written only after the load is saved, so the files never describe a load
     # that was rolled back.
     output = write_output(result, output_dir)

@@ -64,6 +64,7 @@ def _result(
         lei_decisions_used=0,
         name_decisions_used=0,
         companies_renamed=0,
+        exclusions_used=0,
         companies=0,
         instruments=0,
         not_loaded=not_loaded,
@@ -109,6 +110,8 @@ def test_a_line_not_loaded_is_written_as_filed(tmp_path: Path) -> None:
             _line(6, category="OTHER", category_label="GDR"),
             NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED,
         ),
+        # ADR 0013: a security a decision keeps out of the universe.
+        NotLoadedLine("VXUS", _line(7), NotLoadedReason.EXCLUDED_BY_DECISION),
     )
 
     files = write_output(_result(not_loaded=not_loaded), tmp_path)
@@ -116,6 +119,7 @@ def test_a_line_not_loaded_is_written_as_filed(tmp_path: Path) -> None:
     assert files.lines_not_loaded.read_text(encoding="utf-8").splitlines()[1:] == [
         "VTI,5,no_valid_isin,GAMMA INC,GAMMA INC CVR,,N/A,EC,",
         f"DFAX,6,receipt_company_already_loaded,THETA AG,THETA AG,DE00000T0019,{_LEI},OTHER,GDR",
+        f"VXUS,7,excluded_by_decision,THETA AG,THETA AG,DE00000T0019,{_LEI},EC,",
     ]
 
 

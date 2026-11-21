@@ -13,7 +13,14 @@ from pathlib import Path
 import pytest
 
 from pyvalue.db import Database
-from pyvalue.universe import PINNED_FILINGS, FilingError, NameDecision, load_universe
+from pyvalue.universe import (
+    PINNED_FILINGS,
+    Exclusion,
+    FilingError,
+    NameDecision,
+    UniverseError,
+    load_universe,
+)
 
 _CONTACT: str = "Sample Person sample@example.org"
 
@@ -45,7 +52,7 @@ def test_filings_that_are_there_are_used_without_asking_for_anything(
 def test_the_decisions_shipped_with_the_package_are_applied_by_default(
     database: Database, filings_dir: Path, tmp_path: Path
 ) -> None:
-    """ADR 0010 and ADR 0012: a caller that passes no decisions gets the package's own.
+    """ADR 0010, 0012 and 0013: a caller that passes no decisions gets the package's own.
 
     The shipped files are about real securities, so on the sample filings they
     are read and match nothing. A caller's own decisions replace them.
@@ -70,7 +77,67 @@ def test_the_decisions_shipped_with_the_package_are_applied_by_default(
     )
 
     assert (shipped.result.lei_decisions_used, shipped.result.name_decisions_used) == (0, 0)
+    assert shipped.result.exclusions_used == 0
     assert (named.result.name_decisions_used, named.result.companies_renamed) == (1, 1)
+
+
+def test_a_callers_exclusions_keep_a_security_out(
+    database: Database, filings_dir: Path, tmp_path: Path
+) -> None:
+    """ADR 0013: the exclusions reach the load, and an existing database is refused."""
+    exclusions = [
+        Exclusion(
+            isin="US00000H0017",
+            company="Eta Holdings Ltd",
+            decided_on=date(2026, 11, 21),
+            evidence="Made up for a test",
+        )
+    ]
+
+    outcome = load_universe(
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        exclusions=exclusions,
+    )
+
+    assert (outcome.result.exclusions_used, outcome.result.companies) == (1, 13)
+    # The line is reported in the file of lines that were not loaded.
+    assert "VXUS,5,excluded_by_decision," in outcome.output.lines_not_loaded.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_an_exclusion_stops_the_run_on_a_database_that_holds_the_security(
+    database: Database, filings_dir: Path, tmp_path: Path
+) -> None:
+    """Nothing is written, and the output files of the earlier run are left as they were."""
+    first = load_universe(
+        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
+    )
+    before = first.output.lines_not_loaded.read_bytes()
+    exclusions = [
+        Exclusion(
+            isin="US00000H0017",
+            company="Eta Holdings Ltd",
+            decided_on=date(2026, 11, 21),
+            evidence="Made up for a test",
+        )
+    ]
+
+    with pytest.raises(UniverseError, match="has to be rebuilt"):
+        load_universe(
+            database,
+            filings_dir,
+            tmp_path / "universe",
+            _never_asked,
+            _never_fetched,
+            exclusions=exclusions,
+        )
+
+    assert first.output.lines_not_loaded.read_bytes() == before
 
 
 def test_missing_filings_are_downloaded_once_and_kept(

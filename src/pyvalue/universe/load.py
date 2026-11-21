@@ -13,6 +13,11 @@ instead of a company name, a decision gives the name (ADR 0012). In both cases
 the decided value is what a line of that security is read as carrying, and
 what its company is given.
 
+A third kind of decision keeps a security out of the universe altogether
+(ADR 0013): its lines are left out like debt, and reported with their own
+reason. The load never deletes, so it refuses a database that already holds
+such a security.
+
 Author: Emre Tezel
 """
 
@@ -22,6 +27,7 @@ from enum import StrEnum
 
 from pyvalue.db import Company, Database, UnitOfWork
 from pyvalue.universe.errors import UniverseError
+from pyvalue.universe.exclusions import Exclusion
 from pyvalue.universe.identifiers import is_valid_isin, is_valid_lei
 from pyvalue.universe.lei_decisions import LeiDecision
 from pyvalue.universe.name_decisions import NameDecision
@@ -44,6 +50,7 @@ class NotLoadedReason(StrEnum):
     DEBT_OR_DERIVATIVE = "debt_or_derivative"
     NO_VALID_ISIN = "no_valid_isin"
     RECEIPT_COMPANY_ALREADY_LOADED = "receipt_company_already_loaded"
+    EXCLUDED_BY_DECISION = "excluded_by_decision"
 
 
 class AgentCaseReason(StrEnum):
@@ -108,7 +115,7 @@ class LoadResult:
     Attributes:
         lines_read: Lines in all filings, whatever their category.
         securities: Distinct valid ISINs among the lines that are not debt or
-            derivatives.
+            derivatives and not kept out by a decision.
         receipts_recognised: Of those securities, the depositary receipts.
         receipts_kept: Receipts whose company has no other line, so the
             receipt stands for the company and is placed like any security.
@@ -129,6 +136,8 @@ class LoadResult:
         name_decisions_used: Decisions on company names about a security that
             these filings hold.
         companies_renamed: Companies that a decision gave another name.
+        exclusions_used: Securities these filings hold that a decision keeps
+            out of the universe.
         companies: Companies in the database after the load.
         instruments: Instruments in the database after the load.
         not_loaded: Every line that was not loaded, in the order of the
@@ -150,6 +159,7 @@ class LoadResult:
     lei_decisions_used: int
     name_decisions_used: int
     companies_renamed: int
+    exclusions_used: int
     companies: int
     instruments: int
     not_loaded: tuple[NotLoadedLine, ...]
@@ -214,6 +224,8 @@ class _SortedLines:
             occur among the lines.
         name_decisions_used: How many securities with a decided name occur
             among the lines.
+        exclusions_used: How many securities that a decision keeps out occur
+            among the lines.
     """
 
     lines_read: int
@@ -222,10 +234,14 @@ class _SortedLines:
     left_out: tuple[NotLoadedLine, ...]
     lei_decisions_used: int
     name_decisions_used: int
+    exclusions_used: int
 
 
 def _sort_lines(
-    funds: Sequence[FundHoldings], decided: Mapping[str, str], named: Mapping[str, str]
+    funds: Sequence[FundHoldings],
+    decided: Mapping[str, str],
+    named: Mapping[str, str],
+    excluded: frozenset[str],
 ) -> _SortedLines:
     """Decide for every line whether it is left out, ordinary or a receipt.
 
@@ -233,6 +249,7 @@ def _sort_lines(
         funds: The funds, in the order of loading.
         decided: The decided legal-entity identifier of each ISIN that has one.
         named: The decided company name of each ISIN that has one.
+        excluded: The ISINs that a decision keeps out of the universe.
 
     Raises:
         UniverseError: If a line is in a category the load has no rule for.
@@ -240,6 +257,7 @@ def _sort_lines(
     lines_read = 0
     candidates: list[_Candidate] = []
     left_out: list[NotLoadedLine] = []
+    excluded_held: set[str] = set()
     for fund in funds:
         for line in fund.lines:
             lines_read += 1
@@ -256,6 +274,15 @@ def _sort_lines(
                 )
             elif line.isin is None or not is_valid_isin(line.isin):
                 left_out.append(NotLoadedLine(fund.ticker, line, NotLoadedReason.NO_VALID_ISIN))
+            elif line.isin in excluded:
+                # Asked last, so a line that is left out anyway keeps the
+                # reason the filing itself gives. Taken out here, before the
+                # receipts are sorted, the line is not a line of its company
+                # in the receipt rule either (ADR 0013).
+                left_out.append(
+                    NotLoadedLine(fund.ticker, line, NotLoadedReason.EXCLUDED_BY_DECISION)
+                )
+                excluded_held.add(line.isin)
             else:
                 lei = line.lei if line.lei is not None and is_valid_lei(line.lei) else None
                 # A decision overrules what the fund filed, for the identifier
@@ -292,6 +319,7 @@ def _sort_lines(
         left_out=tuple(left_out),
         lei_decisions_used=len(decided.keys() & loadable_isins),
         name_decisions_used=len(named.keys() & loadable_isins),
+        exclusions_used=len(excluded_held),
     )
 
 
@@ -343,6 +371,10 @@ class _Placer:
     def company(self, company_id: int) -> Company:
         """Return a company as it stands now."""
         return self._companies[company_id]
+
+    def held(self, isins: frozenset[str]) -> list[str]:
+        """Return which of the given ISINs are instruments already, in order."""
+        return sorted(isins & self._company_of_isin.keys())
 
     def settle(self, decisions: Sequence[LeiDecision]) -> None:
         """Give the company of every decided security its decided identifier.
@@ -536,6 +568,7 @@ def load_holdings(
     funds: Sequence[FundHoldings],
     lei_decisions: Sequence[LeiDecision] = (),
     name_decisions: Sequence[NameDecision] = (),
+    exclusions: Sequence[Exclusion] = (),
 ) -> LoadResult:
     """Load the holdings of the funds into ``company`` and ``instrument``.
 
@@ -550,6 +583,10 @@ def load_holdings(
     lines are placed, a line of a decided security being read as carrying the
     decided value.
 
+    A security that a decision keeps out of the universe is not loaded
+    (ADR 0013). The load never deletes: a database that already holds such a
+    security is refused and has to be rebuilt.
+
     Everything is written in one unit of work. Loading the same holdings
     with the same decisions again changes nothing.
 
@@ -561,6 +598,8 @@ def load_holdings(
             one per ISIN. None by default.
         name_decisions: The decisions on company names, at most one per ISIN.
             None by default.
+        exclusions: The securities that are kept out of the universe. None by
+            default.
 
     Returns:
         What the load did, including the lines it did not load and the cases
@@ -568,8 +607,10 @@ def load_holdings(
 
     Raises:
         UniverseError: If a line is in a category the load has no rule for,
-            two decisions of one kind are about the same ISIN, or two name
-            decisions call one company by different names. Nothing is written.
+            two decisions of one kind are about the same ISIN, two name
+            decisions call one company by different names, a security is
+            both kept out and decided on, or the database already holds a
+            security that is kept out. Nothing is written.
         DatabaseError: If the database is not ready or refuses a row. Nothing
             is written.
     """
@@ -581,13 +622,33 @@ def load_holdings(
     named = {decision.isin: decision.name for decision in name_decisions}
     if len(named) != len(name_decisions):
         raise UniverseError("two name decisions are about the same ISIN; a company has one name")
-    lines = _sort_lines(funds, decided, named)
+    excluded = frozenset(exclusion.isin for exclusion in exclusions)
+    contradicted = sorted(excluded & (decided.keys() | named.keys()))
+    if contradicted:
+        # A decision about a security that is not loaded can never apply. Left
+        # in the files it would only mislead whoever reads them.
+        raise UniverseError(
+            f"{', '.join(contradicted)}: kept out of the universe by one decisions file and "
+            "given an identifier or a name by another; the files contradict each other"
+        )
+    lines = _sort_lines(funds, decided, named, excluded)
     not_loaded = list(lines.left_out)
     receipts_kept = 0
     receipts_not_loaded = 0
 
     with database.unit_of_work() as work:
         placer = _Placer(work)
+        held = placer.held(excluded)
+        if held:
+            # Taking a row out would be the load's first delete, with rules of
+            # its own for a company left without securities. A rebuild does it
+            # in seconds, and saying so beats leaving the rows in silently.
+            raise UniverseError(
+                f"{database.path} holds securities that a decision keeps out of the universe: "
+                f"{', '.join(held)}. The load does not delete rows, so the database has to be "
+                "rebuilt: set the file aside, run `pyvalue db migrate`, then "
+                "`pyvalue universe load`"
+            )
         # Decisions first, so that every line below is compared with the
         # identifiers and names as they have been decided (ADR 0010, ADR 0012).
         placer.settle(lei_decisions)
@@ -645,6 +706,7 @@ def load_holdings(
         lei_decisions_used=lines.lei_decisions_used,
         name_decisions_used=lines.name_decisions_used,
         companies_renamed=placer.companies_renamed,
+        exclusions_used=lines.exclusions_used,
         companies=placer.company_count,
         instruments=placer.instrument_count,
         not_loaded=tuple(

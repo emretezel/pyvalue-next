@@ -13,7 +13,8 @@ from pathlib import Path
 import pytest
 
 from pyvalue.db import Company, Database, Instrument, migrate
-from pyvalue.universe import load_universe
+from pyvalue.universe import UniverseError, load_universe
+from pyvalue.universe.exclusions import read_exclusions
 from pyvalue.universe.lei_decisions import read_lei_decisions
 from pyvalue.universe.name_decisions import read_name_decisions
 
@@ -194,6 +195,7 @@ def test_the_shipped_decisions_concern_none_of_the_sample_securities(
 
     assert outcome.result.lei_decisions_used == 0
     assert outcome.result.name_decisions_used == 0
+    assert outcome.result.exclusions_used == 0
     assert len(outcome.result.agent_cases) == 2
 
 
@@ -301,3 +303,89 @@ def test_a_name_decided_later_gives_the_database_a_rebuild_would_give(
     assert (renamed.result.name_decisions_used, renamed.result.companies_renamed) == (1, 1)
     # The second run finds the name already there.
     assert (again.result.name_decisions_used, again.result.companies_renamed) == (1, 0)
+
+
+# --- With the sample exclusion (ADR 0013) ------------------------------------------------
+
+# What the sample exclusion changes: Eta Holdings, whose only line is the excluded
+# receipt, is not loaded, so Omicron takes the next free ids.
+_EXPECTED_COMPANIES_WITHOUT_ETA: tuple[Company, ...] = (
+    *_EXPECTED_COMPANIES[:12],
+    Company(13, "Omicron Ltd", None),
+)
+_EXPECTED_INSTRUMENTS_WITHOUT_ETA: tuple[Instrument, ...] = (
+    *_EXPECTED_INSTRUMENTS[:14],
+    Instrument(15, 13, "US00000O0018"),
+)
+_EXCLUDED_LINE: str = (
+    "VXUS,5,excluded_by_decision,ETA HOLDINGS LTD,ETA HOLDINGS LTD SPONSORED ADR,"
+    "US00000H0017,N/A,EC,"
+)
+
+
+def test_the_sample_exclusion_keeps_the_security_out(
+    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+) -> None:
+    """A database built with the exclusion never holds the security or its company."""
+    exclusions = read_exclusions(nport_samples / "decisions" / "excluded.csv")
+
+    outcome = load_universe(
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        (),
+        (),
+        exclusions,
+    )
+
+    assert _tables(database) == (_EXPECTED_COMPANIES_WITHOUT_ETA, _EXPECTED_INSTRUMENTS_WITHOUT_ETA)
+    result = outcome.result
+    assert (result.exclusions_used, result.securities) == (1, 18)
+    # One receipt fewer is recognised, and one fewer is kept as a company's only line.
+    assert (result.receipts_recognised, result.receipts_kept, result.receipts_not_loaded) == (
+        4,
+        1,
+        3,
+    )
+    # The file of lines not loaded has the excluded line, in the order of the
+    # filings, and is otherwise as without the exclusion.
+    expected = (
+        (nport_samples / "expected" / "lines_not_loaded.csv")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
+    written = outcome.output.lines_not_loaded.read_text(encoding="utf-8").splitlines()
+    assert _EXCLUDED_LINE in written
+    assert [line for line in written if line != _EXCLUDED_LINE] == expected
+    assert written.index(_EXCLUDED_LINE) == written.index(expected[4]) + 1
+
+
+def test_an_exclusion_added_later_is_refused_until_the_database_is_rebuilt(
+    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+) -> None:
+    """The load never deletes: the old database is left as it is, a new one is right."""
+    exclusions = read_exclusions(nport_samples / "decisions" / "excluded.csv")
+    load_universe(database, filings_dir, tmp_path / "first", _never_asked, _never_fetched, (), ())
+
+    with pytest.raises(UniverseError, match="US00000H0017"):
+        load_universe(
+            database,
+            filings_dir,
+            tmp_path / "second",
+            _never_asked,
+            _never_fetched,
+            (),
+            (),
+            exclusions,
+        )
+
+    assert _tables(database) == (_EXPECTED_COMPANIES, _EXPECTED_INSTRUMENTS)
+    # The rebuild: a new database that sees the exclusion from the start.
+    migrate(tmp_path / "rebuilt.db")
+    rebuilt = Database(tmp_path / "rebuilt.db")
+    load_universe(
+        rebuilt, filings_dir, tmp_path / "third", _never_asked, _never_fetched, (), (), exclusions
+    )
+    assert _tables(rebuilt) == (_EXPECTED_COMPANIES_WITHOUT_ETA, _EXPECTED_INSTRUMENTS_WITHOUT_ETA)

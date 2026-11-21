@@ -72,3 +72,11 @@ With these decisions the load reports no case.
 | `JP300000I006` (Iota KK) | "Iota KK", as DFAX files it | Company 7 is called "Iota KK" instead of "IOTA KK", the spelling VXUS files |
 
 The two spellings compare as equal, so the decision changes no join.
+
+`decisions/excluded.csv` keeps one security out of the universe (ADR 0013).
+
+| Security | Why | Effect |
+|---|---|---|
+| `US00000H0017` (Eta Holdings Ltd, VXUS line 5) | Made up: a receipt whose ordinary share is listed at home | The line is not loaded and is listed with the reason `excluded_by_decision`. Eta Holdings has no other line, so the company is not loaded: 13 companies and 15 instruments, and Omicron Ltd becomes company 13 |
+
+A database that was loaded before the exclusion existed is refused; a rebuilt one is right.

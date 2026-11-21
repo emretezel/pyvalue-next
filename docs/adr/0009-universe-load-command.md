@@ -1,6 +1,6 @@
 # ADR 0009: The universe load is a command that reads pinned filings
 
-- Status: Accepted. The open point on how an agent's answer reaches the database is settled by ADR 0010.
+- Status: Accepted. The open point on how an agent's answer reaches the database is settled by ADR 0010. ADR 0013 adds a fourth reason to `lines_not_loaded.csv`: `excluded_by_decision`.
 - Date: 2026-11-20
 
 ## Decision

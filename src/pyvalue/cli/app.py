@@ -61,7 +61,8 @@ def _universe_load(arguments: argparse.Namespace) -> int:
         f"({result.not_loaded_for(NotLoadedReason.DEBT_OR_DERIVATIVE):,} debt or derivative, "
         f"{result.not_loaded_for(NotLoadedReason.NO_VALID_ISIN):,} without a valid ISIN, "
         f"{result.not_loaded_for(NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED):,} "
-        "receipt of a company already loaded)"
+        "receipt of a company already loaded, "
+        f"{result.not_loaded_for(NotLoadedReason.EXCLUDED_BY_DECISION):,} kept out by decision)"
     )
     print(
         f"Securities: {result.securities:,}, of which {result.receipts_recognised:,} receipts "
@@ -86,6 +87,7 @@ def _universe_load(arguments: argparse.Namespace) -> int:
         f"Decisions on company names used: {result.name_decisions_used:,}; "
         f"companies renamed: {result.companies_renamed:,}"
     )
+    print(f"Securities kept out of the universe by decision: {result.exclusions_used:,}")
     print(
         f"The database now holds {result.companies:,} companies and "
         f"{result.instruments:,} instruments"

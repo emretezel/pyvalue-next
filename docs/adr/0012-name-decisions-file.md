@@ -1,6 +1,6 @@
 # ADR 0012: A company's name can be decided in a file the load applies
 
-- Status: Accepted
+- Status: Accepted. One of the 47 names was withdrawn the same day: ADR 0013 keeps Pony AI's security out of the universe, so the file holds 46.
 - Date: 2026-11-21
 
 ## Decision

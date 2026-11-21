@@ -4,12 +4,14 @@ Which funds, and why, is ADR 0004. The rules of the load are ADR 0006. How it
 is run, where its files go and what it leaves for an agent is ADR 0009. How a
 decision on a company's legal-entity identifier is applied is ADR 0010, and
 which identifier it may name is ADR 0011. How a decision on a company's name
-is applied is ADR 0012.
+is applied is ADR 0012, and how a security is kept out of the universe is
+ADR 0013.
 
 Author: Emre Tezel
 """
 
 from pyvalue.universe.errors import FilingError, UniverseError
+from pyvalue.universe.exclusions import Exclusion
 from pyvalue.universe.filings import PINNED_FILINGS, PinnedFiling
 from pyvalue.universe.lei_decisions import LeiDecision
 from pyvalue.universe.load import (
@@ -37,6 +39,7 @@ __all__ = [
     "PINNED_FILINGS",
     "AgentCase",
     "AgentCaseReason",
+    "Exclusion",
     "FilingError",
     "FundHoldings",
     "HoldingLine",

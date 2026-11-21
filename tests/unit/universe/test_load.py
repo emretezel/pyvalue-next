@@ -19,6 +19,7 @@ from hypothesis import strategies as st
 from pyvalue.db import Company, ConstraintError, Database, DatabaseError, Instrument, migrate
 from pyvalue.universe import (
     AgentCaseReason,
+    Exclusion,
     FundHoldings,
     HoldingLine,
     LeiDecision,
@@ -88,6 +89,13 @@ def _name_decision(isin: str, name: str) -> NameDecision:
     """Build a decision that the security's issuer is called by the given name."""
     return NameDecision(
         isin=isin, name=name, decided_on=date(2026, 11, 21), evidence="Made up for a test"
+    )
+
+
+def _exclusion(isin: str) -> Exclusion:
+    """Build a decision that keeps the security out of the universe."""
+    return Exclusion(
+        isin=isin, company="Sample Co", decided_on=date(2026, 11, 21), evidence="Made up for a test"
     )
 
 
@@ -1402,6 +1410,209 @@ def test_a_database_renamed_in_place_equals_one_built_from_scratch(
         Company(3, "Iota KK", None),
     )
     assert (renamed.companies_renamed, built.companies_renamed) == (2, 0)
+
+
+# --- Securities kept out of the universe (ADR 0013) --------------------------------------
+
+
+def _receipt_and_share_funds() -> list[FundHoldings]:
+    """Return two funds: one files a company's receipt as a plain share, one holds its share.
+
+    Nothing in the first line says "receipt", so without a decision the load
+    takes both securities for ordinary shares of one company.
+    """
+    return [
+        _fund(
+            "VXUS",
+            _line("Kappa Ltd", _RECEIPT_ISIN, lei=_KAPPA_LEI),
+            _line("Delta PLC", _ISIN_3, lei=_DELTA_LEI),
+        ),
+        _fund("DFAX", _line("Kappa Ltd", _ISIN_1, lei=_KAPPA_LEI)),
+    ]
+
+
+def test_without_an_exclusion_the_unrecognised_receipt_is_loaded(database: Database) -> None:
+    """The starting point of the tests below: two instruments under one company."""
+    result = load_holdings(database, _receipt_and_share_funds())
+
+    assert _companies(database) == (
+        Company(1, "Kappa Ltd", _KAPPA_LEI),
+        Company(2, "Delta PLC", _DELTA_LEI),
+    )
+    assert _instruments(database) == (
+        Instrument(1, 1, _RECEIPT_ISIN),
+        Instrument(2, 2, _ISIN_3),
+        Instrument(3, 1, _ISIN_1),
+    )
+    assert result.exclusions_used == 0
+
+
+def test_an_excluded_security_is_not_loaded_and_its_company_stays_on_its_other_security(
+    database: Database,
+) -> None:
+    """The company is loaded through the share another fund holds."""
+    result = load_holdings(
+        database, _receipt_and_share_funds(), exclusions=[_exclusion(_RECEIPT_ISIN)]
+    )
+
+    assert _companies(database) == (
+        Company(1, "Delta PLC", _DELTA_LEI),
+        Company(2, "Kappa Ltd", _KAPPA_LEI),
+    )
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3), Instrument(2, 2, _ISIN_1))
+    assert _not_loaded(result) == [("VXUS", 1, NotLoadedReason.EXCLUDED_BY_DECISION)]
+    assert result.not_loaded_for(NotLoadedReason.EXCLUDED_BY_DECISION) == 1
+    # The excluded security is not one of the securities the load counts.
+    assert (result.exclusions_used, result.securities) == (1, 2)
+
+
+def test_a_company_whose_only_security_is_excluded_is_not_loaded(database: Database) -> None:
+    """Nothing is left that could bring the company in."""
+    result = load_holdings(
+        database,
+        [_fund("VXUS", _line("Kappa Ltd", _RECEIPT_ISIN, lei=_KAPPA_LEI))],
+        exclusions=[_exclusion(_RECEIPT_ISIN)],
+    )
+
+    assert _companies(database) == ()
+    assert _instruments(database) == ()
+    assert (result.companies, result.instruments, result.exclusions_used) == (0, 0, 1)
+
+
+def test_every_line_of_an_excluded_security_is_left_out(database: Database) -> None:
+    """A security held by two funds is one exclusion and two lines not loaded."""
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line("Kappa Ltd", _RECEIPT_ISIN, lei=_KAPPA_LEI)),
+            _fund("DFAX", _line("KAPPA LIMITED", _RECEIPT_ISIN, category="OTHER", label="ADR")),
+        ],
+        exclusions=[_exclusion(_RECEIPT_ISIN)],
+    )
+
+    assert _not_loaded(result) == [
+        ("VXUS", 1, NotLoadedReason.EXCLUDED_BY_DECISION),
+        ("DFAX", 1, NotLoadedReason.EXCLUDED_BY_DECISION),
+    ]
+    # Taken out before the receipts are sorted: it is not counted as a receipt.
+    assert (result.exclusions_used, result.receipts_recognised) == (1, 0)
+
+
+def test_an_excluded_line_is_not_a_line_of_its_company_in_the_receipt_rule(
+    database: Database,
+) -> None:
+    """With the plain-looking line gone, the labelled receipt is the company's only line."""
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line("Kappa Ltd", _ISIN_1, lei=_KAPPA_LEI)),
+            _fund(
+                "DFAX",
+                _line("Kappa Ltd", _RECEIPT_ISIN, lei=_KAPPA_LEI, category="OTHER", label="GDR"),
+            ),
+        ],
+        exclusions=[_exclusion(_ISIN_1)],
+    )
+
+    assert _instruments(database) == (Instrument(1, 1, _RECEIPT_ISIN),)
+    assert (result.receipts_kept, result.receipts_not_loaded) == (1, 0)
+
+
+def test_a_line_left_out_anyway_keeps_its_own_reason(database: Database) -> None:
+    """Debt stays debt in the report, whatever the exclusions say about its ISIN."""
+    result = load_holdings(
+        database,
+        [_fund("VXUS", _line("SAMPLE TREASURY", _ISIN_5, category="DBT"))],
+        exclusions=[_exclusion(_ISIN_5)],
+    )
+
+    assert _not_loaded(result) == [("VXUS", 1, NotLoadedReason.DEBT_OR_DERIVATIVE)]
+    assert result.exclusions_used == 0
+
+
+def test_an_exclusion_for_a_security_no_fund_holds_changes_nothing(database: Database) -> None:
+    """The file may name a security the filings do not hold; such a row waits."""
+    result = load_holdings(database, _receipt_and_share_funds(), exclusions=[_exclusion(_ISIN_5)])
+
+    assert len(_instruments(database)) == 3
+    assert result.exclusions_used == 0
+    assert result.not_loaded == ()
+
+
+def test_a_database_that_holds_an_excluded_security_is_refused(database: Database) -> None:
+    """The load never deletes, so it says that the database has to be rebuilt."""
+    load_holdings(database, _receipt_and_share_funds())
+    before = (_companies(database), _instruments(database))
+    # A new line in the same run, to show that nothing at all is written.
+    funds = [*_receipt_and_share_funds(), _fund("VTI", _line("Gamma Inc", _ISIN_2))]
+
+    with pytest.raises(UniverseError) as raised:
+        load_holdings(database, funds, exclusions=[_exclusion(_RECEIPT_ISIN)])
+
+    message = str(raised.value)
+    assert f"{database.path} holds securities that a decision keeps out" in message
+    assert _RECEIPT_ISIN in message
+    assert "has to be rebuilt" in message
+    assert (_companies(database), _instruments(database)) == before
+
+
+def test_a_security_that_is_excluded_and_decided_on_is_refused(database: Database) -> None:
+    """A decision about a security that is not loaded could never apply."""
+    with pytest.raises(UniverseError, match="the files contradict each other") as raised:
+        load_holdings(
+            database,
+            _receipt_and_share_funds(),
+            name_decisions=[_name_decision(_RECEIPT_ISIN, "Kappa Ltd")],
+            exclusions=[_exclusion(_RECEIPT_ISIN)],
+        )
+
+    assert _RECEIPT_ISIN in str(raised.value)
+    assert _companies(database) == ()
+
+
+def test_an_identifier_decision_about_an_excluded_security_is_refused(
+    database: Database,
+) -> None:
+    """The same refusal for the other decisions file."""
+    with pytest.raises(UniverseError, match="the files contradict each other"):
+        load_holdings(
+            database,
+            _receipt_and_share_funds(),
+            [_decision(_RECEIPT_ISIN, _KAPPA_LEI)],
+            exclusions=[_exclusion(_RECEIPT_ISIN)],
+        )
+
+
+def test_loading_with_an_exclusion_equals_loading_filings_without_those_lines(
+    database: Database, tmp_path: Path
+) -> None:
+    """An exclusion is exactly "as if the funds did not hold it"."""
+    load_holdings(database, _receipt_and_share_funds(), exclusions=[_exclusion(_RECEIPT_ISIN)])
+    other_path = tmp_path / "other.db"
+    migrate(other_path)
+    other = Database(other_path)
+    load_holdings(
+        other,
+        [
+            _fund("VXUS", _line("Delta PLC", _ISIN_3, lei=_DELTA_LEI)),
+            _fund("DFAX", _line("Kappa Ltd", _ISIN_1, lei=_KAPPA_LEI)),
+        ],
+    )
+
+    assert _companies(database) == _companies(other)
+    assert _instruments(database) == _instruments(other)
+
+
+def test_a_second_run_with_the_same_exclusion_changes_nothing(database: Database) -> None:
+    """A database built with the exclusion never held the security, so nothing is refused."""
+    exclusions = [_exclusion(_RECEIPT_ISIN)]
+    load_holdings(database, _receipt_and_share_funds(), exclusions=exclusions)
+    before = (_companies(database), _instruments(database))
+
+    again = load_holdings(database, _receipt_and_share_funds(), exclusions=exclusions)
+
+    assert (_companies(database), _instruments(database)) == before
+    assert (again.companies_added, again.instruments_added, again.exclusions_used) == (0, 0, 1)
 
 
 # --- Comparing names ---------------------------------------------------------------------

@@ -8,12 +8,13 @@ Author: Emre Tezel
 """
 
 import shutil
+from datetime import date
 from pathlib import Path
 
 import pytest
 
 from pyvalue.cli import main
-from pyvalue.universe import PINNED_FILINGS
+from pyvalue.universe import PINNED_FILINGS, Exclusion
 
 
 @pytest.fixture
@@ -50,13 +51,14 @@ def test_load_fills_the_database_and_says_what_it_did(
         "Filing DFAX 0001004726-26-009205: already there",
         "Lines read: 31",
         "Lines not loaded: 11 (3 debt or derivative, 4 without a valid ISIN, "
-        "4 receipt of a company already loaded)",
+        "4 receipt of a company already loaded, 0 kept out by decision)",
         "Securities: 19, of which 5 receipts (2 kept as the company's only line, 3 not loaded)",
         "Added: 14 companies and 16 instruments",
         "Joined to an existing company: 1 by legal-entity identifier, 1 by name",
         "Legal-entity identifiers filled in: 1",
         "Decisions on legal-entity identifiers used: 0; companies corrected: 0",
         "Decisions on company names used: 0; companies renamed: 0",
+        "Securities kept out of the universe by decision: 0",
         "The database now holds 14 companies and 16 instruments",
         f"Lines not loaded are listed in {Path('data') / 'universe' / 'lines_not_loaded.csv'}",
         f"Cases for the agent: 2, listed in {Path('data') / 'universe' / 'cases_for_agent.csv'}",
@@ -77,6 +79,38 @@ def test_a_second_load_adds_nothing(workspace: Path, capsys: pytest.CaptureFixtu
     assert "Added: 0 companies and 0 instruments" in lines
     assert "The database now holds 14 companies and 16 instruments" in lines
     assert lines[-1].startswith("Cases for the agent: 2, ")
+
+
+def test_a_database_that_holds_an_excluded_security_gives_one_line_and_status_one(
+    workspace: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR 0013: the load does not delete; it says that the database has to be rebuilt."""
+    main(["universe", "load"])
+    # The package's own exclusions are about real securities. Stand in one
+    # that names a sample security the first load has just put in.
+    monkeypatch.setattr(
+        "pyvalue.universe.pipeline.packaged_exclusions",
+        lambda: (
+            Exclusion(
+                isin="US00000H0017",
+                company="Eta Holdings Ltd",
+                decided_on=date(2026, 11, 21),
+                evidence="Made up for a test",
+            ),
+        ),
+    )
+    capsys.readouterr()
+
+    status = main(["universe", "load"])
+
+    output = capsys.readouterr()
+    assert status == 1
+    assert output.out == ""
+    assert output.err.splitlines() == [
+        f"pyvalue: error: {Path('data') / 'pyvalue.db'} holds securities that a decision keeps "
+        "out of the universe: US00000H0017. The load does not delete rows, so the database has "
+        "to be rebuilt: set the file aside, run `pyvalue db migrate`, then `pyvalue universe load`"
+    ]
 
 
 def test_the_database_option_points_the_load_elsewhere(
