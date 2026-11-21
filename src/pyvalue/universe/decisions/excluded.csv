@@ -1,1 +1,2 @@
 isin,company,decided_on,evidence
+US9220428588,Vanguard FTSE Emerging Markets ETF,2026-11-21,"An exchange-traded fund, not a company. VXUS holds it and files its issuer as a registered fund; OpenFIGI classes it as an exchange-traded product. pyvalue analyses companies, not funds"

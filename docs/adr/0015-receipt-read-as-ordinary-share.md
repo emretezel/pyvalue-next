@@ -77,7 +77,7 @@ Measured on 2026-11-21.
 | James Hardie | 1 | 1 | `AU000000JHX1` to `IE000R94NGM2` | The EU securities register, under the company's own identifier; OpenFIGI |
 | Russian companies with a Moscow share | 14 | 13 | Gazprom to `RU0007661625`; Sberbank to `RU0009029540`; RusHydro to `RU000A0JPKH7`; Sistema to `RU000A0DQZE3`; Norilsk Nickel to `RU0007288411`; Mechel to `RU000A0DKXV5`; Novatek to `RU000A0DKVS5`; Severstal to `RU0009046510`; Surgutneftegas to `RU0008926258`; VTB to `RU000A0JP5V6`; Magnitogorsk to `RU0009084396`; PhosAgro's two receipts to `RU000A0JRKT8`; Polyus to `RU000A0JNAA8` | The Moscow Exchange's list of shares on its main board, all with trades on 2026-11-21 |
 
-- **That each first code is a receipt** is given by OpenFIGI or the EU register for 25 of the 26. The exception is PhosAgro's line in VXUS, `US71922G4073`, which neither source knows; it is a US-coded security of a Russian company and is taken to be a receipt.
+- **That each first code is a receipt** is given by OpenFIGI or the EU register for 25 of the 26. The 26th, PhosAgro's line in VXUS, `US71922G4073`, is unknown to both. The Russian National Settlement Depository lists it as a depositary receipt for PhosAgro's ordinary share `RU000A0JRKT8`, three for one, and the depositary bank's notice to holders calls it a blocked GDR.
 - **A fund already holds the ordinary share** of Kanzhun (DFAX) and VTB (VXUS). The other 23 ordinary shares are new to the universe.
 - **One search result was discarded.** A second ISIN reported for Vista Energy, `MX01VI000003`, has an invalid check digit and is unknown to OpenFIGI.
 
