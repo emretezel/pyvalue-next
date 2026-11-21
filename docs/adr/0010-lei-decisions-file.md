@@ -1,6 +1,6 @@
 # ADR 0010: Decisions on a company's legal-entity identifier are a file the load applies
 
-- Status: Accepted. ADR 0011 narrows which identifier a decision may name, and closes the first two points under "Not decided here".
+- Status: Accepted. ADR 0011 narrows which identifier a decision may name, and closes the first two points under "Not decided here". ADR 0012 settles how a company's stored name is corrected.
 - Date: 2026-11-20
 
 ## Decision

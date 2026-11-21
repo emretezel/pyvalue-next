@@ -64,3 +64,11 @@ In total: 31 lines, 14 companies, 16 instruments, 11 lines not loaded, 2 cases f
 | `JP300000I006` (Iota KK) | An identifier neither fund files | Company 7, which had none, carries it |
 
 With these decisions the load reports no case.
+
+`decisions/name.csv` holds one decision on a company name (ADR 0012). None of the sample filings carries a vendor placeholder, so the sample decision does the next closest thing: it takes the spelling the second fund files.
+
+| Security | Decided name | Effect |
+|---|---|---|
+| `JP300000I006` (Iota KK) | "Iota KK", as DFAX files it | Company 7 is called "Iota KK" instead of "IOTA KK", the spelling VXUS files |
+
+The two spellings compare as equal, so the decision changes no join.

@@ -6,9 +6,12 @@ database. Placing writes: it finds or adds the company of each line and adds
 the instrument, all inside one unit of work, so a load is saved whole or not
 at all (ADR 0009).
 
-Where the filings are wrong about a company's legal-entity identifier, a
-decision overrules them (ADR 0010): the decided identifier is what a line of
-that security is read as carrying, and what its company is given.
+Two kinds of decision overrule the filings, each for the security it names.
+Where the funds disagree about a company's legal-entity identifier, a decision
+says which one holds (ADR 0010, ADR 0011). Where a fund files a placeholder
+instead of a company name, a decision gives the name (ADR 0012). In both cases
+the decided value is what a line of that security is read as carrying, and
+what its company is given.
 
 Author: Emre Tezel
 """
@@ -21,6 +24,7 @@ from pyvalue.db import Company, Database, UnitOfWork
 from pyvalue.universe.errors import UniverseError
 from pyvalue.universe.identifiers import is_valid_isin, is_valid_lei
 from pyvalue.universe.lei_decisions import LeiDecision
+from pyvalue.universe.name_decisions import NameDecision
 from pyvalue.universe.nport import CONDITIONAL_CATEGORY, HoldingLine
 from pyvalue.universe.receipts import is_receipt
 
@@ -120,7 +124,11 @@ class LoadResult:
             from a line of a security already loaded or from a decision.
         leis_corrected: Companies whose legal-entity identifier a decision
             replaced by another.
-        decisions_used: Decisions about a security that these filings hold.
+        lei_decisions_used: Decisions on legal-entity identifiers about a
+            security that these filings hold.
+        name_decisions_used: Decisions on company names about a security that
+            these filings hold.
+        companies_renamed: Companies that a decision gave another name.
         companies: Companies in the database after the load.
         instruments: Instruments in the database after the load.
         not_loaded: Every line that was not loaded, in the order of the
@@ -139,7 +147,9 @@ class LoadResult:
     joined_by_name: int
     leis_filled: int
     leis_corrected: int
-    decisions_used: int
+    lei_decisions_used: int
+    name_decisions_used: int
+    companies_renamed: int
     companies: int
     instruments: int
     not_loaded: tuple[NotLoadedLine, ...]
@@ -172,9 +182,12 @@ class _Candidate:
             decided one when there is a decision for the security, else the
             filed one when it is valid, else ``None`` (a missing one, or a
             placeholder such as ``N/A``).
-        name: The issuer name as it would be stored: runs of spaces reduced
-            to one.
-        key: The issuer name as it is compared.
+        name: The company name the line is read as carrying, as it would be
+            stored: the decided one when there is a decision for the security,
+            else the filed issuer name with runs of spaces reduced to one.
+        key: That name as it is compared.
+        named: Whether the name comes from a decision. The company such a
+            line belongs to is given the name (ADR 0012).
     """
 
     fund: str
@@ -183,6 +196,7 @@ class _Candidate:
     lei: str | None
     name: str
     key: str
+    named: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,22 +210,29 @@ class _SortedLines:
         receipts: The lines of receipts, one group per ISIN, groups in the
             order their ISIN first appears.
         left_out: The lines that cannot be loaded at all.
-        decisions_used: How many decided securities occur among the lines.
+        lei_decisions_used: How many securities with a decided identifier
+            occur among the lines.
+        name_decisions_used: How many securities with a decided name occur
+            among the lines.
     """
 
     lines_read: int
     ordinary: tuple[_Candidate, ...]
     receipts: tuple[tuple[_Candidate, ...], ...]
     left_out: tuple[NotLoadedLine, ...]
-    decisions_used: int
+    lei_decisions_used: int
+    name_decisions_used: int
 
 
-def _sort_lines(funds: Sequence[FundHoldings], decided: Mapping[str, str]) -> _SortedLines:
+def _sort_lines(
+    funds: Sequence[FundHoldings], decided: Mapping[str, str], named: Mapping[str, str]
+) -> _SortedLines:
     """Decide for every line whether it is left out, ordinary or a receipt.
 
     Args:
         funds: The funds, in the order of loading.
-        decided: The decided legal-entity identifier of each decided ISIN.
+        decided: The decided legal-entity identifier of each ISIN that has one.
+        named: The decided company name of each ISIN that has one.
 
     Raises:
         UniverseError: If a line is in a category the load has no rule for.
@@ -237,15 +258,18 @@ def _sort_lines(funds: Sequence[FundHoldings], decided: Mapping[str, str]) -> _S
                 left_out.append(NotLoadedLine(fund.ticker, line, NotLoadedReason.NO_VALID_ISIN))
             else:
                 lei = line.lei if line.lei is not None and is_valid_lei(line.lei) else None
+                # A decision overrules what the fund filed, for the identifier
+                # (ADR 0010) and for the name (ADR 0012).
+                name = named.get(line.isin, " ".join(line.issuer_name.split()))
                 candidates.append(
                     _Candidate(
                         fund=fund.ticker,
                         line=line,
                         isin=line.isin,
-                        # A decision overrules what the fund filed (ADR 0010).
                         lei=decided.get(line.isin, lei),
-                        name=" ".join(line.issuer_name.split()),
-                        key=name_key(line.issuer_name),
+                        name=name,
+                        key=name_key(name),
+                        named=line.isin in named,
                     )
                 )
 
@@ -260,12 +284,14 @@ def _sort_lines(funds: Sequence[FundHoldings], decided: Mapping[str, str]) -> _S
             receipt_groups.setdefault(candidate.isin, []).append(candidate)
         else:
             ordinary.append(candidate)
+    loadable_isins = {candidate.isin for candidate in candidates}
     return _SortedLines(
         lines_read=lines_read,
         ordinary=tuple(ordinary),
         receipts=tuple(tuple(group) for group in receipt_groups.values()),
         left_out=tuple(left_out),
-        decisions_used=len(decided.keys() & {candidate.isin for candidate in candidates}),
+        lei_decisions_used=len(decided.keys() & loadable_isins),
+        name_decisions_used=len(named.keys() & loadable_isins),
     )
 
 
@@ -297,7 +323,12 @@ class _Placer:
         self.joined_by_name = 0
         self.leis_filled = 0
         self.leis_corrected = 0
+        self.companies_renamed = 0
         self.agent_cases: list[AgentCase] = []
+        # The name each company was given by a decision in this run, with the
+        # security the decision is about: what tells two decisions apart that
+        # call one company by different names.
+        self._decided_name: dict[int, tuple[str, str]] = {}
 
     @property
     def company_count(self) -> int:
@@ -340,6 +371,23 @@ class _Placer:
                 self._set_lei(company, decision.lei)
             settled.add(company_id)
 
+    def settle_names(self, decisions: Sequence[NameDecision]) -> None:
+        """Give the company of every security with a decided name that name.
+
+        Only securities that are already instruments are touched; a new one
+        brings its decided name with its line. This runs before any line is
+        placed, so that the lines are compared with the names as decided
+        (ADR 0012).
+
+        Raises:
+            UniverseError: If two decisions call one company by different
+                names.
+        """
+        for decision in decisions:
+            company_id = self._company_of_isin.get(decision.isin)
+            if company_id is not None:
+                self._name(company_id, decision.name, decision.isin)
+
     def place(self, candidate: _Candidate) -> int:
         """Put one line into the database.
 
@@ -353,6 +401,8 @@ class _Placer:
         existing = self._company_of_isin.get(candidate.isin)
         if existing is not None:
             self._meet_again(candidate, self._companies[existing])
+            if candidate.named:
+                self._name(existing, candidate.name, candidate.isin)
             return existing
 
         if candidate.lei is not None:
@@ -365,6 +415,11 @@ class _Placer:
                 self.joined_by_name += 1
         if company_id is None:
             company_id = self._add_company(candidate)
+        if candidate.named:
+            # The company may have been found by its identifier under the
+            # name another line gave it. A decision names the company of its
+            # security, whichever line brought the company in.
+            self._name(company_id, candidate.name, candidate.isin)
 
         self._work.instruments.add(company_id, candidate.isin)
         self._company_of_isin[candidate.isin] = company_id
@@ -408,6 +463,38 @@ class _Placer:
             self.leis_corrected += 1
         self._remember(replace(company, lei=lei))
 
+    def _name(self, company_id: int, name: str, isin: str) -> None:
+        """Give a company the name a decision gives the company of a security.
+
+        Args:
+            company_id: The company the security belongs to.
+            name: The decided name.
+            isin: The security the decision is about.
+
+        Raises:
+            UniverseError: If a decision about another security of the same
+                company gave it a different name in this run. Renaming it
+                back and forth would make the result depend on the order of
+                the lines, so the file has to be put right first.
+        """
+        earlier = self._decided_name.get(company_id)
+        if earlier is not None and earlier[0] != name:
+            raise UniverseError(
+                f"{earlier[1]} and {isin} are securities of one company, but the name "
+                f"decisions call it '{earlier[0]}' and '{name}'"
+            )
+        self._decided_name[company_id] = (name, isin)
+        company = self._companies[company_id]
+        if company.name == name:
+            return
+        self._work.companies.set_name(company_id, name)
+        # The old name no longer leads to this company. Only a company
+        # without an identifier is found by name at all.
+        if self._company_by_name.get(name_key(company.name)) == company_id:
+            del self._company_by_name[name_key(company.name)]
+        self.companies_renamed += 1
+        self._remember(replace(company, name=name))
+
     def _report(
         self,
         candidate: _Candidate,
@@ -445,7 +532,10 @@ class _Placer:
 
 
 def load_holdings(
-    database: Database, funds: Sequence[FundHoldings], decisions: Sequence[LeiDecision] = ()
+    database: Database,
+    funds: Sequence[FundHoldings],
+    lei_decisions: Sequence[LeiDecision] = (),
+    name_decisions: Sequence[NameDecision] = (),
 ) -> LoadResult:
     """Load the holdings of the funds into ``company`` and ``instrument``.
 
@@ -454,10 +544,11 @@ def load_holdings(
     order of the funds; a depositary receipt is loaded only when no ordinary
     line of this run belongs to a company with its identifier or its name.
 
-    Decisions on legal-entity identifiers overrule the filings (ADR 0010):
-    first the company of every decided security already loaded is given its
-    decided identifier, then the lines are placed, a line of a decided
-    security being read as carrying the decided identifier.
+    Decisions overrule the filings, on legal-entity identifiers (ADR 0010)
+    and on company names (ADR 0012): first the company of every decided
+    security already loaded is given its decided identifier or name, then the
+    lines are placed, a line of a decided security being read as carrying the
+    decided value.
 
     Everything is written in one unit of work. Loading the same holdings
     with the same decisions again changes nothing.
@@ -466,8 +557,10 @@ def load_holdings(
         database: The database to load into.
         funds: The funds, in the order they are to be loaded. The first fund
             that names a company decides how its name is stored.
-        decisions: The decisions on legal-entity identifiers, at most one
-            per ISIN. None by default.
+        lei_decisions: The decisions on legal-entity identifiers, at most
+            one per ISIN. None by default.
+        name_decisions: The decisions on company names, at most one per ISIN.
+            None by default.
 
     Returns:
         What the load did, including the lines it did not load and the cases
@@ -475,16 +568,20 @@ def load_holdings(
 
     Raises:
         UniverseError: If a line is in a category the load has no rule for,
-            or two decisions are about the same ISIN. Nothing is written.
+            two decisions of one kind are about the same ISIN, or two name
+            decisions call one company by different names. Nothing is written.
         DatabaseError: If the database is not ready or refuses a row. Nothing
             is written.
     """
     # Sorting comes first and needs no database, so a filing the load cannot
     # handle is refused before a transaction is even opened.
-    decided = {decision.isin: decision.lei for decision in decisions}
-    if len(decided) != len(decisions):
+    decided = {decision.isin: decision.lei for decision in lei_decisions}
+    if len(decided) != len(lei_decisions):
         raise UniverseError("two decisions are about the same ISIN; a security has one issuer")
-    lines = _sort_lines(funds, decided)
+    named = {decision.isin: decision.name for decision in name_decisions}
+    if len(named) != len(name_decisions):
+        raise UniverseError("two name decisions are about the same ISIN; a company has one name")
+    lines = _sort_lines(funds, decided, named)
     not_loaded = list(lines.left_out)
     receipts_kept = 0
     receipts_not_loaded = 0
@@ -492,8 +589,9 @@ def load_holdings(
     with database.unit_of_work() as work:
         placer = _Placer(work)
         # Decisions first, so that every line below is compared with the
-        # identifiers as they have been decided (ADR 0010).
-        placer.settle(decisions)
+        # identifiers and names as they have been decided (ADR 0010, ADR 0012).
+        placer.settle(lei_decisions)
+        placer.settle_names(name_decisions)
 
         # Step 4 of ADR 0006: ordinary lines. The companies they belong to are
         # what "already in the universe through its own shares" means below.
@@ -544,7 +642,9 @@ def load_holdings(
         joined_by_name=placer.joined_by_name,
         leis_filled=placer.leis_filled,
         leis_corrected=placer.leis_corrected,
-        decisions_used=lines.decisions_used,
+        lei_decisions_used=lines.lei_decisions_used,
+        name_decisions_used=lines.name_decisions_used,
+        companies_renamed=placer.companies_renamed,
         companies=placer.company_count,
         instruments=placer.instrument_count,
         not_loaded=tuple(

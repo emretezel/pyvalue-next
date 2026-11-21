@@ -24,6 +24,7 @@ One row per legal entity that issues securities. Decided in ADR 0001. Created by
 - **`company_id` is a surrogate key** because no identifier covers every company.
 - **`lei` is optional** because many companies have none. Any number of companies may have an empty `lei`; two companies can never share one.
 - **`name` is not unique**: different companies can share a name.
+- **Where `name` comes from**: the spelling of the first fund that names the company (ADR 0006), or, when that fund files a vendor placeholder, the name a decision gives (ADR 0012).
 - **How a company is matched when holdings are loaded** is set out in ADR 0006: by `lei` when the holdings line has one, otherwise by exact name.
 
 ## Relationships

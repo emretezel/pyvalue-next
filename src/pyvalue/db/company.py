@@ -16,7 +16,8 @@ class Company:
 
     Attributes:
         company_id: The row's id.
-        name: The company's name as it was first loaded.
+        name: The company's name: the spelling of the first fund that named
+            it, or the name a decision gave it (ADR 0012).
         lei: The legal-entity identifier, or ``None`` when none is known.
     """
 
@@ -77,7 +78,33 @@ class CompanyRepository(Repository):
                 company already has it.
             DatabaseError: If there is no company with this id.
         """
-        cursor = self._execute("UPDATE company SET lei = ? WHERE company_id = ?", (lei, company_id))
+        self._change_one("UPDATE company SET lei = ? WHERE company_id = ?", lei, company_id)
+
+    def set_name(self, company_id: int, name: str) -> None:
+        """Give a company another name.
+
+        Args:
+            company_id: The company to change.
+            name: The name: not empty, no surrounding spaces.
+
+        Raises:
+            ConstraintError: If the name has the wrong shape.
+            DatabaseError: If there is no company with this id.
+        """
+        self._change_one("UPDATE company SET name = ? WHERE company_id = ?", name, company_id)
+
+    def _change_one(self, sql: str, value: str, company_id: int) -> None:
+        """Run an update of one column of one company.
+
+        Args:
+            sql: The statement: first the new value, then the company's id.
+            value: The new value.
+            company_id: The company to change.
+
+        Raises:
+            DatabaseError: If there is no company with this id.
+        """
+        cursor = self._execute(sql, (value, company_id))
         # An UPDATE that matches no row succeeds silently in SQL. Here it means
         # the caller holds an id that does not exist, which must not pass.
         if cursor.rowcount != 1:

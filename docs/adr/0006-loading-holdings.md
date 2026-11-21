@@ -1,6 +1,6 @@
 # ADR 0006: Holdings are loaded straight into `company` and `instrument`
 
-- Status: Accepted. Two points left open here, where the load output goes and punctuation in name comparison, are settled by ADR 0009.
+- Status: Accepted. Two points left open here, where the load output goes and punctuation in name comparison, are settled by ADR 0009. ADR 0012 lets a decision replace a stored name that is a vendor placeholder; otherwise the stored name is still the first fund's spelling.
 - Date: 2026-11-20
 
 ## Decision

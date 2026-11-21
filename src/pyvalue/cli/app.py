@@ -76,9 +76,15 @@ def _universe_load(arguments: argparse.Namespace) -> int:
         f"{result.joined_by_name:,} by name"
     )
     print(f"Legal-entity identifiers filled in: {result.leis_filled:,}")
+    # "Companies corrected: 1" reads right for any count, which "corrected 1
+    # companies" did not.
     print(
-        f"Decisions on legal-entity identifiers used: {result.decisions_used:,}, "
-        f"which corrected {result.leis_corrected:,} companies"
+        f"Decisions on legal-entity identifiers used: {result.lei_decisions_used:,}; "
+        f"companies corrected: {result.leis_corrected:,}"
+    )
+    print(
+        f"Decisions on company names used: {result.name_decisions_used:,}; "
+        f"companies renamed: {result.companies_renamed:,}"
     )
     print(
         f"The database now holds {result.companies:,} companies and "

@@ -7,12 +7,13 @@ files: which are downloaded, which are reused, and what is asked of the SEC.
 Author: Emre Tezel
 """
 
+from datetime import date
 from pathlib import Path
 
 import pytest
 
 from pyvalue.db import Database
-from pyvalue.universe import PINNED_FILINGS, FilingError, load_universe
+from pyvalue.universe import PINNED_FILINGS, FilingError, NameDecision, load_universe
 
 _CONTACT: str = "Sample Person sample@example.org"
 
@@ -39,6 +40,37 @@ def test_filings_that_are_there_are_used_without_asking_for_anything(
     assert outcome.result.lines_read == 31
     assert outcome.output.lines_not_loaded == tmp_path / "universe" / "lines_not_loaded.csv"
     assert outcome.output.cases_for_agent.is_file()
+
+
+def test_the_decisions_shipped_with_the_package_are_applied_by_default(
+    database: Database, filings_dir: Path, tmp_path: Path
+) -> None:
+    """ADR 0010 and ADR 0012: a caller that passes no decisions gets the package's own.
+
+    The shipped files are about real securities, so on the sample filings they
+    are read and match nothing. A caller's own decisions replace them.
+    """
+    shipped = load_universe(
+        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
+    )
+    named = load_universe(
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        name_decisions=[
+            NameDecision(
+                isin="JP300000I006",
+                name="Iota KK",
+                decided_on=date(2026, 11, 21),
+                evidence="Made up for a test",
+            )
+        ],
+    )
+
+    assert (shipped.result.lei_decisions_used, shipped.result.name_decisions_used) == (0, 0)
+    assert (named.result.name_decisions_used, named.result.companies_renamed) == (1, 1)
 
 
 def test_missing_filings_are_downloaded_once_and_kept(

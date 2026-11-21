@@ -15,6 +15,7 @@ import pytest
 from pyvalue.db import Company, Database, Instrument, migrate
 from pyvalue.universe import load_universe
 from pyvalue.universe.lei_decisions import read_lei_decisions
+from pyvalue.universe.name_decisions import read_name_decisions
 
 pytestmark = pytest.mark.integration
 
@@ -191,7 +192,8 @@ def test_the_shipped_decisions_concern_none_of_the_sample_securities(
         database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
     )
 
-    assert outcome.result.decisions_used == 0
+    assert outcome.result.lei_decisions_used == 0
+    assert outcome.result.name_decisions_used == 0
     assert len(outcome.result.agent_cases) == 2
 
 
@@ -207,7 +209,7 @@ def test_the_sample_decisions_settle_both_cases(
 
     assert _tables(database) == (_EXPECTED_COMPANIES_AFTER_DECISIONS, _EXPECTED_INSTRUMENTS)
     result = outcome.result
-    assert (result.decisions_used, result.leis_corrected) == (2, 0)
+    assert (result.lei_decisions_used, result.leis_corrected) == (2, 0)
     assert result.agent_cases == ()
     assert outcome.output.cases_for_agent.read_bytes() == _CASES_HEADER
     # The lines that are not loaded have nothing to do with the decisions.
@@ -238,3 +240,64 @@ def test_decisions_applied_later_give_the_database_a_rebuild_would_give(
     assert (corrected.result.leis_corrected, corrected.result.leis_filled) == (1, 1)
     assert corrected.result.agent_cases == ()
     assert corrected.output.cases_for_agent.read_bytes() == _CASES_HEADER
+
+
+# --- With the sample name decision (ADR 0012) --------------------------------------------
+
+# What the sample name decision changes: Iota is called as DFAX spells it.
+_EXPECTED_COMPANIES_AFTER_NAMING: tuple[Company, ...] = tuple(
+    Company(7, "Iota KK", None) if company.company_id == 7 else company
+    for company in _EXPECTED_COMPANIES
+)
+
+
+def test_the_sample_name_decision_names_the_company(
+    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+) -> None:
+    """A database built with the decision stores the decided name from the start."""
+    names = read_name_decisions(nport_samples / "decisions" / "name.csv")
+
+    outcome = load_universe(
+        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched, (), names
+    )
+
+    assert _tables(database) == (_EXPECTED_COMPANIES_AFTER_NAMING, _EXPECTED_INSTRUMENTS)
+    # The company was added under the decided name, so nothing had to be renamed.
+    assert (outcome.result.name_decisions_used, outcome.result.companies_renamed) == (1, 0)
+    # A name decides nothing about identifiers: both cases are still open.
+    assert len(outcome.result.agent_cases) == 2
+    assert (
+        outcome.output.lines_not_loaded.read_bytes()
+        == (nport_samples / "expected" / "lines_not_loaded.csv").read_bytes()
+    )
+
+
+def test_a_name_decided_later_gives_the_database_a_rebuild_would_give(
+    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+) -> None:
+    """Renamed in place or built from scratch, with both kinds of decision, the rows agree."""
+    leis = read_lei_decisions(nport_samples / "decisions" / "lei.csv")
+    names = read_name_decisions(nport_samples / "decisions" / "name.csv")
+    # In place: loaded before any decision existed.
+    load_universe(database, filings_dir, tmp_path / "first", _never_asked, _never_fetched, (), ())
+    renamed = load_universe(
+        database, filings_dir, tmp_path / "second", _never_asked, _never_fetched, leis, names
+    )
+    again = load_universe(
+        database, filings_dir, tmp_path / "third", _never_asked, _never_fetched, leis, names
+    )
+    # From scratch: a second database that sees the decisions from the start.
+    migrate(tmp_path / "scratch.db")
+    scratch = Database(tmp_path / "scratch.db")
+    load_universe(
+        scratch, filings_dir, tmp_path / "fourth", _never_asked, _never_fetched, leis, names
+    )
+
+    expected = tuple(
+        Company(7, "Iota KK", _IOTA_DECIDED) if company.company_id == 7 else company
+        for company in _EXPECTED_COMPANIES_AFTER_DECISIONS
+    )
+    assert _tables(database) == _tables(scratch) == (expected, _EXPECTED_INSTRUMENTS)
+    assert (renamed.result.name_decisions_used, renamed.result.companies_renamed) == (1, 1)
+    # The second run finds the name already there.
+    assert (again.result.name_decisions_used, again.result.companies_renamed) == (1, 0)

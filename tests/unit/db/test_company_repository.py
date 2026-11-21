@@ -80,6 +80,44 @@ def test_set_lei_refuses_a_company_that_does_not_exist(database: Database) -> No
             work.companies.set_lei(99, _LEI)
 
 
+def test_set_name_renames_the_company(database: Database) -> None:
+    """A company loaded under a vendor placeholder can be given its name (ADR 0012)."""
+    with database.unit_of_work() as work:
+        company = work.companies.add("New Issuer: BB Company ID:1", _LEI)
+        work.companies.set_name(company.company_id, "Alpha Corp")
+
+        # The identifier is left as it was.
+        assert work.companies.all() == (Company(company_id=1, name="Alpha Corp", lei=_LEI),)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param("", id="empty"),
+        pytest.param(" Alpha Corp", id="leading space"),
+        pytest.param("Alpha Corp ", id="trailing space"),
+    ],
+)
+def test_set_name_refuses_a_name_of_the_wrong_shape(database: Database, name: str) -> None:
+    """The checks on a new row hold for a renamed one too."""
+    with database.unit_of_work() as work:
+        company = work.companies.add("Alpha Corp", None)
+
+        with pytest.raises(ConstraintError, match="the company table refused a row"):
+            work.companies.set_name(company.company_id, name)
+
+        assert work.companies.all() == (Company(company_id=1, name="Alpha Corp", lei=None),)
+
+
+def test_set_name_refuses_a_company_that_does_not_exist(database: Database) -> None:
+    """An update that matches no row is an error, not a silent success."""
+    with database.unit_of_work() as work:
+        work.companies.add("Alpha Corp", None)
+
+        with pytest.raises(DatabaseError, match="there is no company with id 99"):
+            work.companies.set_name(99, "Beta Inc")
+
+
 @pytest.mark.parametrize(
     ("name", "lei"),
     [

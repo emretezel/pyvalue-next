@@ -23,6 +23,7 @@ from pyvalue.universe import (
     HoldingLine,
     LeiDecision,
     LoadResult,
+    NameDecision,
     NotLoadedReason,
     UniverseError,
     load_holdings,
@@ -80,6 +81,13 @@ def _decision(isin: str, lei: str) -> LeiDecision:
         company="Sample Co",
         decided_on=date(2026, 11, 20),
         evidence="Made up for a test",
+    )
+
+
+def _name_decision(isin: str, name: str) -> NameDecision:
+    """Build a decision that the security's issuer is called by the given name."""
+    return NameDecision(
+        isin=isin, name=name, decided_on=date(2026, 11, 21), evidence="Made up for a test"
     )
 
 
@@ -790,7 +798,7 @@ def test_without_a_decision_the_dispute_is_a_case(database: Database) -> None:
 
     assert _companies(database) == (Company(1, "THETA AG", _THETA_LEI),)
     assert len(result.agent_cases) == 1
-    assert (result.decisions_used, result.leis_corrected) == (0, 0)
+    assert (result.lei_decisions_used, result.leis_corrected) == (0, 0)
 
 
 def test_on_an_empty_database_the_decided_identifier_is_the_one_loaded(
@@ -801,7 +809,7 @@ def test_on_an_empty_database_the_decided_identifier_is_the_one_loaded(
 
     assert _companies(database) == (Company(1, "THETA AG", _ALPHA_LEI),)
     assert result.agent_cases == ()
-    assert (result.decisions_used, result.leis_corrected) == (1, 0)
+    assert (result.lei_decisions_used, result.leis_corrected) == (1, 0)
 
 
 def test_a_decision_may_side_with_the_first_fund(database: Database) -> None:
@@ -812,7 +820,7 @@ def test_a_decision_may_side_with_the_first_fund(database: Database) -> None:
 
     assert _companies(database) == (Company(1, "THETA AG", _THETA_LEI),)
     assert result.agent_cases == ()
-    assert (result.decisions_used, result.leis_corrected) == (1, 0)
+    assert (result.lei_decisions_used, result.leis_corrected) == (1, 0)
 
 
 def test_a_decision_may_name_an_identifier_no_fund_filed(database: Database) -> None:
@@ -847,7 +855,7 @@ def test_a_correction_is_made_once(database: Database) -> None:
     assert _companies(database) == (Company(1, "THETA AG", _ALPHA_LEI),)
     assert (again.leis_corrected, again.leis_filled) == (0, 0)
     assert again.agent_cases == ()
-    assert again.decisions_used == 1
+    assert again.lei_decisions_used == 1
 
 
 def test_a_decision_gives_an_identifier_to_a_company_that_has_none(database: Database) -> None:
@@ -927,7 +935,7 @@ def test_deciding_the_sibling_too_closes_the_case(database: Database) -> None:
 
     assert _companies(database) == (Company(1, "THETA AG", _ALPHA_LEI),)
     assert result.agent_cases == ()
-    assert (result.decisions_used, result.leis_corrected) == (2, 1)
+    assert (result.lei_decisions_used, result.leis_corrected) == (2, 1)
 
 
 def test_a_database_corrected_in_place_equals_one_built_from_scratch(
@@ -1084,7 +1092,7 @@ def test_a_decision_for_a_security_no_fund_holds_changes_nothing(database: Datab
     result = load_holdings(database, _disputed_funds(), [_decision(_ISIN_1, _KAPPA_LEI)])
 
     assert _companies(database) == (Company(1, "THETA AG", _THETA_LEI),)
-    assert result.decisions_used == 0
+    assert result.lei_decisions_used == 0
     assert len(result.agent_cases) == 1
 
 
@@ -1097,7 +1105,7 @@ def test_a_decision_does_not_make_a_line_loadable(database: Database) -> None:
     )
 
     assert _companies(database) == ()
-    assert result.decisions_used == 0
+    assert result.lei_decisions_used == 0
 
 
 def test_two_decisions_for_one_security_are_refused(database: Database) -> None:
@@ -1108,6 +1116,292 @@ def test_two_decisions_for_one_security_are_refused(database: Database) -> None:
         load_holdings(database, _disputed_funds(), decisions)
 
     assert _companies(database) == ()
+
+
+# --- Decisions on company names (ADR 0012) -----------------------------------------------
+
+# What a fund's data vendor files when it has not set the issuer up yet.
+_PLACEHOLDER: str = "New Issuer: BB Company ID:68830100"
+
+
+def _placeholder_funds() -> list[FundHoldings]:
+    """Return two funds that hold one security; the first files a placeholder for its issuer."""
+    return [
+        _fund("VXUS", _line(_PLACEHOLDER, _ISIN_5, lei=_THETA_LEI)),
+        _fund("DFAX", _line("Theta AG", _ISIN_5, lei=_THETA_LEI)),
+    ]
+
+
+def test_without_a_name_decision_the_placeholder_is_stored(database: Database) -> None:
+    """The starting point of the tests below: the first fund's spelling is kept."""
+    result = load_holdings(database, _placeholder_funds())
+
+    assert _companies(database) == (Company(1, _PLACEHOLDER, _THETA_LEI),)
+    assert (result.name_decisions_used, result.companies_renamed) == (0, 0)
+
+
+def test_on_an_empty_database_the_decided_name_is_the_one_stored(database: Database) -> None:
+    """The line is read as carrying the decided name, so the company is added under it."""
+    result = load_holdings(
+        database, _placeholder_funds(), name_decisions=[_name_decision(_ISIN_5, "Theta AG")]
+    )
+
+    assert _companies(database) == (Company(1, "Theta AG", _THETA_LEI),)
+    # Added under the name, not renamed.
+    assert (result.name_decisions_used, result.companies_renamed) == (1, 0)
+
+
+def test_a_name_decision_renames_a_company_that_is_already_loaded(database: Database) -> None:
+    """The real database was loaded first and given its names afterwards."""
+    load_holdings(database, _placeholder_funds())
+
+    result = load_holdings(
+        database, _placeholder_funds(), name_decisions=[_name_decision(_ISIN_5, "Theta AG")]
+    )
+
+    # The identifier and the instrument are left as they were.
+    assert _companies(database) == (Company(1, "Theta AG", _THETA_LEI),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_5),)
+    assert (result.name_decisions_used, result.companies_renamed) == (1, 1)
+    assert (result.companies_added, result.instruments_added) == (0, 0)
+
+
+def test_a_name_that_is_already_right_is_not_changed(database: Database) -> None:
+    """A second run with the same decision finds nothing left to rename."""
+    names = [_name_decision(_ISIN_5, "Theta AG")]
+    load_holdings(database, _placeholder_funds(), name_decisions=names)
+
+    again = load_holdings(database, _placeholder_funds(), name_decisions=names)
+
+    assert _companies(database) == (Company(1, "Theta AG", _THETA_LEI),)
+    assert (again.name_decisions_used, again.companies_renamed) == (1, 0)
+
+
+def test_a_company_found_by_its_identifier_is_given_the_decided_name(database: Database) -> None:
+    """A decision names the company of its security, whichever line brought the company in."""
+    result = load_holdings(
+        database,
+        [
+            _fund(
+                "VXUS",
+                _line("THETA AG", _ISIN_1, lei=_THETA_LEI, title="THETA AG-A"),
+                _line(_PLACEHOLDER, _ISIN_5, lei=_THETA_LEI, title="THETA AG-B"),
+            )
+        ],
+        name_decisions=[_name_decision(_ISIN_5, "Theta Aktiengesellschaft")],
+    )
+
+    assert _companies(database) == (Company(1, "Theta Aktiengesellschaft", _THETA_LEI),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_1), Instrument(2, 1, _ISIN_5))
+    assert (result.joined_by_lei, result.companies_renamed) == (1, 1)
+
+
+def test_a_later_line_joins_under_the_decided_name_and_not_under_the_placeholder(
+    database: Database,
+) -> None:
+    """A renamed company without an identifier is found by its new name only."""
+    load_holdings(database, [_fund("VXUS", _line(_PLACEHOLDER, _ISIN_1))])
+
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line(_PLACEHOLDER, _ISIN_1)),
+            _fund(
+                "DFAX",
+                # The decided name in another case: the same company.
+                _line("BETA INC", _ISIN_2),
+                # The placeholder again, for another security: it leads nowhere now.
+                _line(_PLACEHOLDER, _ISIN_3),
+            ),
+        ],
+        name_decisions=[_name_decision(_ISIN_1, "Beta Inc")],
+    )
+
+    assert _companies(database) == (Company(1, "Beta Inc", None), Company(2, _PLACEHOLDER, None))
+    assert _instruments(database) == (
+        Instrument(1, 1, _ISIN_1),
+        Instrument(2, 1, _ISIN_2),
+        Instrument(3, 2, _ISIN_3),
+    )
+    assert (result.joined_by_name, result.companies_renamed) == (1, 1)
+
+
+def test_a_placeholder_hides_a_company_from_its_receipt(database: Database) -> None:
+    """Without a decision nothing ties the receipt to the company, so the receipt is loaded."""
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line(_PLACEHOLDER, _ISIN_3)),
+            _fund("DFAX", _line("Zeta Ltd", _RECEIPT_ISIN, category="OTHER", label="ADR")),
+        ],
+    )
+
+    assert _companies(database) == (Company(1, _PLACEHOLDER, None), Company(2, "Zeta Ltd", None))
+    assert (result.receipts_kept, result.receipts_not_loaded) == (1, 0)
+
+
+def test_a_receipt_of_a_company_named_by_decision_is_not_loaded(database: Database) -> None:
+    """The receipt rule compares names as decided: the company is seen to be there already."""
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line(_PLACEHOLDER, _ISIN_3)),
+            _fund("DFAX", _line("Zeta Ltd", _RECEIPT_ISIN, category="OTHER", label="ADR")),
+        ],
+        name_decisions=[_name_decision(_ISIN_3, "Zeta Ltd")],
+    )
+
+    assert _companies(database) == (Company(1, "Zeta Ltd", None),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3),)
+    assert _not_loaded(result) == [("DFAX", 1, NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED)]
+
+
+def _two_securities_of_one_company() -> list[FundHoldings]:
+    """Return one fund that holds two securities of a company, joined by its identifier."""
+    return [
+        _fund(
+            "VXUS",
+            _line(_PLACEHOLDER, _ISIN_1, lei=_THETA_LEI, title="THETA AG-A"),
+            _line(_PLACEHOLDER, _ISIN_5, lei=_THETA_LEI, title="THETA AG-B"),
+        )
+    ]
+
+
+def test_the_same_name_for_two_securities_of_a_company_is_no_contradiction(
+    database: Database,
+) -> None:
+    """Deciding every security of a company alike is the normal case."""
+    names = [_name_decision(_ISIN_1, "Theta AG"), _name_decision(_ISIN_5, "Theta AG")]
+
+    result = load_holdings(database, _two_securities_of_one_company(), name_decisions=names)
+
+    assert _companies(database) == (Company(1, "Theta AG", _THETA_LEI),)
+    assert (result.name_decisions_used, result.companies_renamed) == (2, 0)
+
+
+def test_name_decisions_that_contradict_each_other_are_refused_on_an_empty_database(
+    database: Database,
+) -> None:
+    """One company cannot be called two things, so the load stops and writes nothing."""
+    names = [_name_decision(_ISIN_1, "Theta AG"), _name_decision(_ISIN_5, "Theta SE")]
+
+    with pytest.raises(UniverseError) as raised:
+        load_holdings(database, _two_securities_of_one_company(), name_decisions=names)
+
+    assert str(raised.value) == (
+        f"{_ISIN_1} and {_ISIN_5} are securities of one company, but the name decisions call it "
+        "'Theta AG' and 'Theta SE'"
+    )
+    assert _companies(database) == ()
+    assert _instruments(database) == ()
+
+
+def test_name_decisions_that_contradict_each_other_are_refused_on_a_loaded_database(
+    database: Database,
+) -> None:
+    """The same refusal when the company is already there; it keeps the name it had."""
+    load_holdings(database, _two_securities_of_one_company())
+    funds = [*_two_securities_of_one_company(), _fund("DFAX", _line("Gamma Inc", _ISIN_3))]
+    names = [_name_decision(_ISIN_1, "Theta AG"), _name_decision(_ISIN_5, "Theta SE")]
+
+    with pytest.raises(UniverseError, match="are securities of one company"):
+        load_holdings(database, funds, name_decisions=names)
+
+    # Neither the first rename nor the new line of the same run was saved.
+    assert _companies(database) == (Company(1, _PLACEHOLDER, _THETA_LEI),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_1), Instrument(2, 1, _ISIN_5))
+
+
+def test_a_name_decision_for_a_security_no_fund_holds_changes_nothing(
+    database: Database,
+) -> None:
+    """The file may run ahead of the filings; such a row waits."""
+    result = load_holdings(
+        database, _placeholder_funds(), name_decisions=[_name_decision(_ISIN_1, "Alpha Corp")]
+    )
+
+    assert _companies(database) == (Company(1, _PLACEHOLDER, _THETA_LEI),)
+    assert (result.name_decisions_used, result.companies_renamed) == (0, 0)
+
+
+def test_a_name_decision_does_not_make_a_line_loadable(database: Database) -> None:
+    """A line that is debt stays out, whatever the names file says about its ISIN."""
+    result = load_holdings(
+        database,
+        [_fund("VXUS", _line(_PLACEHOLDER, _ISIN_5, category="DBT"))],
+        name_decisions=[_name_decision(_ISIN_5, "Theta AG")],
+    )
+
+    assert _companies(database) == ()
+    assert result.name_decisions_used == 0
+
+
+def test_two_name_decisions_for_one_security_are_refused(database: Database) -> None:
+    """A company has one name; the load does not pick between two answers."""
+    names = [_name_decision(_ISIN_5, "Theta AG"), _name_decision(_ISIN_5, "Theta SE")]
+
+    with pytest.raises(UniverseError, match="two name decisions are about the same ISIN"):
+        load_holdings(database, _placeholder_funds(), name_decisions=names)
+
+    assert _companies(database) == ()
+
+
+def test_both_kinds_of_decision_apply_to_one_company(database: Database) -> None:
+    """A company can need its identifier settled and its name given in the same run."""
+    funds = [
+        _fund("VXUS", _line(_PLACEHOLDER, _ISIN_5, lei=_THETA_LEI)),
+        _fund("DFAX", _line("Theta AG", _ISIN_5, lei=_ALPHA_LEI)),
+    ]
+    load_holdings(database, funds)
+
+    result = load_holdings(
+        database,
+        funds,
+        [_decision(_ISIN_5, _ALPHA_LEI)],
+        [_name_decision(_ISIN_5, "Theta AG")],
+    )
+
+    assert _companies(database) == (Company(1, "Theta AG", _ALPHA_LEI),)
+    assert (result.leis_corrected, result.companies_renamed) == (1, 1)
+    assert result.agent_cases == ()
+
+
+def test_a_database_renamed_in_place_equals_one_built_from_scratch(
+    database: Database, tmp_path: Path
+) -> None:
+    """The names are an input of the load, so both ways give the same rows."""
+    funds = [
+        _fund(
+            "VXUS",
+            _line("DELTA PLC", _ISIN_3, lei=_DELTA_LEI),
+            _line(_PLACEHOLDER, _ISIN_1, lei=_THETA_LEI, title="THETA AG-B"),
+            _line(_PLACEHOLDER, _ISIN_5, lei=_THETA_LEI, title="THETA AG-A"),
+            _line("New Issuer: BB Company ID:2", _ISIN_4),
+        ),
+        _fund("DFAX", _line("Theta AG", _ISIN_5, lei=_THETA_LEI), _line("Iota KK", _ISIN_4)),
+    ]
+    names = [
+        _name_decision(_ISIN_1, "Theta AG"),
+        _name_decision(_ISIN_5, "Theta AG"),
+        _name_decision(_ISIN_4, "Iota KK"),
+    ]
+    # Renamed in place: loaded without the names first, as the real database was.
+    load_holdings(database, funds)
+    renamed = load_holdings(database, funds, name_decisions=names)
+    # Built from scratch: a second database that sees the names from the start.
+    scratch_path = tmp_path / "scratch.db"
+    migrate(scratch_path)
+    scratch = Database(scratch_path)
+    built = load_holdings(scratch, funds, name_decisions=names)
+
+    assert _companies(database) == _companies(scratch)
+    assert _instruments(database) == _instruments(scratch)
+    assert _companies(database) == (
+        Company(1, "DELTA PLC", _DELTA_LEI),
+        Company(2, "Theta AG", _THETA_LEI),
+        Company(3, "Iota KK", None),
+    )
+    assert (renamed.companies_renamed, built.companies_renamed) == (2, 0)
 
 
 # --- Comparing names ---------------------------------------------------------------------
