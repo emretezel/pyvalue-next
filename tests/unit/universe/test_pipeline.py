@@ -18,6 +18,7 @@ from pyvalue.universe import (
     Exclusion,
     FilingError,
     NameDecision,
+    OrdinaryShare,
     UniverseError,
     load_universe,
 )
@@ -52,7 +53,7 @@ def test_filings_that_are_there_are_used_without_asking_for_anything(
 def test_the_decisions_shipped_with_the_package_are_applied_by_default(
     database: Database, filings_dir: Path, tmp_path: Path
 ) -> None:
-    """ADR 0010, 0012 and 0013: a caller that passes no decisions gets the package's own.
+    """ADR 0010, 0012, 0013 and 0015: a caller that passes none gets the package's own.
 
     The shipped files are about real securities, so on the sample filings they
     are read and match nothing. A caller's own decisions replace them.
@@ -77,7 +78,7 @@ def test_the_decisions_shipped_with_the_package_are_applied_by_default(
     )
 
     assert (shipped.result.lei_decisions_used, shipped.result.name_decisions_used) == (0, 0)
-    assert shipped.result.exclusions_used == 0
+    assert (shipped.result.exclusions_used, shipped.result.ordinary_shares_used) == (0, 0)
     assert (named.result.name_decisions_used, named.result.companies_renamed) == (1, 1)
 
 
@@ -138,6 +139,33 @@ def test_an_exclusion_stops_the_run_on_a_database_that_holds_the_security(
         )
 
     assert first.output.lines_not_loaded.read_bytes() == before
+
+
+def test_a_callers_swap_reads_a_receipt_as_its_ordinary_share(
+    database: Database, filings_dir: Path, tmp_path: Path
+) -> None:
+    """ADR 0015: the swaps reach the load, and the receipt's lines are loaded under the share."""
+    outcome = load_universe(
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        ordinary_shares=[
+            OrdinaryShare(
+                isin="US00000O0018",
+                ordinary_isin="SG00000O0017",
+                company="Omicron Ltd",
+                decided_on=date(2026, 11, 21),
+                evidence="Made up for a test",
+            )
+        ],
+    )
+
+    result = outcome.result
+    assert (result.ordinary_shares_used, result.companies, result.instruments) == (1, 14, 16)
+    # One receipt fewer: the swapped line is an ordinary line.
+    assert (result.receipts_recognised, result.receipts_kept) == (4, 1)
 
 
 def test_missing_filings_are_downloaded_once_and_kept(

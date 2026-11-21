@@ -65,6 +65,7 @@ def _result(
         name_decisions_used=0,
         companies_renamed=0,
         exclusions_used=0,
+        ordinary_shares_used=0,
         companies=0,
         instruments=0,
         not_loaded=not_loaded,

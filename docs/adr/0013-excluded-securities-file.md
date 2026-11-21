@@ -1,6 +1,6 @@
 # ADR 0013: A security can be kept out of the universe by a file the load applies
 
-- Status: Accepted
+- Status: Accepted. Its first use is replaced by ADR 0015: the receipts kept out here are now read as their ordinary shares, so their companies are back in the universe. The file and the mechanism stay; the file holds no row.
 - Date: 2026-11-21
 
 ## Decision

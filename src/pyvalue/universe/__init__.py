@@ -5,7 +5,7 @@ is run, where its files go and what it leaves for an agent is ADR 0009. How a
 decision on a company's legal-entity identifier is applied is ADR 0010, and
 which identifier it may name is ADR 0011. How a decision on a company's name
 is applied is ADR 0012, and how a security is kept out of the universe is
-ADR 0013.
+ADR 0013. How a depositary receipt is read as its ordinary share is ADR 0015.
 
 Author: Emre Tezel
 """
@@ -25,6 +25,7 @@ from pyvalue.universe.load import (
 )
 from pyvalue.universe.name_decisions import NameDecision
 from pyvalue.universe.nport import HoldingLine
+from pyvalue.universe.ordinary_shares import OrdinaryShare
 from pyvalue.universe.output import OutputFiles
 from pyvalue.universe.pipeline import (
     DEFAULT_FILINGS_DIR,
@@ -48,6 +49,7 @@ __all__ = [
     "NameDecision",
     "NotLoadedLine",
     "NotLoadedReason",
+    "OrdinaryShare",
     "OutputFiles",
     "PinnedFiling",
     "UniverseError",

@@ -88,6 +88,7 @@ def _universe_load(arguments: argparse.Namespace) -> int:
         f"companies renamed: {result.companies_renamed:,}"
     )
     print(f"Securities kept out of the universe by decision: {result.exclusions_used:,}")
+    print(f"Receipts read as their ordinary share by decision: {result.ordinary_shares_used:,}")
     print(
         f"The database now holds {result.companies:,} companies and "
         f"{result.instruments:,} instruments"

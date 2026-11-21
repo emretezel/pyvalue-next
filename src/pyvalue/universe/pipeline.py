@@ -15,6 +15,7 @@ from pyvalue.universe.filings import PINNED_FILINGS, PinnedFiling, read_pinned_f
 from pyvalue.universe.lei_decisions import LeiDecision, packaged_lei_decisions
 from pyvalue.universe.load import FundHoldings, LoadResult, load_holdings
 from pyvalue.universe.name_decisions import NameDecision, packaged_name_decisions
+from pyvalue.universe.ordinary_shares import OrdinaryShare, packaged_ordinary_shares
 from pyvalue.universe.output import OutputFiles, write_output
 from pyvalue.universe.sec import Fetch, download_filing, fetch_from_sec
 
@@ -49,6 +50,7 @@ def load_universe(
     lei_decisions: Sequence[LeiDecision] | None = None,
     name_decisions: Sequence[NameDecision] | None = None,
     exclusions: Sequence[Exclusion] | None = None,
+    ordinary_shares: Sequence[OrdinaryShare] | None = None,
 ) -> UniverseLoad:
     """Load the pinned filings into the database.
 
@@ -70,6 +72,9 @@ def load_universe(
         exclusions: The securities to keep out of the universe. Defaults
             to the ones shipped with the package (ADR 0013); tests pass
             their own.
+        ordinary_shares: The receipts to read as their ordinary share.
+            Defaults to the ones shipped with the package (ADR 0015);
+            tests pass their own.
 
     Returns:
         What was downloaded, what the load did and where its output is.
@@ -88,6 +93,8 @@ def load_universe(
         name_decisions = packaged_name_decisions()
     if exclusions is None:
         exclusions = packaged_exclusions()
+    if ordinary_shares is None:
+        ordinary_shares = packaged_ordinary_shares()
     downloaded: list[PinnedFiling] = []
     funds: list[FundHoldings] = []
     for pinned in PINNED_FILINGS:
@@ -97,7 +104,9 @@ def load_universe(
             downloaded.append(pinned)
         funds.append(FundHoldings(ticker=pinned.ticker, lines=read_pinned_filing(path, pinned)))
 
-    result = load_holdings(database, funds, lei_decisions, name_decisions, exclusions)
+    result = load_holdings(
+        database, funds, lei_decisions, name_decisions, exclusions, ordinary_shares
+    )
     # Written only after the load is saved, so the files never describe a load
     # that was rolled back.
     output = write_output(result, output_dir)

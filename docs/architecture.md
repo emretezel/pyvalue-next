@@ -10,7 +10,7 @@ Only what has been agreed is described as designed. Everything else is listed as
 |---|---|---|---|
 | Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections, migrations, the unit of work, and the repositories for `company` and `instrument`. A repository is added when a component first needs its table |
 | Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load` |
-| Universe load | `pyvalue.universe` | Downloads the three SEC holdings filings and reads them into `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names and on securities kept out (ADR 0004, ADR 0006, ADR 0009, ADR 0010, ADR 0011, ADR 0012, ADR 0013) | Built |
+| Universe load | `pyvalue.universe` | Downloads the three SEC holdings filings and reads them into `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0004, ADR 0006, ADR 0009 to ADR 0015) | Built |
 | Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line |
 | Listings | `pyvalue.listings` | Looks up provider listings, applies the automatic rule and the decisions file (ADR 0005) | Planned |
 | Providers | `pyvalue.providers` | The EODHD client | Planned |
@@ -62,7 +62,7 @@ The data model and the steps are fixed by the records. Step 1 is built; the code
 
 | Step | What happens | Record |
 |---|---|---|
-| 1. Load | The SEC holdings filings of VTI, VXUS and DFAX are read into `company` and `instrument`. Where the funds file different legal-entity identifiers for a security, a decisions file chooses between them. Where a fund files a placeholder instead of a company name, a second decisions file gives the name. A third lists securities that are kept out of the universe | ADR 0004, ADR 0006, ADR 0009, ADR 0010, ADR 0011, ADR 0012, ADR 0013 |
+| 1. Load | The SEC holdings filings of VTI, VXUS and DFAX are read into `company` and `instrument`. Where the funds file different legal-entity identifiers for a security, a decisions file chooses between them. Where a fund files a placeholder instead of a company name, a second decisions file gives the name. A third lists securities that are kept out of the universe, and a fourth reads a depositary receipt as its ordinary share | ADR 0004, ADR 0006, ADR 0009 to ADR 0015 |
 | 2. Look up | The provider's symbol lists are matched to instruments by ISIN | ADR 0005 |
 | 3. Fill | A listing is written when the automatic rule applies | ADR 0005 |
 | 4. Decide | An agent decides every other case; its decisions are kept in a committed file | ADR 0005 |
@@ -78,6 +78,7 @@ The data model and the steps are fixed by the records. Step 1 is built; the code
 | Decisions on legal-entity identifiers | `src/pyvalue/universe/decisions/lei.csv`, one row per security, shipped inside the package (ADR 0010). A row names only an identifier a fund filed (ADR 0011) | Yes |
 | Decisions on company names | `src/pyvalue/universe/decisions/name.csv`, one row per security, shipped inside the package. For a company whose filed name is a vendor placeholder (ADR 0012) | Yes |
 | Securities kept out of the universe | `src/pyvalue/universe/decisions/excluded.csv`, one row per security, shipped inside the package. The load does not load them; a database that already holds one has to be rebuilt (ADR 0013) | Yes |
+| Receipts read as their ordinary share | `src/pyvalue/universe/decisions/ordinary_share.csv`, one row per receipt, shipped inside the package. The load reads the receipt's lines under the ordinary share's ISIN; a database that already holds the receipt has to be rebuilt (ADR 0015) | Yes |
 | The agent's listing decisions | A file under version control, expected in the same folder; settled when listings are built | Yes |
 | Credentials and the SEC contact line | `private/config.toml` | No |
 | Table documentation | `docs/database/`, one file per table | Yes |

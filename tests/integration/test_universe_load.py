@@ -17,6 +17,7 @@ from pyvalue.universe import UniverseError, load_universe
 from pyvalue.universe.exclusions import read_exclusions
 from pyvalue.universe.lei_decisions import read_lei_decisions
 from pyvalue.universe.name_decisions import read_name_decisions
+from pyvalue.universe.ordinary_shares import read_ordinary_shares
 
 pytestmark = pytest.mark.integration
 
@@ -196,6 +197,7 @@ def test_the_shipped_decisions_concern_none_of_the_sample_securities(
     assert outcome.result.lei_decisions_used == 0
     assert outcome.result.name_decisions_used == 0
     assert outcome.result.exclusions_used == 0
+    assert outcome.result.ordinary_shares_used == 0
     assert len(outcome.result.agent_cases) == 2
 
 
@@ -389,3 +391,76 @@ def test_an_exclusion_added_later_is_refused_until_the_database_is_rebuilt(
         rebuilt, filings_dir, tmp_path / "third", _never_asked, _never_fetched, (), (), exclusions
     )
     assert _tables(rebuilt) == (_EXPECTED_COMPANIES_WITHOUT_ETA, _EXPECTED_INSTRUMENTS_WITHOUT_ETA)
+
+
+# --- With the sample swap (ADR 0015) -----------------------------------------------------
+
+# What the sample swap changes: Omicron's receipt line is read as its ordinary
+# share. As an ordinary line it is placed in step 4, before the receipts, so
+# Omicron comes before Eta Holdings, whose only line is still a receipt.
+_EXPECTED_COMPANIES_WITH_SWAP: tuple[Company, ...] = (
+    *_EXPECTED_COMPANIES[:12],
+    Company(13, "Omicron Ltd", None),
+    Company(14, "ETA HOLDINGS LTD", None),
+)
+_EXPECTED_INSTRUMENTS_WITH_SWAP: tuple[Instrument, ...] = (
+    *_EXPECTED_INSTRUMENTS[:14],
+    Instrument(15, 13, "SG00000O0017"),
+    Instrument(16, 14, "US00000H0017"),
+)
+
+
+def test_the_sample_swap_loads_the_receipt_as_its_ordinary_share(
+    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+) -> None:
+    """The company is the one the filing names; its instrument is the ordinary share."""
+    swaps = read_ordinary_shares(nport_samples / "decisions" / "ordinary_share.csv")
+
+    outcome = load_universe(
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        (),
+        (),
+        (),
+        swaps,
+    )
+
+    assert _tables(database) == (_EXPECTED_COMPANIES_WITH_SWAP, _EXPECTED_INSTRUMENTS_WITH_SWAP)
+    result = outcome.result
+    assert (result.ordinary_shares_used, result.securities) == (1, 19)
+    assert (result.receipts_recognised, result.receipts_kept, result.receipts_not_loaded) == (
+        4,
+        1,
+        3,
+    )
+    # The swapped line is loaded, so the file of lines not loaded is unchanged.
+    assert (
+        outcome.output.lines_not_loaded.read_bytes()
+        == (nport_samples / "expected" / "lines_not_loaded.csv").read_bytes()
+    )
+
+
+def test_a_swap_added_later_is_refused_until_the_database_is_rebuilt(
+    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+) -> None:
+    """The load never deletes the receipt it loaded before: the old database is left as it is."""
+    swaps = read_ordinary_shares(nport_samples / "decisions" / "ordinary_share.csv")
+    load_universe(database, filings_dir, tmp_path / "first", _never_asked, _never_fetched, (), ())
+
+    with pytest.raises(UniverseError, match="US00000O0018"):
+        load_universe(
+            database,
+            filings_dir,
+            tmp_path / "second",
+            _never_asked,
+            _never_fetched,
+            (),
+            (),
+            (),
+            swaps,
+        )
+
+    assert _tables(database) == (_EXPECTED_COMPANIES, _EXPECTED_INSTRUMENTS)

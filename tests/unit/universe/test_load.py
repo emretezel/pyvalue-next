@@ -26,6 +26,7 @@ from pyvalue.universe import (
     LoadResult,
     NameDecision,
     NotLoadedReason,
+    OrdinaryShare,
     UniverseError,
     load_holdings,
 )
@@ -96,6 +97,17 @@ def _exclusion(isin: str) -> Exclusion:
     """Build a decision that keeps the security out of the universe."""
     return Exclusion(
         isin=isin, company="Sample Co", decided_on=date(2026, 11, 21), evidence="Made up for a test"
+    )
+
+
+def _ordinary_share(isin: str, ordinary_isin: str) -> OrdinaryShare:
+    """Build a decision that the first security is a receipt of the second."""
+    return OrdinaryShare(
+        isin=isin,
+        ordinary_isin=ordinary_isin,
+        company="Sample Co",
+        decided_on=date(2026, 11, 21),
+        evidence="Made up for a test",
     )
 
 
@@ -1694,6 +1706,282 @@ def test_a_second_run_with_the_same_exclusion_changes_nothing(database: Database
 
     assert (_companies(database), _instruments(database)) == before
     assert (again.companies_added, again.instruments_added, again.exclusions_used) == (0, 0, 1)
+
+
+# --- A receipt read as its ordinary share (ADR 0015) -------------------------------------
+
+
+def _receipt_only_funds() -> list[FundHoldings]:
+    """Return one fund that holds a company through its labelled receipt only."""
+    return [
+        _fund(
+            "DFAX",
+            _line("KT CORPORATION", _RECEIPT_ISIN, lei=_KAPPA_LEI, category="OTHER", label="ADR"),
+        )
+    ]
+
+
+def test_without_a_swap_the_receipt_is_the_company_s_only_line(database: Database) -> None:
+    """The starting point of the tests below: the receipt itself is the instrument."""
+    result = load_holdings(database, _receipt_only_funds())
+
+    assert _instruments(database) == (Instrument(1, 1, _RECEIPT_ISIN),)
+    assert (result.receipts_recognised, result.receipts_kept) == (1, 1)
+    assert result.ordinary_shares_used == 0
+
+
+def test_a_swapped_receipt_is_loaded_under_its_ordinary_share(database: Database) -> None:
+    """The company and its identifier come from the filing line; the ISIN is the share's."""
+    result = load_holdings(
+        database,
+        _receipt_only_funds(),
+        ordinary_shares=[_ordinary_share(_RECEIPT_ISIN, _ISIN_3)],
+    )
+
+    assert _companies(database) == (Company(1, "KT CORPORATION", _KAPPA_LEI),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3),)
+    assert result.not_loaded == ()
+    assert result.ordinary_shares_used == 1
+    # The line is an ordinary line now, whatever its label says.
+    assert (result.receipts_recognised, result.securities) == (0, 1)
+
+
+def test_a_swapped_receipt_joins_the_share_another_fund_holds(database: Database) -> None:
+    """Both lines are the same security, so there is one instrument."""
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line("Kanzhun Ltd", _RECEIPT_ISIN, lei=_KAPPA_LEI)),
+            _fund("DFAX", _line("Kanzhun Ltd", _ISIN_1, lei=_KAPPA_LEI)),
+        ],
+        ordinary_shares=[_ordinary_share(_RECEIPT_ISIN, _ISIN_1)],
+    )
+
+    assert _companies(database) == (Company(1, "Kanzhun Ltd", _KAPPA_LEI),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_1),)
+    assert (result.instruments_added, result.securities) == (1, 1)
+
+
+def test_two_receipts_of_a_company_are_read_as_one_share(database: Database) -> None:
+    """Two receipt lines under two spellings end as one company with one instrument."""
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line("PhosAgro PJSC", _SECOND_RECEIPT_ISIN, lei=_KAPPA_LEI)),
+            _fund("DFAX", _line("PHOSAGRO PJSC", _RECEIPT_ISIN)),
+        ],
+        ordinary_shares=[
+            _ordinary_share(_RECEIPT_ISIN, _ISIN_3),
+            _ordinary_share(_SECOND_RECEIPT_ISIN, _ISIN_3),
+        ],
+    )
+
+    assert _companies(database) == (Company(1, "PhosAgro PJSC", _KAPPA_LEI),)
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3),)
+    assert result.ordinary_shares_used == 2
+
+
+def test_a_swapped_line_is_a_line_of_its_company_in_the_receipt_rule(
+    database: Database,
+) -> None:
+    """Another receipt of the company is left out: the company has a line of its own now."""
+    result = load_holdings(
+        database,
+        [
+            _fund(
+                "DFAX",
+                _line("Kappa Ltd", _RECEIPT_ISIN, lei=_KAPPA_LEI, category="OTHER", label="ADR"),
+                _line(
+                    "Kappa Ltd", _SECOND_RECEIPT_ISIN, lei=_KAPPA_LEI, category="OTHER", label="GDR"
+                ),
+            )
+        ],
+        ordinary_shares=[_ordinary_share(_RECEIPT_ISIN, _ISIN_3)],
+    )
+
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3),)
+    assert _not_loaded(result) == [("DFAX", 2, NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED)]
+
+
+def test_a_share_named_as_ordinary_is_no_receipt_whatever_a_line_says(
+    database: Database,
+) -> None:
+    """A fund that files the ordinary share under receipt-like wording does not undo the swap."""
+    result = load_holdings(
+        database,
+        [
+            _fund("VXUS", _line("Kappa Ltd", _ISIN_3, lei=_KAPPA_LEI, title="KAPPA LTD-CDI")),
+            _fund(
+                "DFAX",
+                _line("Kappa Ltd", _RECEIPT_ISIN, lei=_KAPPA_LEI, category="OTHER", label="ADR"),
+            ),
+        ],
+        ordinary_shares=[_ordinary_share(_RECEIPT_ISIN, _ISIN_3)],
+    )
+
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3),)
+    assert result.receipts_recognised == 0
+
+
+def test_decisions_for_a_swapped_company_are_keyed_by_the_ordinary_share(
+    database: Database,
+) -> None:
+    """The line is a line of the share, so that is the ISIN the other files speak of."""
+    result = load_holdings(
+        database,
+        [_fund("VXUS", _line(_PLACEHOLDER, _RECEIPT_ISIN, lei=_THETA_LEI))],
+        [_decision(_ISIN_3, _KAPPA_LEI)],
+        [_name_decision(_ISIN_3, "Kappa Ltd")],
+        ordinary_shares=[_ordinary_share(_RECEIPT_ISIN, _ISIN_3)],
+    )
+
+    assert _companies(database) == (Company(1, "Kappa Ltd", _KAPPA_LEI),)
+    assert (result.lei_decisions_used, result.name_decisions_used) == (1, 1)
+
+
+def test_a_decision_keyed_by_a_swapped_receipt_is_refused(database: Database) -> None:
+    """It could never apply: no line is read under the receipt's ISIN any more."""
+    with pytest.raises(UniverseError, match="has to be keyed by that share") as raised:
+        load_holdings(
+            database,
+            _receipt_only_funds(),
+            name_decisions=[_name_decision(_RECEIPT_ISIN, "KT Corp")],
+            ordinary_shares=[_ordinary_share(_RECEIPT_ISIN, _ISIN_3)],
+        )
+
+    assert _RECEIPT_ISIN in str(raised.value)
+    assert _companies(database) == ()
+
+
+def test_a_receipt_that_is_swapped_and_kept_out_is_refused(database: Database) -> None:
+    """The two files say opposite things about one security."""
+    with pytest.raises(UniverseError, match="read as an ordinary share by another"):
+        load_holdings(
+            database,
+            _receipt_only_funds(),
+            exclusions=[_exclusion(_RECEIPT_ISIN)],
+            ordinary_shares=[_ordinary_share(_RECEIPT_ISIN, _ISIN_3)],
+        )
+
+
+@pytest.mark.parametrize(
+    "also",
+    [
+        pytest.param("receipt", id="the ordinary share is itself listed as a receipt"),
+        pytest.param("excluded", id="the ordinary share is kept out"),
+    ],
+)
+def test_an_ordinary_share_that_is_not_to_be_loaded_itself_is_refused(
+    database: Database, also: str
+) -> None:
+    """A chain of swaps, or a swap into a security that is kept out, has no meaning."""
+    swaps = [_ordinary_share(_RECEIPT_ISIN, _ISIN_3)]
+    exclusions = []
+    if also == "receipt":
+        swaps.append(_ordinary_share(_ISIN_3, _ISIN_1))
+    else:
+        exclusions.append(_exclusion(_ISIN_3))
+
+    with pytest.raises(UniverseError, match="named as an ordinary share by one row") as raised:
+        load_holdings(database, _receipt_only_funds(), exclusions=exclusions, ordinary_shares=swaps)
+
+    assert _ISIN_3 in str(raised.value)
+
+
+def test_two_swaps_for_one_receipt_are_refused(database: Database) -> None:
+    """A receipt stands for one share; the load does not pick between two answers."""
+    swaps = [_ordinary_share(_RECEIPT_ISIN, _ISIN_3), _ordinary_share(_RECEIPT_ISIN, _ISIN_1)]
+
+    with pytest.raises(UniverseError, match="two decisions name an ordinary share"):
+        load_holdings(database, _receipt_only_funds(), ordinary_shares=swaps)
+
+    assert _companies(database) == ()
+
+
+def test_a_database_that_holds_a_swapped_receipt_is_refused(database: Database) -> None:
+    """The load never deletes, so it says that the database has to be rebuilt."""
+    load_holdings(database, _receipt_only_funds())
+    before = (_companies(database), _instruments(database))
+
+    with pytest.raises(UniverseError) as raised:
+        load_holdings(
+            database,
+            _receipt_only_funds(),
+            ordinary_shares=[_ordinary_share(_RECEIPT_ISIN, _ISIN_3)],
+        )
+
+    message = str(raised.value)
+    assert (
+        f"{database.path} holds receipts that a decision reads as their ordinary share" in message
+    )
+    assert _RECEIPT_ISIN in message
+    assert "has to be rebuilt" in message
+    assert (_companies(database), _instruments(database)) == before
+
+
+def test_a_swap_for_a_receipt_no_fund_holds_changes_nothing(database: Database) -> None:
+    """The file may name a receipt the filings do not hold; such a row waits."""
+    result = load_holdings(
+        database, _receipt_only_funds(), ordinary_shares=[_ordinary_share(_ISIN_5, _ISIN_3)]
+    )
+
+    assert _instruments(database) == (Instrument(1, 1, _RECEIPT_ISIN),)
+    assert result.ordinary_shares_used == 0
+
+
+def test_a_swapped_line_that_is_debt_keeps_its_own_reason(database: Database) -> None:
+    """A swap does not make a line loadable."""
+    result = load_holdings(
+        database,
+        [_fund("VXUS", _line("SAMPLE TREASURY", _RECEIPT_ISIN, category="DBT"))],
+        ordinary_shares=[_ordinary_share(_RECEIPT_ISIN, _ISIN_3)],
+    )
+
+    assert _not_loaded(result) == [("VXUS", 1, NotLoadedReason.DEBT_OR_DERIVATIVE)]
+    assert result.ordinary_shares_used == 0
+
+
+def test_loading_with_a_swap_equals_loading_filings_that_carry_the_ordinary_share(
+    database: Database, tmp_path: Path
+) -> None:
+    """A swap is exactly "as if the fund held the share"."""
+    load_holdings(
+        database,
+        [
+            _fund("VXUS", _line("Delta PLC", _ISIN_4, lei=_DELTA_LEI)),
+            *_receipt_only_funds(),
+        ],
+        ordinary_shares=[_ordinary_share(_RECEIPT_ISIN, _ISIN_3)],
+    )
+    other_path = tmp_path / "other.db"
+    migrate(other_path)
+    other = Database(other_path)
+    load_holdings(
+        other,
+        [
+            _fund("VXUS", _line("Delta PLC", _ISIN_4, lei=_DELTA_LEI)),
+            _fund("DFAX", _line("KT CORPORATION", _ISIN_3, lei=_KAPPA_LEI)),
+        ],
+    )
+
+    assert _companies(database) == _companies(other)
+    assert _instruments(database) == _instruments(other)
+
+
+def test_a_second_run_with_the_same_swap_changes_nothing(database: Database) -> None:
+    """A database built with the swap never held the receipt, so nothing is refused."""
+    swaps = [_ordinary_share(_RECEIPT_ISIN, _ISIN_3)]
+    load_holdings(database, _receipt_only_funds(), ordinary_shares=swaps)
+    before = (_companies(database), _instruments(database))
+
+    again = load_holdings(database, _receipt_only_funds(), ordinary_shares=swaps)
+
+    assert (_companies(database), _instruments(database)) == before
+    assert (again.companies_added, again.instruments_added, again.ordinary_shares_used) == (
+        0,
+        0,
+        1,
+    )
 
 
 # --- Comparing names ---------------------------------------------------------------------

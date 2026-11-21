@@ -15,13 +15,16 @@ what its company is given.
 
 A third kind of decision keeps a security out of the universe altogether
 (ADR 0013): its lines are left out like debt, and reported with their own
-reason. The load never deletes, so it refuses a database that already holds
-such a security.
+reason. A fourth says that a security is a depositary receipt and names the
+ordinary share it stands for (ADR 0015): its lines are read as lines of that
+share, so the company stays in the universe through the share pyvalue
+analyses. The load never deletes, so it refuses a database that already holds
+a security of either kind.
 
 Author: Emre Tezel
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
@@ -32,6 +35,7 @@ from pyvalue.universe.identifiers import is_valid_isin, is_valid_lei
 from pyvalue.universe.lei_decisions import LeiDecision
 from pyvalue.universe.name_decisions import NameDecision
 from pyvalue.universe.nport import CONDITIONAL_CATEGORY, HoldingLine
+from pyvalue.universe.ordinary_shares import OrdinaryShare
 from pyvalue.universe.receipts import is_receipt
 
 # The form's category codes for debt and for the six kinds of derivative. A
@@ -42,6 +46,15 @@ _DEBT_OR_DERIVATIVE: frozenset[str] = frozenset({"DBT", "DCO", "DCR", "DE", "DFE
 # preferred equity, short-term investment vehicles (the funds' cash, which in
 # practice has no ISIN), and whatever a filer puts in the conditional category.
 _LOADABLE: frozenset[str] = frozenset({"EC", "EP", "STIV", CONDITIONAL_CATEGORY})
+
+
+# What the load says when the database holds a security it is no longer to
+# hold. Taking a row out would be the load's first delete, with rules of its
+# own for a company left without securities; a rebuild does it in seconds.
+_REBUILD: str = (
+    "The load does not delete rows, so the database has to be rebuilt: set the file aside, "
+    "run `pyvalue db migrate`, then `pyvalue universe load`"
+)
 
 
 class NotLoadedReason(StrEnum):
@@ -138,6 +151,8 @@ class LoadResult:
         companies_renamed: Companies that a decision gave another name.
         exclusions_used: Securities these filings hold that a decision keeps
             out of the universe.
+        ordinary_shares_used: Receipts these filings hold whose lines a
+            decision reads as lines of their ordinary share.
         companies: Companies in the database after the load.
         instruments: Instruments in the database after the load.
         not_loaded: Every line that was not loaded, in the order of the
@@ -160,6 +175,7 @@ class LoadResult:
     name_decisions_used: int
     companies_renamed: int
     exclusions_used: int
+    ordinary_shares_used: int
     companies: int
     instruments: int
     not_loaded: tuple[NotLoadedLine, ...]
@@ -198,6 +214,9 @@ class _Candidate:
         key: That name as it is compared.
         named: Whether the name comes from a decision. The company such a
             line belongs to is given the name (ADR 0012).
+        swapped: Whether ``isin`` is the ordinary share that a decision names
+            for the receipt the fund filed (ADR 0015). Such a line is an
+            ordinary line, whatever its title or label says.
     """
 
     fund: str
@@ -207,6 +226,7 @@ class _Candidate:
     name: str
     key: str
     named: bool
+    swapped: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +246,8 @@ class _SortedLines:
             among the lines.
         exclusions_used: How many securities that a decision keeps out occur
             among the lines.
+        ordinary_shares_used: How many receipts that a decision reads as
+            their ordinary share occur among the lines.
     """
 
     lines_read: int
@@ -235,6 +257,7 @@ class _SortedLines:
     lei_decisions_used: int
     name_decisions_used: int
     exclusions_used: int
+    ordinary_shares_used: int
 
 
 def _sort_lines(
@@ -242,6 +265,7 @@ def _sort_lines(
     decided: Mapping[str, str],
     named: Mapping[str, str],
     excluded: frozenset[str],
+    ordinary_of: Mapping[str, str],
 ) -> _SortedLines:
     """Decide for every line whether it is left out, ordinary or a receipt.
 
@@ -250,6 +274,8 @@ def _sort_lines(
         decided: The decided legal-entity identifier of each ISIN that has one.
         named: The decided company name of each ISIN that has one.
         excluded: The ISINs that a decision keeps out of the universe.
+        ordinary_of: For each receipt that a decision reads as its ordinary
+            share, the ISIN of that share.
 
     Raises:
         UniverseError: If a line is in a category the load has no rule for.
@@ -258,6 +284,7 @@ def _sort_lines(
     candidates: list[_Candidate] = []
     left_out: list[NotLoadedLine] = []
     excluded_held: set[str] = set()
+    swapped_held: set[str] = set()
     for fund in funds:
         for line in fund.lines:
             lines_read += 1
@@ -284,26 +311,41 @@ def _sort_lines(
                 )
                 excluded_held.add(line.isin)
             else:
+                # A receipt with a known ordinary share is read as that share
+                # (ADR 0015). From here on the line is a line of the share:
+                # the other decisions are looked up by its ISIN too.
+                swapped = line.isin in ordinary_of
+                isin = ordinary_of.get(line.isin, line.isin)
+                if swapped:
+                    swapped_held.add(line.isin)
                 lei = line.lei if line.lei is not None and is_valid_lei(line.lei) else None
                 # A decision overrules what the fund filed, for the identifier
                 # (ADR 0010) and for the name (ADR 0012).
-                name = named.get(line.isin, " ".join(line.issuer_name.split()))
+                name = named.get(isin, " ".join(line.issuer_name.split()))
                 candidates.append(
                     _Candidate(
                         fund=fund.ticker,
                         line=line,
-                        isin=line.isin,
-                        lei=decided.get(line.isin, lei),
+                        isin=isin,
+                        lei=decided.get(isin, lei),
                         name=name,
                         key=name_key(name),
-                        named=line.isin in named,
+                        named=isin in named,
+                        swapped=swapped,
                     )
                 )
 
     # A security is a receipt when any of its lines says so. One fund may label
     # a receipt that another files as plain common shares, and it is the same
     # security in both.
-    receipt_isins = {candidate.isin for candidate in candidates if is_receipt(candidate.line)}
+    # A line read as an ordinary share is not asked: its wording is the
+    # receipt's. And a share a decision names as ordinary is ordinary in every
+    # fund's filing.
+    receipt_isins = {
+        candidate.isin
+        for candidate in candidates
+        if not candidate.swapped and is_receipt(candidate.line)
+    } - set(ordinary_of.values())
     receipt_groups: dict[str, list[_Candidate]] = {}
     ordinary: list[_Candidate] = []
     for candidate in candidates:
@@ -320,6 +362,7 @@ def _sort_lines(
         lei_decisions_used=len(decided.keys() & loadable_isins),
         name_decisions_used=len(named.keys() & loadable_isins),
         exclusions_used=len(excluded_held),
+        ordinary_shares_used=len(swapped_held),
     )
 
 
@@ -563,12 +606,60 @@ class _Placer:
             self._company_by_name.setdefault(name_key(company.name), company.company_id)
 
 
+def _refuse_contradictions(
+    decided_on: Set[str], excluded: frozenset[str], ordinary_of: Mapping[str, str]
+) -> None:
+    """Stop the load when the decisions files say two things about one security.
+
+    Each file is checked on its own when it is read. What no single reader
+    can see is a security that two files treat differently. Left in, such a
+    row could never apply and would mislead whoever reads the files.
+
+    Args:
+        decided_on: The ISINs that have an identifier or a name decision.
+        excluded: The ISINs that are kept out of the universe.
+        ordinary_of: For each receipt read as its ordinary share, that share.
+
+    Raises:
+        UniverseError: Naming the securities and what the files say of them.
+    """
+    receipts = ordinary_of.keys()
+    checks: tuple[tuple[Set[str], str], ...] = (
+        (
+            excluded & decided_on,
+            "kept out of the universe by one decisions file and given an identifier or a "
+            "name by another",
+        ),
+        (
+            excluded & receipts,
+            "kept out of the universe by one decisions file and read as an ordinary share "
+            "by another",
+        ),
+        (
+            receipts & decided_on,
+            "read as an ordinary share, so a decision on the identifier or the name has to "
+            "be keyed by that share",
+        ),
+        (
+            set(ordinary_of.values()) & (receipts | excluded),
+            "named as an ordinary share by one row and listed as a receipt or kept out of "
+            "the universe by another",
+        ),
+    )
+    for isins, what in checks:
+        if isins:
+            raise UniverseError(
+                f"{', '.join(sorted(isins))}: {what}; the files contradict each other"
+            )
+
+
 def load_holdings(
     database: Database,
     funds: Sequence[FundHoldings],
     lei_decisions: Sequence[LeiDecision] = (),
     name_decisions: Sequence[NameDecision] = (),
     exclusions: Sequence[Exclusion] = (),
+    ordinary_shares: Sequence[OrdinaryShare] = (),
 ) -> LoadResult:
     """Load the holdings of the funds into ``company`` and ``instrument``.
 
@@ -585,8 +676,9 @@ def load_holdings(
     decided value.
 
     A security that a decision keeps out of the universe is not loaded
-    (ADR 0013). The load never deletes: a database that already holds such a
-    security is refused and has to be rebuilt.
+    (ADR 0013). A receipt that a decision pairs with its ordinary share is
+    loaded as that share (ADR 0015). The load never deletes: a database that
+    already holds a security of either kind is refused and has to be rebuilt.
 
     Everything is written in one unit of work. Loading the same holdings
     with the same decisions again changes nothing.
@@ -601,6 +693,8 @@ def load_holdings(
             None by default.
         exclusions: The securities that are kept out of the universe. None by
             default.
+        ordinary_shares: The receipts that are read as their ordinary share,
+            at most one decision per receipt. None by default.
 
     Returns:
         What the load did, including the lines it did not load and the cases
@@ -609,9 +703,10 @@ def load_holdings(
     Raises:
         UniverseError: If a line is in a category the load has no rule for,
             two decisions of one kind are about the same ISIN, two name
-            decisions call one company by different names, a security is
-            both kept out and decided on, or the database already holds a
-            security that is kept out. Nothing is written.
+            decisions call one company by different names, the decisions
+            files contradict each other about a security, or the database
+            already holds a security that is kept out or read as its ordinary
+            share. Nothing is written.
         DatabaseError: If the database is not ready or refuses a row. Nothing
             is written.
     """
@@ -624,31 +719,31 @@ def load_holdings(
     if len(named) != len(name_decisions):
         raise UniverseError("two name decisions are about the same ISIN; a company has one name")
     excluded = frozenset(exclusion.isin for exclusion in exclusions)
-    contradicted = sorted(excluded & (decided.keys() | named.keys()))
-    if contradicted:
-        # A decision about a security that is not loaded can never apply. Left
-        # in the files it would only mislead whoever reads them.
+    ordinary_of = {decision.isin: decision.ordinary_isin for decision in ordinary_shares}
+    if len(ordinary_of) != len(ordinary_shares):
         raise UniverseError(
-            f"{', '.join(contradicted)}: kept out of the universe by one decisions file and "
-            "given an identifier or a name by another; the files contradict each other"
+            "two decisions name an ordinary share for the same receipt; a receipt stands for one"
         )
-    lines = _sort_lines(funds, decided, named, excluded)
+    _refuse_contradictions(decided.keys() | named.keys(), excluded, ordinary_of)
+    lines = _sort_lines(funds, decided, named, excluded, ordinary_of)
     not_loaded = list(lines.left_out)
     receipts_kept = 0
     receipts_not_loaded = 0
 
     with database.unit_of_work() as work:
         placer = _Placer(work)
+        # Saying so beats leaving the rows in silently (ADR 0013, ADR 0015).
         held = placer.held(excluded)
         if held:
-            # Taking a row out would be the load's first delete, with rules of
-            # its own for a company left without securities. A rebuild does it
-            # in seconds, and saying so beats leaving the rows in silently.
             raise UniverseError(
                 f"{database.path} holds securities that a decision keeps out of the universe: "
-                f"{', '.join(held)}. The load does not delete rows, so the database has to be "
-                "rebuilt: set the file aside, run `pyvalue db migrate`, then "
-                "`pyvalue universe load`"
+                f"{', '.join(held)}. {_REBUILD}"
+            )
+        held = placer.held(frozenset(ordinary_of))
+        if held:
+            raise UniverseError(
+                f"{database.path} holds receipts that a decision reads as their ordinary share: "
+                f"{', '.join(held)}. {_REBUILD}"
             )
         # Decisions first, so that every line below is compared with the
         # identifiers and names as they have been decided (ADR 0010, ADR 0012).
@@ -714,6 +809,7 @@ def load_holdings(
         name_decisions_used=lines.name_decisions_used,
         companies_renamed=placer.companies_renamed,
         exclusions_used=lines.exclusions_used,
+        ordinary_shares_used=lines.ordinary_shares_used,
         companies=placer.company_count,
         instruments=placer.instrument_count,
         not_loaded=tuple(

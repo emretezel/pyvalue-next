@@ -80,3 +80,11 @@ The two spellings compare as equal, so the decision changes no join.
 | `US00000H0017` (Eta Holdings Ltd, VXUS line 5) | Made up: a receipt whose ordinary share is listed at home | The line is not loaded and is listed with the reason `excluded_by_decision`. Eta Holdings has no other line, so the company is not loaded: 13 companies and 15 instruments, and Omicron Ltd becomes company 13 |
 
 A database that was loaded before the exclusion existed is refused; a rebuilt one is right.
+
+`decisions/ordinary_share.csv` reads one receipt as its ordinary share (ADR 0015).
+
+| Receipt | Ordinary share | Effect |
+|---|---|---|
+| `US00000O0018` (Omicron Ltd, DFAX line 14) | `SG00000O0017`, made up | The line is loaded as an ordinary line under the ordinary share's ISIN. Still 14 companies and 16 instruments, but Omicron is now company 13 with instrument 15, ahead of Eta Holdings, whose only line is still a receipt. One receipt fewer is recognised |
+
+A database that already holds the receipt is refused, as for an exclusion.

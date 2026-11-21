@@ -108,10 +108,13 @@ def test_a_missing_file_is_refused(tmp_path: Path) -> None:
 
 
 def test_the_exclusions_shipped_with_the_package_are_valid() -> None:
-    """The real file is read with the same checks on every test run."""
+    """The real file is read with the same checks on every test run.
+
+    It may hold no row: since ADR 0015 the receipts that were kept out are
+    read as their ordinary shares instead.
+    """
     exclusions = packaged_exclusions()
 
-    assert exclusions, "the shipped exclusions file is empty"
     assert all(is_valid_isin(exclusion.isin) for exclusion in exclusions)
     assert len({exclusion.isin for exclusion in exclusions}) == len(exclusions)
 

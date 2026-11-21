@@ -59,6 +59,7 @@ def test_load_fills_the_database_and_says_what_it_did(
         "Decisions on legal-entity identifiers used: 0; companies corrected: 0",
         "Decisions on company names used: 0; companies renamed: 0",
         "Securities kept out of the universe by decision: 0",
+        "Receipts read as their ordinary share by decision: 0",
         "The database now holds 14 companies and 16 instruments",
         f"Lines not loaded are listed in {Path('data') / 'universe' / 'lines_not_loaded.csv'}",
         f"Cases for the agent: 2, listed in {Path('data') / 'universe' / 'cases_for_agent.csv'}",
