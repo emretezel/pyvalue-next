@@ -10,7 +10,7 @@ Only what has been agreed is described as designed. Everything else is listed as
 |---|---|---|---|
 | Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections, migrations, the unit of work, and the repositories for `company` and `instrument`. A repository is added when a component first needs its table |
 | Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load` |
-| Universe load | `pyvalue.universe` | Downloads the three SEC holdings filings and reads them into `company` and `instrument`, applying the decisions file on legal-entity identifiers (ADR 0004, ADR 0006, ADR 0009, ADR 0010) | Built |
+| Universe load | `pyvalue.universe` | Downloads the three SEC holdings filings and reads them into `company` and `instrument`, applying the decisions file on legal-entity identifiers (ADR 0004, ADR 0006, ADR 0009, ADR 0010, ADR 0011) | Built |
 | Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line |
 | Listings | `pyvalue.listings` | Looks up provider listings, applies the automatic rule and the decisions file (ADR 0005) | Planned |
 | Providers | `pyvalue.providers` | The EODHD client | Planned |
@@ -62,7 +62,7 @@ The data model and the steps are fixed by the records. Step 1 is built; the code
 
 | Step | What happens | Record |
 |---|---|---|
-| 1. Load | The SEC holdings filings of VTI, VXUS and DFAX are read into `company` and `instrument`. Where the filings are wrong about a company's legal-entity identifier, a decisions file overrules them | ADR 0004, ADR 0006, ADR 0009, ADR 0010 |
+| 1. Load | The SEC holdings filings of VTI, VXUS and DFAX are read into `company` and `instrument`. Where the funds file different legal-entity identifiers for a security, a decisions file chooses between them | ADR 0004, ADR 0006, ADR 0009, ADR 0010, ADR 0011 |
 | 2. Look up | The provider's symbol lists are matched to instruments by ISIN | ADR 0005 |
 | 3. Fill | A listing is written when the automatic rule applies | ADR 0005 |
 | 4. Decide | An agent decides every other case; its decisions are kept in a committed file | ADR 0005 |
@@ -75,7 +75,7 @@ The data model and the steps are fixed by the records. Step 1 is built; the code
 | Downloaded SEC filings | `data/sec/`, one file per filing, named by ticker and filing number | No |
 | The load output | `data/universe/lines_not_loaded.csv` and `data/universe/cases_for_agent.csv`, rewritten by every load | No |
 | Migrations | `src/pyvalue/db/migrations/`, one numbered SQL file each (ADR 0007) | Yes |
-| Decisions on legal-entity identifiers | `src/pyvalue/universe/decisions/lei.csv`, one row per security, shipped inside the package (ADR 0010) | Yes |
+| Decisions on legal-entity identifiers | `src/pyvalue/universe/decisions/lei.csv`, one row per security, shipped inside the package (ADR 0010). A row names only an identifier a fund filed (ADR 0011) | Yes |
 | The agent's listing decisions | A file under version control, expected in the same folder; settled when listings are built | Yes |
 | Credentials and the SEC contact line | `private/config.toml` | No |
 | Table documentation | `docs/database/`, one file per table | Yes |
