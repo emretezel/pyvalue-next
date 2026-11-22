@@ -139,7 +139,7 @@ Update this list in the same commit as any structural change. `docs/architecture
   - `config.py`: reads `private/config.toml`. Never puts a value from that file into a message.
   - `errors.py`: `PyvalueError`, the base of every error a person can fix. The command line prints such an error as one line.
 - `tests/`: pytest suite, mirroring the source tree under `tests/unit/`, `tests/regression/`, and `tests/integration/`. Shared fixtures are in `tests/conftest.py`; checked-in sample data is under `tests/fixtures/`.
-- `docs/`: substantive documentation (see the **Documentation** section); `docs/architecture.md` is the design, `docs/adr/` holds the architecture decision records, and `docs/database/` has one file per table.
+- `docs/`: substantive documentation (see the **Documentation** section); `docs/architecture.md` is the design, `docs/adr/` holds the architecture decision records, `docs/database/` has one file per table, and `docs/universe.md` records what the universe held at the end of the universe phase.
 - `data/`: local artifacts such as the database (gitignored).
 - `private/`: local config and API keys (`private/config.toml`, gitignored).
 
