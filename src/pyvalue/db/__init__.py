@@ -12,6 +12,7 @@ Author: Emre Tezel
 from pyvalue.db.company import Company, CompanyRepository
 from pyvalue.db.connection import DEFAULT_DATABASE_PATH
 from pyvalue.db.errors import ConstraintError, DatabaseError
+from pyvalue.db.exchange import Exchange, ExchangeRepository
 from pyvalue.db.fund import Fund, FundRepository
 from pyvalue.db.holding import Holding, HoldingRepository
 from pyvalue.db.instrument import Instrument, InstrumentRepository
@@ -23,6 +24,9 @@ from pyvalue.db.migrate import (
     migrate,
     packaged_migrations,
 )
+from pyvalue.db.provider import Provider, ProviderRepository
+from pyvalue.db.provider_exchange import ProviderExchange, ProviderExchangeRepository
+from pyvalue.db.provider_symbol import ProviderSymbol, ProviderSymbolRepository
 from pyvalue.db.unit_of_work import Database, UnitOfWork
 
 __all__ = [
@@ -32,6 +36,8 @@ __all__ = [
     "ConstraintError",
     "Database",
     "DatabaseError",
+    "Exchange",
+    "ExchangeRepository",
     "Fund",
     "FundRepository",
     "Holding",
@@ -41,6 +47,12 @@ __all__ = [
     "Migration",
     "MigrationError",
     "MigrationReport",
+    "Provider",
+    "ProviderExchange",
+    "ProviderExchangeRepository",
+    "ProviderRepository",
+    "ProviderSymbol",
+    "ProviderSymbolRepository",
     "UnitOfWork",
     "load_migrations",
     "migrate",

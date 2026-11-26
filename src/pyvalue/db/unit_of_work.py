@@ -17,10 +17,14 @@ from typing import Final
 from pyvalue.db.company import CompanyRepository
 from pyvalue.db.connection import connect
 from pyvalue.db.errors import DatabaseError
+from pyvalue.db.exchange import ExchangeRepository
 from pyvalue.db.fund import FundRepository
 from pyvalue.db.holding import HoldingRepository
 from pyvalue.db.instrument import InstrumentRepository
 from pyvalue.db.migrate import require_current_schema
+from pyvalue.db.provider import ProviderRepository
+from pyvalue.db.provider_exchange import ProviderExchangeRepository
+from pyvalue.db.provider_symbol import ProviderSymbolRepository
 
 
 class UnitOfWork:
@@ -35,6 +39,10 @@ class UnitOfWork:
         instruments: The repository of the ``instrument`` table.
         funds: The repository of the ``fund`` table.
         holdings: The repository of the ``holding`` table.
+        exchanges: The repository of the ``exchange`` table.
+        providers: The repository of the ``provider`` table.
+        provider_exchanges: The repository of the ``provider_exchange`` table.
+        provider_symbols: The repository of the ``provider_symbol`` table.
     """
 
     def __init__(self, connection: sqlite3.Connection) -> None:
@@ -43,6 +51,14 @@ class UnitOfWork:
         self.instruments: Final[InstrumentRepository] = InstrumentRepository(connection)
         self.funds: Final[FundRepository] = FundRepository(connection)
         self.holdings: Final[HoldingRepository] = HoldingRepository(connection)
+        self.exchanges: Final[ExchangeRepository] = ExchangeRepository(connection)
+        self.providers: Final[ProviderRepository] = ProviderRepository(connection)
+        self.provider_exchanges: Final[ProviderExchangeRepository] = ProviderExchangeRepository(
+            connection
+        )
+        self.provider_symbols: Final[ProviderSymbolRepository] = ProviderSymbolRepository(
+            connection
+        )
 
 
 class Database:
