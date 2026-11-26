@@ -15,6 +15,7 @@ from pyvalue.db import (
     ProviderExchange,
     ProviderSymbol,
 )
+from pyvalue.db.connection import connect
 
 _HYNIX: ProviderSymbol = ProviderSymbol(
     provider_code="eodhd",
@@ -87,6 +88,42 @@ def test_add_stores_lines_and_they_are_counted_under_their_code(mapped: Database
 
     assert _count(mapped, "KO") == 1
     assert _count(mapped, "US") == 2
+
+
+def test_add_stores_every_column_as_given(mapped: Database) -> None:
+    """Read back with a plain query: the repository has no reader for a line yet.
+
+    The listing rule will bring one (ADR 0019). Until then this is the test
+    that each value lands in its own column, and an absent one as NULL.
+    """
+    with mapped.unit_of_work() as work:
+        work.provider_symbols.add(_BERKSHIRE)
+        work.provider_symbols.add(_BARE)
+
+    connection = connect(mapped.path)
+    try:
+        rows = connection.execute(
+            "SELECT provider_code, provider_exchange_code, provider_symbol, mic, provider_venue, "
+            "provider_name, provider_type, provider_currency, isin FROM provider_symbol "
+            "ORDER BY provider_symbol"
+        ).fetchall()
+    finally:
+        connection.close()
+
+    assert rows == [
+        (
+            "eodhd",
+            "US",
+            "BRK-B",
+            "XNYS",
+            "NYSE",
+            "Berkshire Hathaway Inc",
+            "Common Stock",
+            "USD",
+            "US0846707026",
+        ),
+        ("eodhd", "US", "XYZ", "XNAS", None, None, "Preferred Stock", "USD", None),
+    ]
 
 
 def test_the_count_is_per_provider(mapped: Database) -> None:

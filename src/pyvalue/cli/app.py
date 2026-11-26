@@ -8,6 +8,7 @@ Author: Emre Tezel
 
 import argparse
 import sys
+from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -15,6 +16,8 @@ from pyvalue import __version__
 from pyvalue.config import sec_user_agent
 from pyvalue.db import DEFAULT_DATABASE_PATH, Database, migrate
 from pyvalue.errors import PyvalueError
+from pyvalue.listings import DEFAULT_LISTS_DIR, NotStoredReason, load_symbols
+from pyvalue.providers.eodhd import PROVIDER_NAME
 from pyvalue.universe import (
     DEFAULT_FILINGS_DIR,
     DEFAULT_OUTPUT_DIR,
@@ -116,6 +119,66 @@ def _universe_load(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def _symbols_load(arguments: argparse.Namespace) -> int:
+    """Fill the exchange tables and store the saved symbol lists, and say what was done."""
+    database = Database(arguments.db)
+    outcome = load_symbols(database, DEFAULT_LISTS_DIR)
+    tables = outcome.tables
+
+    print(f"Database: {database.path}")
+    print(
+        f"Exchanges: {tables.exchanges:,} ({tables.exchanges_added:,} added, "
+        f"{tables.exchanges_corrected:,} corrected)"
+    )
+    print(f"{PROVIDER_NAME} exchange codes: {tables.mappings:,} ({tables.mappings_added:,} added)")
+    print(
+        f"Lists stored: {len(outcome.stored):,} of {len(outcome.lists):,}, "
+        f"{outcome.lines_stored:,} lines"
+    )
+    for stored in outcome.stored:
+        print(f"  {stored.provider_exchange_code}: {stored.stored:,} lines")
+
+    # What was left out of the stored lists, summed over them. A list that was
+    # not stored is reported on its own below.
+    not_shares: Counter[str] = Counter()
+    for stored in outcome.stored:
+        not_shares.update(stored.not_shares)
+    by_type = ", ".join(f"{kind} {count:,}" for kind, count in sorted(not_shares.items()))
+    print(
+        f"Lines not stored: {sum(not_shares.values()):,} not a share"
+        + (f" ({by_type})" if by_type else "")
+        + f", {sum(stored.without_symbol for stored in outcome.stored):,} without a symbol, "
+        f"{sum(stored.without_currency for stored in outcome.stored):,} without a currency, "
+        f"{sum(stored.left_out for stored in outcome.stored):,} under a venue label that is "
+        "left out"
+    )
+    print(
+        f"Lines stored without an ISIN: "
+        f"{sum(stored.without_isin for stored in outcome.stored):,}, of which "
+        f"{sum(stored.invalid_isin for stored in outcome.stored):,} carried one that is not valid"
+    )
+    # Before the first download every code is without a list, so these are
+    # named on one line, apart from the lists that need a person's attention.
+    never_saved = [
+        each.provider_exchange_code
+        for each in outcome.not_stored
+        if each.not_stored is NotStoredReason.NO_SAVED_LIST
+    ]
+    print(
+        f"Codes without a saved list: {len(never_saved):,}"
+        + (f" ({', '.join(never_saved)})" if never_saved else "")
+    )
+    refused = [
+        each for each in outcome.not_stored if each.not_stored is not NotStoredReason.NO_SAVED_LIST
+    ]
+    print(f"Lists not stored: {len(refused):,}")
+    for each in refused:
+        # Narrowed for the type checker: a list that was not stored has a reason.
+        reason = "" if each.not_stored is None else each.not_stored.value
+        print(f"  {each.provider_exchange_code}: {reason} ({each.detail})")
+    return 0
+
+
 def _add_database_option(command: argparse.ArgumentParser) -> None:
     """Give a command the ``--db`` option every database command shares."""
     command.add_argument(
@@ -161,6 +224,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_database_option(universe_load)
     universe_load.set_defaults(run=_universe_load)
+
+    symbols = groups.add_parser("symbols", help="keep the provider's symbol lists")
+    symbols_commands = symbols.add_subparsers(dest="command", required=True, metavar="ACTION")
+    symbols_load = symbols_commands.add_parser(
+        "load",
+        help="fill the exchange tables and store the saved symbol lists",
+        description=(
+            "Add our exchanges and the provider's exchange codes to the database from the "
+            f"files shipped with pyvalue, and store the symbol lists saved in {DEFAULT_LISTS_DIR}. "
+            "A list is replaced as a whole; one that cannot be stored is reported and leaves "
+            "the stored rows as they were. This command never reaches the network. Running it "
+            "again changes nothing."
+        ),
+    )
+    _add_database_option(symbols_load)
+    symbols_load.set_defaults(run=_symbols_load)
     return parser
 
 

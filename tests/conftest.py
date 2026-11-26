@@ -15,8 +15,10 @@ from pathlib import Path
 
 import pytest
 
-from pyvalue.db import Database, migrate
+from pyvalue.db import Database, Exchange, migrate
 from pyvalue.db.connection import connect
+from pyvalue.listings import read_exchanges
+from pyvalue.providers import ExchangeCodes, read_exchange_codes
 from pyvalue.universe import FUNDS, Sponsor, SponsorAdapter, VanguardAdapter
 
 # The checked-in sample data: tests/fixtures.
@@ -107,6 +109,32 @@ def eodhd_samples() -> Path:
     folder's README.
     """
     return _FIXTURES / "eodhd"
+
+
+@pytest.fixture
+def eodhd_lists_dir(tmp_path: Path, eodhd_samples: Path) -> Path:
+    """Return a temporary folder holding the sample EODHD lists as the load expects them.
+
+    It stands in for ``data/eodhd`` after a download: the exchange list and
+    the symbol lists of three codes.
+    """
+    folder = tmp_path / "eodhd"
+    folder.mkdir()
+    for sample in sorted(eodhd_samples.glob("*.json")):
+        shutil.copyfile(sample, folder / sample.name)
+    return folder
+
+
+@pytest.fixture
+def sample_exchanges(eodhd_samples: Path) -> tuple[Exchange, ...]:
+    """Return the five exchanges that go with the sample EODHD lists."""
+    return read_exchanges(eodhd_samples / "exchange.csv")
+
+
+@pytest.fixture
+def sample_codes(eodhd_samples: Path) -> ExchangeCodes:
+    """Return the provider's exchange file that goes with the sample EODHD lists."""
+    return read_exchange_codes(eodhd_samples / "eodhd_exchange.csv")
 
 
 @pytest.fixture
