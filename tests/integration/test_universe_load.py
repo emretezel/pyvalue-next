@@ -8,12 +8,13 @@ expected output files were worked out by hand from the rules of ADR 0006.
 Author: Emre Tezel
 """
 
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
 
 from pyvalue.db import Company, Database, Instrument, migrate
-from pyvalue.universe import UniverseError, load_universe
+from pyvalue.universe import Sponsor, SponsorAdapter, UniverseError, load_universe
 from pyvalue.universe.exclusions import read_exclusions
 from pyvalue.universe.lei_decisions import read_lei_decisions
 from pyvalue.universe.name_decisions import read_name_decisions
@@ -90,11 +91,19 @@ def _tables(database: Database) -> tuple[tuple[Company, ...], tuple[Instrument, 
 
 
 def test_the_sample_filings_give_exactly_the_expected_universe(
-    database: Database, filings_dir: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """Every company and instrument, with the ids the order of loading gives them."""
     outcome = load_universe(
-        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        adapters=adapters,
     )
 
     assert _tables(database) == (_EXPECTED_COMPANIES, _EXPECTED_INSTRUMENTS)
@@ -113,11 +122,20 @@ def test_the_sample_filings_give_exactly_the_expected_universe(
 
 
 def test_the_output_files_are_byte_identical_to_the_expected_ones(
-    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    nport_samples: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """Reproducibility: fixed filings give fixed files, down to the last byte."""
     outcome = load_universe(
-        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        adapters=adapters,
     )
 
     expected = nport_samples / "expected"
@@ -132,11 +150,19 @@ def test_the_output_files_are_byte_identical_to_the_expected_ones(
 
 
 def test_every_line_of_the_filings_is_loaded_or_listed(
-    database: Database, filings_dir: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """Nothing is left behind: 31 lines are 11 listed ones plus 20 that reached an instrument."""
     outcome = load_universe(
-        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        adapters=adapters,
     )
 
     result = outcome.result
@@ -145,11 +171,19 @@ def test_every_line_of_the_filings_is_loaded_or_listed(
 
 
 def test_a_second_run_changes_nothing_and_writes_the_same_files(
-    database: Database, filings_dir: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """ADR 0009: running the load again is harmless, and its output is the same."""
     first = load_universe(
-        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        adapters=adapters,
     )
     first_files = (
         first.output.lines_not_loaded.read_bytes(),
@@ -157,7 +191,12 @@ def test_a_second_run_changes_nothing_and_writes_the_same_files(
     )
 
     second = load_universe(
-        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        adapters=adapters,
     )
 
     assert _tables(database) == (_EXPECTED_COMPANIES, _EXPECTED_INSTRUMENTS)
@@ -187,11 +226,19 @@ _CASES_HEADER: bytes = (
 
 
 def test_the_shipped_decisions_concern_none_of_the_sample_securities(
-    database: Database, filings_dir: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """By default the load applies the package's own file, which is about real securities."""
     outcome = load_universe(
-        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        adapters=adapters,
     )
 
     assert outcome.result.lei_decisions_used == 0
@@ -202,13 +249,23 @@ def test_the_shipped_decisions_concern_none_of_the_sample_securities(
 
 
 def test_the_sample_decisions_settle_both_cases(
-    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    nport_samples: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """A database built with the decisions has the decided identifiers and no open case."""
     decisions = read_lei_decisions(nport_samples / "decisions" / "lei.csv")
 
     outcome = load_universe(
-        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched, decisions
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        decisions,
+        adapters=adapters,
     )
 
     assert _tables(database) == (_EXPECTED_COMPANIES_AFTER_DECISIONS, _EXPECTED_INSTRUMENTS)
@@ -224,19 +281,45 @@ def test_the_sample_decisions_settle_both_cases(
 
 
 def test_decisions_applied_later_give_the_database_a_rebuild_would_give(
-    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    nport_samples: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """Corrected in place or built from scratch, the rows are the same."""
     decisions = read_lei_decisions(nport_samples / "decisions" / "lei.csv")
     # In place: loaded before the decisions existed, as the real database was.
-    load_universe(database, filings_dir, tmp_path / "first", _never_asked, _never_fetched, ())
+    load_universe(
+        database,
+        filings_dir,
+        tmp_path / "first",
+        _never_asked,
+        _never_fetched,
+        (),
+        adapters=adapters,
+    )
     corrected = load_universe(
-        database, filings_dir, tmp_path / "second", _never_asked, _never_fetched, decisions
+        database,
+        filings_dir,
+        tmp_path / "second",
+        _never_asked,
+        _never_fetched,
+        decisions,
+        adapters=adapters,
     )
     # From scratch: a second database that sees the decisions from the start.
     migrate(tmp_path / "scratch.db")
     scratch = Database(tmp_path / "scratch.db")
-    load_universe(scratch, filings_dir, tmp_path / "third", _never_asked, _never_fetched, decisions)
+    load_universe(
+        scratch,
+        filings_dir,
+        tmp_path / "third",
+        _never_asked,
+        _never_fetched,
+        decisions,
+        adapters=adapters,
+    )
 
     assert _tables(database) == _tables(scratch)
     assert _tables(database) == (_EXPECTED_COMPANIES_AFTER_DECISIONS, _EXPECTED_INSTRUMENTS)
@@ -256,13 +339,24 @@ _EXPECTED_COMPANIES_AFTER_NAMING: tuple[Company, ...] = tuple(
 
 
 def test_the_sample_name_decision_names_the_company(
-    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    nport_samples: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """A database built with the decision stores the decided name from the start."""
     names = read_name_decisions(nport_samples / "decisions" / "name.csv")
 
     outcome = load_universe(
-        database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched, (), names
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        (),
+        names,
+        adapters=adapters,
     )
 
     assert _tables(database) == (_EXPECTED_COMPANIES_AFTER_NAMING, _EXPECTED_INSTRUMENTS)
@@ -277,24 +371,58 @@ def test_the_sample_name_decision_names_the_company(
 
 
 def test_a_name_decided_later_gives_the_database_a_rebuild_would_give(
-    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    nport_samples: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """Renamed in place or built from scratch, with both kinds of decision, the rows agree."""
     leis = read_lei_decisions(nport_samples / "decisions" / "lei.csv")
     names = read_name_decisions(nport_samples / "decisions" / "name.csv")
     # In place: loaded before any decision existed.
-    load_universe(database, filings_dir, tmp_path / "first", _never_asked, _never_fetched, (), ())
+    load_universe(
+        database,
+        filings_dir,
+        tmp_path / "first",
+        _never_asked,
+        _never_fetched,
+        (),
+        (),
+        adapters=adapters,
+    )
     renamed = load_universe(
-        database, filings_dir, tmp_path / "second", _never_asked, _never_fetched, leis, names
+        database,
+        filings_dir,
+        tmp_path / "second",
+        _never_asked,
+        _never_fetched,
+        leis,
+        names,
+        adapters=adapters,
     )
     again = load_universe(
-        database, filings_dir, tmp_path / "third", _never_asked, _never_fetched, leis, names
+        database,
+        filings_dir,
+        tmp_path / "third",
+        _never_asked,
+        _never_fetched,
+        leis,
+        names,
+        adapters=adapters,
     )
     # From scratch: a second database that sees the decisions from the start.
     migrate(tmp_path / "scratch.db")
     scratch = Database(tmp_path / "scratch.db")
     load_universe(
-        scratch, filings_dir, tmp_path / "fourth", _never_asked, _never_fetched, leis, names
+        scratch,
+        filings_dir,
+        tmp_path / "fourth",
+        _never_asked,
+        _never_fetched,
+        leis,
+        names,
+        adapters=adapters,
     )
 
     expected = tuple(
@@ -320,13 +448,16 @@ _EXPECTED_INSTRUMENTS_WITHOUT_ETA: tuple[Instrument, ...] = (
     Instrument(15, 13, "US00000O0018"),
 )
 _EXCLUDED_LINE: str = (
-    "VXUS,5,excluded_by_decision,ETA HOLDINGS LTD,ETA HOLDINGS LTD SPONSORED ADR,"
-    "US00000H0017,N/A,EC,"
+    "VXUS,5,excluded_by_decision,ETA HOLDINGS LTD,ETA HOLDINGS LTD SPONSORED ADR,US00000H0017,,EC,"
 )
 
 
 def test_the_sample_exclusion_keeps_the_security_out(
-    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    nport_samples: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """A database built with the exclusion never holds the security or its company."""
     exclusions = read_exclusions(nport_samples / "decisions" / "excluded.csv")
@@ -340,6 +471,7 @@ def test_the_sample_exclusion_keeps_the_security_out(
         (),
         (),
         exclusions,
+        adapters=adapters,
     )
 
     assert _tables(database) == (_EXPECTED_COMPANIES_WITHOUT_ETA, _EXPECTED_INSTRUMENTS_WITHOUT_ETA)
@@ -365,11 +497,24 @@ def test_the_sample_exclusion_keeps_the_security_out(
 
 
 def test_an_exclusion_added_later_is_refused_until_the_database_is_rebuilt(
-    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    nport_samples: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """The load never deletes: the old database is left as it is, a new one is right."""
     exclusions = read_exclusions(nport_samples / "decisions" / "excluded.csv")
-    load_universe(database, filings_dir, tmp_path / "first", _never_asked, _never_fetched, (), ())
+    load_universe(
+        database,
+        filings_dir,
+        tmp_path / "first",
+        _never_asked,
+        _never_fetched,
+        (),
+        (),
+        adapters=adapters,
+    )
 
     with pytest.raises(UniverseError, match="US00000H0017"):
         load_universe(
@@ -381,6 +526,7 @@ def test_an_exclusion_added_later_is_refused_until_the_database_is_rebuilt(
             (),
             (),
             exclusions,
+            adapters=adapters,
         )
 
     assert _tables(database) == (_EXPECTED_COMPANIES, _EXPECTED_INSTRUMENTS)
@@ -388,7 +534,15 @@ def test_an_exclusion_added_later_is_refused_until_the_database_is_rebuilt(
     migrate(tmp_path / "rebuilt.db")
     rebuilt = Database(tmp_path / "rebuilt.db")
     load_universe(
-        rebuilt, filings_dir, tmp_path / "third", _never_asked, _never_fetched, (), (), exclusions
+        rebuilt,
+        filings_dir,
+        tmp_path / "third",
+        _never_asked,
+        _never_fetched,
+        (),
+        (),
+        exclusions,
+        adapters=adapters,
     )
     assert _tables(rebuilt) == (_EXPECTED_COMPANIES_WITHOUT_ETA, _EXPECTED_INSTRUMENTS_WITHOUT_ETA)
 
@@ -411,7 +565,11 @@ _EXPECTED_INSTRUMENTS_WITH_SWAP: tuple[Instrument, ...] = (
 
 
 def test_the_sample_swap_loads_the_receipt_as_its_ordinary_share(
-    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    nport_samples: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """The company is the one the filing names; its instrument is the ordinary share."""
     swaps = read_ordinary_shares(nport_samples / "decisions" / "ordinary_share.csv")
@@ -426,6 +584,7 @@ def test_the_sample_swap_loads_the_receipt_as_its_ordinary_share(
         (),
         (),
         swaps,
+        adapters=adapters,
     )
 
     assert _tables(database) == (_EXPECTED_COMPANIES_WITH_SWAP, _EXPECTED_INSTRUMENTS_WITH_SWAP)
@@ -444,11 +603,24 @@ def test_the_sample_swap_loads_the_receipt_as_its_ordinary_share(
 
 
 def test_a_swap_added_later_is_refused_until_the_database_is_rebuilt(
-    database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
+    database: Database,
+    filings_dir: Path,
+    nport_samples: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
     """The load never deletes the receipt it loaded before: the old database is left as it is."""
     swaps = read_ordinary_shares(nport_samples / "decisions" / "ordinary_share.csv")
-    load_universe(database, filings_dir, tmp_path / "first", _never_asked, _never_fetched, (), ())
+    load_universe(
+        database,
+        filings_dir,
+        tmp_path / "first",
+        _never_asked,
+        _never_fetched,
+        (),
+        (),
+        adapters=adapters,
+    )
 
     with pytest.raises(UniverseError, match="US00000O0018"):
         load_universe(
@@ -461,6 +633,7 @@ def test_a_swap_added_later_is_refused_until_the_database_is_rebuilt(
             (),
             (),
             swaps,
+            adapters=adapters,
         )
 
     assert _tables(database) == (_EXPECTED_COMPANIES, _EXPECTED_INSTRUMENTS)

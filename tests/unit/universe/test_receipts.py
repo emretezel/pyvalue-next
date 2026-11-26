@@ -7,7 +7,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from pyvalue.universe.nport import HoldingLine
+from pyvalue.universe import HoldingLine
 from pyvalue.universe.receipts import RECEIPT_LABELS, is_receipt
 
 # Words that say nothing about receipts, for building names that must pass.
@@ -41,8 +41,14 @@ def _line(
         title=title,
         lei=None,
         isin="US00000A0014",
+        cusip=None,
         category=category,
         category_label=category_label,
+        issuer_type="CORP",
+        trading_country="US",
+        currency="USD",
+        ticker=None,
+        sedol=None,
     )
 
 

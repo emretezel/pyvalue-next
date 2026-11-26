@@ -36,7 +36,7 @@ Fill the stock universe with the companies and securities held by two broad inde
 pyvalue universe load
 ```
 
-The first run downloads the funds' holdings filings from the SEC into `data/sec/`. The SEC asks automated clients to identify themselves, so put your contact details into `private/config.toml` first:
+The first run downloads the funds' holdings filings from the SEC into `data/sec/`, and Vanguard's own holdings files, which add a ticker to each holding, into `data/vanguard/`. The SEC asks automated clients to identify themselves, so put your contact details into `private/config.toml` first; they are sent to the SEC only:
 
 ```toml
 [sec]

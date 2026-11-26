@@ -14,7 +14,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from pyvalue.universe.errors import FilingError
-from pyvalue.universe.nport import HoldingLine, read_filing
+from pyvalue.universe.nport import FiledLine, read_filing
 
 
 class Scope(StrEnum):
@@ -105,7 +105,7 @@ FUNDS: tuple[FundDefinition, ...] = (
 )
 
 
-def read_pinned_filing(path: Path, fund: FundDefinition) -> tuple[HoldingLine, ...]:
+def read_pinned_filing(path: Path, fund: FundDefinition) -> tuple[FiledLine, ...]:
     """Read a filing file and make sure it is the fund's pinned filing.
 
     Args:

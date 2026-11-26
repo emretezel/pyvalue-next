@@ -2,12 +2,15 @@
 
 The command reads and writes under the folder it is run from, so every test
 runs it in a temporary folder. None touches the network: either the sample
-filings are already in place, or the run stops before a download.
+filings and the sample Vanguard files are already in place, or the run stops
+before a download.
 
 Author: Emre Tezel
 """
 
 import shutil
+import urllib.error
+import urllib.request
 from datetime import date
 from pathlib import Path
 
@@ -18,18 +21,24 @@ from pyvalue.universe import FUNDS, Exclusion
 
 
 @pytest.fixture
-def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, nport_samples: Path) -> Path:
-    """Return a temporary working folder with a migrated database and the sample filings.
+def workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, nport_samples: Path, vanguard_samples: Path
+) -> Path:
+    """Return a temporary working folder with a migrated database and the sample documents.
 
     It mirrors a checkout after ``pyvalue db migrate`` and one earlier download:
-    ``data/pyvalue.db`` and ``data/sec/``. There is no ``private/config.toml``.
+    ``data/pyvalue.db``, ``data/sec/`` and ``data/vanguard/``. There is no
+    ``private/config.toml``.
     """
     monkeypatch.chdir(tmp_path)
     assert main(["db", "migrate"]) == 0
-    folder = tmp_path / "data" / "sec"
-    folder.mkdir()
+    filings = tmp_path / "data" / "sec"
+    filings.mkdir()
+    sponsor_files = tmp_path / "data" / "vanguard"
+    sponsor_files.mkdir()
     for fund in FUNDS:
-        shutil.copyfile(nport_samples / f"{fund.code}.xml", folder / fund.filing_file_name)
+        shutil.copyfile(nport_samples / f"{fund.code}.xml", filings / fund.filing_file_name)
+        shutil.copyfile(vanguard_samples / f"{fund.code}.json", sponsor_files / f"{fund.code}.json")
     return tmp_path
 
 
@@ -48,6 +57,8 @@ def test_load_fills_the_database_and_says_what_it_did(
         f"Database: {Path('data') / 'pyvalue.db'}",
         "Filing VTI 0000036405-26-000480: already there",
         "Filing VXUS 0000736054-26-000275: already there",
+        "Sponsor file VTI: already there",
+        "Sponsor file VXUS: already there",
         "Lines read: 31",
         "Lines not loaded: 11 (3 debt or derivative, 4 without a valid ISIN, "
         "4 receipt of a company already loaded, 0 kept out by decision)",
@@ -180,6 +191,38 @@ def test_a_damaged_filing_gives_one_line_and_status_one(
     assert output.err.startswith("pyvalue: error: ")
     assert "is not an N-PORT filing" in output.err
     assert len(output.err.splitlines()) == 1
+
+
+def test_a_missing_sponsor_file_that_cannot_be_fetched_gives_one_line_and_status_one(
+    workspace: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR 0016: without Vanguard's file the load stops; it does not go on without tickers."""
+    (workspace / "data" / "vanguard" / "VXUS.json").unlink()
+
+    class _NoNetwork:
+        """Stands in for urllib's opener when there is no connection."""
+
+        def open(self, request: urllib.request.Request, timeout: float) -> None:
+            """Fail the way urllib does."""
+            raise urllib.error.URLError("no route to host")
+
+    def build_opener(*handlers: type[urllib.request.BaseHandler]) -> _NoNetwork:
+        return _NoNetwork()
+
+    monkeypatch.setattr(urllib.request, "build_opener", build_opener)
+    capsys.readouterr()
+
+    status = main(["universe", "load"])
+
+    output = capsys.readouterr()
+    assert status == 1
+    assert output.out == ""
+    assert output.err.startswith(
+        "pyvalue: error: cannot download https://investor.vanguard.com/vmf/api/3369/"
+    )
+    assert len(output.err.splitlines()) == 1
+    # Nothing was loaded, although both filings and one sponsor file were there.
+    assert not (workspace / "data" / "universe").exists()
 
 
 @pytest.mark.parametrize("arguments", [["universe"], ["universe", "nonsense"]])

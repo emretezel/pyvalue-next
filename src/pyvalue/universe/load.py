@@ -31,10 +31,11 @@ from enum import StrEnum
 from pyvalue.db import Company, Database, UnitOfWork
 from pyvalue.universe.errors import UniverseError
 from pyvalue.universe.exclusions import Exclusion
+from pyvalue.universe.holdings import FundHoldings, HoldingLine
 from pyvalue.universe.identifiers import is_valid_isin, is_valid_lei
 from pyvalue.universe.lei_decisions import LeiDecision
 from pyvalue.universe.name_decisions import NameDecision
-from pyvalue.universe.nport import CONDITIONAL_CATEGORY, HoldingLine
+from pyvalue.universe.nport import CONDITIONAL_CATEGORY
 from pyvalue.universe.ordinary_shares import OrdinaryShare
 from pyvalue.universe.receipts import is_receipt
 
@@ -71,19 +72,6 @@ class AgentCaseReason(StrEnum):
 
     DIFFERENT_LEI = "different_lei"
     LEI_BELONGS_TO_ANOTHER_COMPANY = "lei_belongs_to_another_company"
-
-
-@dataclass(frozen=True, slots=True)
-class FundHoldings:
-    """The lines of one fund's filing.
-
-    Attributes:
-        ticker: The fund's ticker, which names the fund in the load output.
-        lines: Every line of the filing, in its order.
-    """
-
-    ticker: str
-    lines: tuple[HoldingLine, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -285,30 +273,27 @@ def _sort_lines(
     left_out: list[NotLoadedLine] = []
     excluded_held: set[str] = set()
     swapped_held: set[str] = set()
-    for fund in funds:
-        for line in fund.lines:
+    for holdings in funds:
+        fund = holdings.fund.code
+        for line in holdings.lines:
             lines_read += 1
             if line.category in _DEBT_OR_DERIVATIVE:
-                left_out.append(
-                    NotLoadedLine(fund.ticker, line, NotLoadedReason.DEBT_OR_DERIVATIVE)
-                )
+                left_out.append(NotLoadedLine(fund, line, NotLoadedReason.DEBT_OR_DERIVATIVE))
             elif line.category not in _LOADABLE:
                 # Loading it would be a guess and so would leaving it out.
                 # No fund files such a line today.
                 raise UniverseError(
-                    f"{fund.ticker} line {line.number} ({line.issuer_name}) is in category "
+                    f"{fund} line {line.number} ({line.issuer_name}) is in category "
                     f"'{line.category}', which the load has no rule for"
                 )
             elif line.isin is None or not is_valid_isin(line.isin):
-                left_out.append(NotLoadedLine(fund.ticker, line, NotLoadedReason.NO_VALID_ISIN))
+                left_out.append(NotLoadedLine(fund, line, NotLoadedReason.NO_VALID_ISIN))
             elif line.isin in excluded:
                 # Asked last, so a line that is left out anyway keeps the
                 # reason the filing itself gives. Taken out here, before the
                 # receipts are sorted, the line is not a line of its company
                 # in the receipt rule either (ADR 0013).
-                left_out.append(
-                    NotLoadedLine(fund.ticker, line, NotLoadedReason.EXCLUDED_BY_DECISION)
-                )
+                left_out.append(NotLoadedLine(fund, line, NotLoadedReason.EXCLUDED_BY_DECISION))
                 excluded_held.add(line.isin)
             else:
                 # A receipt with a known ordinary share is read as that share
@@ -324,7 +309,7 @@ def _sort_lines(
                 name = named.get(isin, " ".join(line.issuer_name.split()))
                 candidates.append(
                     _Candidate(
-                        fund=fund.ticker,
+                        fund=fund,
                         line=line,
                         isin=isin,
                         lei=decided.get(isin, lei),
@@ -792,7 +777,7 @@ def load_holdings(
                     placer.place(candidate)
 
     # Report in the order of the filings, whatever order the steps found them in.
-    fund_order = {fund.ticker: position for position, fund in enumerate(funds)}
+    fund_order = {holdings.fund.code: position for position, holdings in enumerate(funds)}
     return LoadResult(
         lines_read=lines.lines_read,
         securities=len({candidate.isin for candidate in lines.ordinary}) + len(lines.receipts),

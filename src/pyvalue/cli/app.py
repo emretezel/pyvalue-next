@@ -18,8 +18,11 @@ from pyvalue.errors import PyvalueError
 from pyvalue.universe import (
     DEFAULT_FILINGS_DIR,
     DEFAULT_OUTPUT_DIR,
+    DEFAULT_VANGUARD_DIR,
     FUNDS,
     NotLoadedReason,
+    Sponsor,
+    VanguardAdapter,
     load_universe,
 )
 
@@ -48,6 +51,7 @@ def _universe_load(arguments: argparse.Namespace) -> int:
         # Passed as a function: the settings file is read only if a filing
         # actually has to be downloaded.
         user_agent=sec_user_agent,
+        adapters={Sponsor.VANGUARD: VanguardAdapter(DEFAULT_VANGUARD_DIR)},
     )
     result = outcome.result
 
@@ -55,6 +59,9 @@ def _universe_load(arguments: argparse.Namespace) -> int:
     for fund in FUNDS:
         action = "downloaded" if fund in outcome.downloaded else "already there"
         print(f"Filing {fund.code} {fund.filing_number}: {action}")
+    for fund in FUNDS:
+        action = "downloaded" if fund in outcome.sponsor_files_downloaded else "already there"
+        print(f"Sponsor file {fund.code}: {action}")
     print(f"Lines read: {result.lines_read:,}")
     print(
         f"Lines not loaded: {len(result.not_loaded):,} "
@@ -137,7 +144,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="load the companies and securities of the fund holdings filings",
         description=(
             "Download the pinned SEC holdings filings of VTI and VXUS if they are not in "
-            f"{DEFAULT_FILINGS_DIR} yet, and load their companies and securities into the "
+            f"{DEFAULT_FILINGS_DIR} yet, and Vanguard's own holdings files if they are not in "
+            f"{DEFAULT_VANGUARD_DIR} yet, and load their companies and securities into the "
             f"database. The lines that were not loaded and the cases left for an agent are "
             f"written to {DEFAULT_OUTPUT_DIR}. Running it again adds nothing."
         ),

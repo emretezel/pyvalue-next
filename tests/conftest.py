@@ -1,24 +1,41 @@
 """Fixtures shared by the whole pyvalue test suite.
 
 No test touches the real database (``data/pyvalue.db``): every database a test
-uses is built here, in pytest's temporary folder.
+uses is built here, in pytest's temporary folder. And no test reaches the
+network: a fixture that applies to every test makes any real request fail.
 
 Author: Emre Tezel
 """
 
 import shutil
 import sqlite3
-from collections.abc import Iterator
+import urllib.request
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 import pytest
 
 from pyvalue.db import Database, migrate
 from pyvalue.db.connection import connect
-from pyvalue.universe import FUNDS
+from pyvalue.universe import FUNDS, Sponsor, SponsorAdapter, VanguardAdapter
 
 # The checked-in sample data: tests/fixtures.
 _FIXTURES: Path = Path(__file__).resolve().parent / "fixtures"
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make every real request fail, in every test.
+
+    Every download of pyvalue goes through one opener built by urllib. A test
+    of a download installs its own stand-in over this one; any other test
+    that would reach the network fails here instead of quietly fetching.
+    """
+
+    def build_opener(*handlers: type[urllib.request.BaseHandler]) -> urllib.request.OpenerDirector:
+        pytest.fail("a test tried to reach the network")
+
+    monkeypatch.setattr(urllib.request, "build_opener", build_opener)
 
 
 @pytest.fixture
@@ -80,3 +97,39 @@ def filings_dir(tmp_path: Path, nport_samples: Path) -> Path:
     for fund in FUNDS:
         shutil.copyfile(nport_samples / f"{fund.code}.xml", folder / fund.filing_file_name)
     return folder
+
+
+@pytest.fixture
+def vanguard_samples() -> Path:
+    """Return the folder of the sample Vanguard holdings files, ``tests/fixtures/vanguard``.
+
+    The files are named by fund code and described in the folder's README.
+    """
+    return _FIXTURES / "vanguard"
+
+
+@pytest.fixture
+def vanguard_dir(tmp_path: Path, vanguard_samples: Path) -> Path:
+    """Return a temporary folder holding the sample Vanguard files as the load expects them.
+
+    So a load that reads this folder downloads nothing from Vanguard.
+    """
+    folder = tmp_path / "vanguard"
+    folder.mkdir()
+    for fund in FUNDS:
+        shutil.copyfile(vanguard_samples / f"{fund.code}.json", folder / f"{fund.code}.json")
+    return folder
+
+
+@pytest.fixture
+def adapters(vanguard_dir: Path) -> Mapping[Sponsor, SponsorAdapter]:
+    """Return the sponsor adapters of a load on the sample documents.
+
+    The Vanguard adapter reads the sample files and fails the test if it is
+    asked to fetch anything: every file is already there.
+    """
+
+    def never_fetched(url: str) -> bytes:
+        pytest.fail(f"{url} was fetched")
+
+    return {Sponsor.VANGUARD: VanguardAdapter(vanguard_dir, never_fetched)}

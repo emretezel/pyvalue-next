@@ -8,6 +8,7 @@ tables back. The end-to-end run on sample filings is in
 Author: Emre Tezel
 """
 
+import zlib
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
@@ -20,6 +21,7 @@ from pyvalue.db import Company, ConstraintError, Database, DatabaseError, Instru
 from pyvalue.universe import (
     AgentCaseReason,
     Exclusion,
+    FundDefinition,
     FundHoldings,
     HoldingLine,
     LeiDecision,
@@ -27,6 +29,8 @@ from pyvalue.universe import (
     NameDecision,
     NotLoadedReason,
     OrdinaryShare,
+    Scope,
+    Sponsor,
     UniverseError,
     load_holdings,
 )
@@ -62,15 +66,43 @@ def _line(
         title=issuer_name if title is None else title,
         lei=lei,
         isin=isin,
+        cusip=None,
         category=category,
         category_label=label,
+        issuer_type="CORP",
+        trading_country="US",
+        currency="USD",
+        ticker=None,
+        sedol=None,
     )
 
 
-def _fund(ticker: str, *lines: HoldingLine) -> FundHoldings:
+def _definition(code: str) -> FundDefinition:
+    """Build the definition of a made-up fund with the given code.
+
+    The load's rules do not care how many funds there are or who runs them,
+    so the tests name three. Each code gets SEC ids of its own, as the
+    ``fund`` table requires, derived from the code so that one code always
+    means one fund.
+    """
+    number = zlib.crc32(code.encode("ascii"))
+    return FundDefinition(
+        code=code,
+        name=f"Sample {code} Fund",
+        scope=Scope.US if code == "VTI" else Scope.NON_US,
+        sponsor=Sponsor.VANGUARD,
+        series_id=f"S{number % 10**9:09d}",
+        registrant_cik=1,
+        filing_number=f"{number % 10**10:010d}-26-{number % 10**6:06d}",
+        holdings_date=date(2026, 7, 31),
+    )
+
+
+def _fund(code: str, *lines: HoldingLine) -> FundHoldings:
     """Build a fund from lines, numbering them from 1 as a filing does."""
     return FundHoldings(
-        ticker=ticker,
+        fund=_definition(code),
+        sponsor_file_date=None,
         lines=tuple(replace(line, number=number) for number, line in enumerate(lines, start=1)),
     )
 
@@ -762,9 +794,9 @@ def test_every_line_is_either_loaded_or_listed(database: Database) -> None:
     listed = {(entry.fund, entry.line.number) for entry in result.not_loaded}
     loaded_isins = {
         line.isin
-        for fund in _mixed_funds()
-        for line in fund.lines
-        if (fund.ticker, line.number) not in listed
+        for holdings in _mixed_funds()
+        for line in holdings.lines
+        if (holdings.fund.code, line.number) not in listed
     }
     assert result.lines_read == len(listed) + 4
     assert loaded_isins == {instrument.isin for instrument in _instruments(database)}

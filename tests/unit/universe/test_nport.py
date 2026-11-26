@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from pyvalue.universe import FilingError, HoldingLine
+from pyvalue.universe import FiledLine, FilingError
 from pyvalue.universe.nport import read_filing
 
 _NAMESPACE: str = "http://www.sec.gov/edgar/nport"
@@ -31,10 +31,15 @@ def _write(tmp_path: Path, text: str) -> Path:
     return path
 
 
+# What every line states besides its name and category: the currency it is
+# held in and the type of its issuer.
+_REST: str = "<curCd>USD</curCd><issuerCat>CORP</issuerCat>"
+
 _PLAIN_LINE: str = (
     "<invstOrSec><name>ALPHA CORP</name><lei>549300ALPHA000000003</lei>"
-    "<title>ALPHA CORP CL A</title><identifiers><isin value='US00000A0014'/></identifiers>"
-    "<assetCat>EC</assetCat></invstOrSec>"
+    "<title>ALPHA CORP CL A</title><cusip>00000A001</cusip>"
+    "<identifiers><isin value='US00000A0014'/></identifiers>"
+    f"<assetCat>EC</assetCat>{_REST}<invCountry>US</invCountry></invstOrSec>"
 )
 
 
@@ -66,17 +71,21 @@ def test_every_line_is_read_whatever_its_category(nport_samples: Path) -> None:
 
 
 def test_a_plain_line_is_read_in_full(nport_samples: Path) -> None:
-    """Name, title, identifier, ISIN and category of an ordinary share."""
+    """Everything the load and the adapter use of an ordinary share's line."""
     filing = read_filing(nport_samples / "VTI.xml")
 
-    assert filing.lines[1] == HoldingLine(
+    assert filing.lines[1] == FiledLine(
         number=2,
         issuer_name="ALPHA CORP",
         title="ALPHA CORP PFD SER A",
         lei="549300ALPHA000000003",
         isin="US00000A0022",
+        cusip=None,
         category="EP",
         category_label=None,
+        issuer_type="CORP",
+        country="US",
+        currency="USD",
     )
 
 
@@ -88,14 +97,18 @@ def test_the_conditional_category_is_read_with_its_label(nport_samples: Path) ->
     """
     filing = read_filing(nport_samples / "VXUS.xml")
 
-    assert filing.lines[15] == HoldingLine(
+    assert filing.lines[15] == FiledLine(
         number=16,
         issuer_name="Kappa Co Ltd",
         title="Kappa Co Ltd",
         lei="549300KAPPA000000078",
         isin="US00000K0012",
+        cusip=None,
         category="OTHER",
         category_label="GDR",
+        issuer_type="CORP",
+        country="US",
+        currency="USD",
     )
     assert [line.category_label for line in filing.lines if line.category == "OTHER"] == [
         "GDR",
@@ -115,11 +128,64 @@ def test_a_line_identified_without_an_isin_has_none(nport_samples: Path) -> None
     assert [line.isin for line in filing.lines[4:]] == [None, None, None]
 
 
-def test_the_identifier_is_kept_as_filed(nport_samples: Path) -> None:
-    """The placeholder stays a placeholder; judging it is the load's job."""
+def test_the_forms_not_applicable_is_read_as_no_identifier(nport_samples: Path) -> None:
+    """A filer writes ``N/A`` where the form demands a value and there is none."""
     filing = read_filing(nport_samples / "VTI.xml")
 
-    assert filing.lines[2].lei == "N/A"
+    assert filing.lines[2].lei is None
+
+
+def test_a_real_cusip_is_kept_and_a_placeholder_is_not(tmp_path: Path) -> None:
+    """``N/A`` and nine zeros both say that the security has no CUSIP."""
+
+    def line(cusip: str) -> str:
+        return (
+            f"<invstOrSec><name>ALPHA CORP</name>{cusip}<assetCat>EC</assetCat>{_REST}</invstOrSec>"
+        )
+
+    path = _write(
+        tmp_path,
+        _filing_text(
+            line("<cusip>037833100</cusip>")
+            + line("<cusip>N/A</cusip>")
+            + line("<cusip>000000000</cusip>")
+            + line("")
+        ),
+    )
+
+    assert [entry.cusip for entry in read_filing(path).lines] == ["037833100", None, None, None]
+
+
+def test_the_currency_is_read_from_either_place(nport_samples: Path) -> None:
+    """A dollar line states its currency plainly, any other beside its exchange rate."""
+    filing = read_filing(nport_samples / "VXUS.xml")
+
+    assert [line.currency for line in filing.lines[:5]] == ["GBP", "EUR", "USD", "HKD", "USD"]
+
+
+def test_the_country_is_read_as_filed(nport_samples: Path) -> None:
+    """What the country means is the sponsor's habit; the reader only reads it."""
+    filing = read_filing(nport_samples / "VXUS.xml")
+
+    assert [line.country for line in filing.lines[:5]] == ["GB", "FR", "US", "HK", "US"]
+
+
+def test_a_derivative_line_has_no_country_and_the_conditional_issuer_type(
+    nport_samples: Path,
+) -> None:
+    """A currency forward gives ``N/A`` as its country and no issuer type of the form's list."""
+    forward = read_filing(nport_samples / "VXUS.xml").lines[6]
+
+    assert forward.category == "DFE"
+    assert forward.country is None
+    assert forward.issuer_type == "OTHER"
+
+
+def test_the_issuer_type_is_read(nport_samples: Path) -> None:
+    """A company is ``CORP``; the code is kept as the form writes it."""
+    filing = read_filing(nport_samples / "VTI.xml")
+
+    assert {line.issuer_type for line in filing.lines} == {"CORP"}
 
 
 def test_inner_spacing_of_a_name_is_kept(nport_samples: Path) -> None:
@@ -143,39 +209,52 @@ def test_surrounding_whitespace_is_dropped_and_empty_values_are_absent(tmp_path:
         _filing_text(
             "<invstOrSec><name>  ALPHA CORP \n</name><lei> </lei><title></title>"
             "<identifiers><isin value='  US00000A0014 '/></identifiers>"
-            "<assetConditional assetCat=' OTHER ' desc='  '/></invstOrSec>"
+            "<currencyConditional curCd=' GBP ' exchangeRt='1.25'/>"
+            "<assetConditional assetCat=' OTHER ' desc='  '/>"
+            "<issuerConditional issuerCat=' OTHER ' desc=' N/A '/>"
+            "<invCountry> GB </invCountry></invstOrSec>"
         ),
     )
 
     assert read_filing(path).lines == (
-        HoldingLine(
+        FiledLine(
             number=1,
             issuer_name="ALPHA CORP",
             title="",
             lei=None,
             isin="US00000A0014",
+            cusip=None,
             category="OTHER",
             category_label=None,
+            issuer_type="OTHER",
+            country="GB",
+            currency="GBP",
         ),
     )
 
 
 def test_a_line_without_title_identifiers_or_identifier_element_is_read(tmp_path: Path) -> None:
-    """Only the name and the category are indispensable."""
+    """Only the name, the category, the issuer type and the currency are indispensable."""
     path = _write(
         tmp_path,
-        _filing_text("<invstOrSec><name>ALPHA CORP</name><assetCat>EC</assetCat></invstOrSec>"),
+        _filing_text(
+            f"<invstOrSec><name>ALPHA CORP</name><assetCat>EC</assetCat>{_REST}</invstOrSec>"
+        ),
     )
 
     assert read_filing(path).lines == (
-        HoldingLine(
+        FiledLine(
             number=1,
             issuer_name="ALPHA CORP",
             title="",
             lei=None,
             isin=None,
+            cusip=None,
             category="EC",
             category_label=None,
+            issuer_type="CORP",
+            country=None,
+            currency="USD",
         ),
     )
 
@@ -186,7 +265,7 @@ def test_an_empty_isin_value_is_no_isin(tmp_path: Path) -> None:
         tmp_path,
         _filing_text(
             "<invstOrSec><name>ALPHA CORP</name><identifiers><isin/></identifiers>"
-            "<assetCat>EC</assetCat></invstOrSec>"
+            f"<assetCat>EC</assetCat>{_REST}</invstOrSec>"
         ),
     )
 
@@ -215,6 +294,30 @@ def test_an_empty_isin_value_is_no_isin(tmp_path: Path) -> None:
             "<invstOrSec><name>BETA INC</name><assetConditional desc='ADR'/></invstOrSec>",
             "line 2 has no asset category",
             id="conditional category without a code",
+        ),
+        pytest.param(
+            "<invstOrSec><name>BETA INC</name><assetCat>EC</assetCat><curCd>USD</curCd>"
+            "</invstOrSec>",
+            "line 2 has no issuer type",
+            id="no issuer type at all",
+        ),
+        pytest.param(
+            "<invstOrSec><name>BETA INC</name><assetCat>EC</assetCat><curCd>USD</curCd>"
+            "<issuerConditional desc='N/A'/></invstOrSec>",
+            "line 2 has no issuer type",
+            id="conditional issuer type without a code",
+        ),
+        pytest.param(
+            "<invstOrSec><name>BETA INC</name><assetCat>EC</assetCat>"
+            "<issuerCat>CORP</issuerCat></invstOrSec>",
+            "line 2 has no currency",
+            id="no currency at all",
+        ),
+        pytest.param(
+            "<invstOrSec><name>BETA INC</name><assetCat>EC</assetCat>"
+            "<issuerCat>CORP</issuerCat><currencyConditional exchangeRt='1.25'/></invstOrSec>",
+            "line 2 has no currency",
+            id="conditional currency without a code",
         ),
     ],
 )

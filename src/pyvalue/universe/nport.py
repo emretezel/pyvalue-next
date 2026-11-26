@@ -5,6 +5,10 @@ whether a line is a receipt and whether it is loaded are decided by the load
 (``pyvalue.universe.load``). It returns every line of the filing, whatever its
 category, so that the load can account for each one.
 
+Every US-registered fund files this form, so the reader is shared by all fund
+sponsors. What a sponsor means by a field that the form leaves open, such as
+the country, is the business of that sponsor's adapter (ADR 0016).
+
 Author: Emre Tezel
 """
 
@@ -24,24 +28,44 @@ _NS: str = "{http://www.sec.gov/edgar/nport}"
 # for shares at all (ADR 0006).
 CONDITIONAL_CATEGORY: str = "OTHER"
 
+# What a filer writes into a field that the form requires and that does not
+# apply to the line. It is the form's way of saying "none", so it is read as
+# no value.
+_NOT_APPLICABLE: str = "N/A"
+
+# What some filers write for a security that has no CUSIP: nine zeros. No
+# real security has that number.
+_NO_CUSIP: str = "000000000"
+
 
 @dataclass(frozen=True, slots=True)
-class HoldingLine:
+class FiledLine:
     """One holding of a fund, as the filing states it.
 
     Attributes:
         number: The line's position in the filing, counted from 1.
         issuer_name: The name of the issuer.
         title: The title of the security; empty when the filing gives none.
-        lei: The issuer's legal-entity identifier exactly as filed, which
-            includes placeholders such as ``N/A``; ``None`` when absent.
+        lei: The issuer's legal-entity identifier as filed; ``None`` when the
+            filing gives none or the form's ``N/A``.
         isin: The security's ISIN exactly as filed; ``None`` when the line
             carries no ISIN.
+        cusip: The security's CUSIP as filed; ``None`` when the filing gives
+            none, the form's ``N/A`` or nine zeros.
         category: The form's asset category code, such as ``EC`` (common
             equity) or ``DBT`` (debt), or ``OTHER`` for the conditional
             category.
         category_label: The filer's own label for a line in the conditional
             category, such as ``ADR``; ``None`` for every other line.
+        issuer_type: The form's issuer type code, such as ``CORP`` (a
+            company) or ``RF`` (a registered fund), or ``OTHER`` for the
+            conditional type.
+        country: The ISO 3166 country code the filing gives for the line;
+            ``None`` when it gives the form's ``N/A``, as derivative lines
+            do. Whether it is where the security trades or where the issuer
+            is registered is the filer's habit.
+        currency: The ISO 4217 code of the currency the fund holds the line
+            in.
     """
 
     number: int
@@ -49,8 +73,12 @@ class HoldingLine:
     title: str
     lei: str | None
     isin: str | None
+    cusip: str | None
     category: str
     category_label: str | None
+    issuer_type: str
+    country: str | None
+    currency: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +93,7 @@ class Filing:
 
     series_id: str
     holdings_date: date
-    lines: tuple[HoldingLine, ...]
+    lines: tuple[FiledLine, ...]
 
 
 def _text(parent: ET.Element, tag: str) -> str | None:
@@ -74,6 +102,12 @@ def _text(parent: ET.Element, tag: str) -> str | None:
     if child is None or child.text is None:
         return None
     return child.text.strip() or None
+
+
+def _applicable(parent: ET.Element, tag: str) -> str | None:
+    """Return the text of a child element, or ``None`` when it says ``N/A`` or nothing."""
+    text = _text(parent, tag)
+    return None if text == _NOT_APPLICABLE else text
 
 
 def _isin(holding: ET.Element) -> str | None:
@@ -89,33 +123,82 @@ def _isin(holding: ET.Element) -> str | None:
     return element.get("value", "").strip() or None
 
 
-def _line(holding: ET.Element, number: int, path: Path) -> HoldingLine:
+def _coded(
+    holding: ET.Element, plain: str, conditional: str, what: str, number: int, path: Path
+) -> tuple[str, str | None]:
+    """Read a fact the form states in one of two ways.
+
+    The asset category and the issuer type are each stated either by a plain
+    element holding one of the form's codes, or by a conditional element whose
+    attribute holds the code (``OTHER``) and whose ``desc`` holds the filer's
+    own label.
+
+    Args:
+        holding: The line.
+        plain: The name of the plain element, which is also the name of the
+            attribute that holds the code on the conditional element.
+        conditional: The name of the conditional element.
+        what: What the fact is called in an error message.
+        number: The line's position, for the error message.
+        path: The filing, for the error message.
+
+    Returns:
+        The code, and the label when the conditional element gave one.
+
+    Raises:
+        FilingError: If the line states the fact in neither way.
+    """
+    code = _text(holding, plain)
+    if code is not None:
+        return code, None
+    element = holding.find(_NS + conditional)
+    code = "" if element is None else element.get(plain, "").strip()
+    if element is None or not code:
+        raise FilingError(f"{path}: line {number} has no {what}")
+    return code, element.get("desc", "").strip() or None
+
+
+def _currency(holding: ET.Element, number: int, path: Path) -> str:
+    """Read the currency a line is held in.
+
+    A line held in US dollars states it in a plain element. Any other line
+    states it on the conditional element, beside the exchange rate.
+    """
+    currency = _text(holding, "curCd")
+    if currency is None:
+        conditional = holding.find(_NS + "currencyConditional")
+        currency = None if conditional is None else conditional.get("curCd", "").strip() or None
+    if currency is None:
+        raise FilingError(f"{path}: line {number} has no currency")
+    return currency
+
+
+def _line(holding: ET.Element, number: int, path: Path) -> FiledLine:
     """Read one holding."""
     issuer_name = _text(holding, "name")
     if issuer_name is None:
         raise FilingError(f"{path}: line {number} has no issuer name")
 
-    # A line states its category in one of two ways: a plain element holding
-    # one of the form's codes, or the conditional element with a label.
-    category = _text(holding, "assetCat")
-    category_label: str | None = None
-    if category is None:
-        conditional = holding.find(_NS + "assetConditional")
-        if conditional is None:
-            raise FilingError(f"{path}: line {number} has no asset category")
-        category = conditional.get("assetCat", "").strip()
-        category_label = conditional.get("desc", "").strip() or None
-        if not category:
-            raise FilingError(f"{path}: line {number} has no asset category")
+    category, category_label = _coded(
+        holding, "assetCat", "assetConditional", "asset category", number, path
+    )
+    # The label of the conditional issuer type says nothing the load uses:
+    # the filings give "N/A" there.
+    issuer_type, _ = _coded(holding, "issuerCat", "issuerConditional", "issuer type", number, path)
+    cusip = _applicable(holding, "cusip")
 
-    return HoldingLine(
+    return FiledLine(
         number=number,
         issuer_name=issuer_name,
         title=_text(holding, "title") or "",
-        lei=_text(holding, "lei"),
+        lei=_applicable(holding, "lei"),
         isin=_isin(holding),
+        cusip=None if cusip == _NO_CUSIP else cusip,
         category=category,
         category_label=category_label,
+        issuer_type=issuer_type,
+        country=_applicable(holding, "invCountry"),
+        currency=_currency(holding, number, path),
     )
 
 

@@ -40,8 +40,14 @@ def _line(
         title=title,
         lei=lei,
         isin=isin,
+        cusip=None,
         category=category,
         category_label=category_label,
+        issuer_type="CORP",
+        trading_country="DE",
+        currency="EUR",
+        ticker=None,
+        sedol=None,
     )
 
 

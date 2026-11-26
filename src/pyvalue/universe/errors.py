@@ -12,3 +12,7 @@ class UniverseError(PyvalueError):
 
 class FilingError(UniverseError):
     """A holdings filing could not be obtained, or is not what was expected."""
+
+
+class SponsorFileError(UniverseError):
+    """A fund sponsor's own holdings file could not be obtained, or is not what was expected."""

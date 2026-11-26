@@ -9,49 +9,19 @@ Author: Emre Tezel
 """
 
 import contextlib
-import gzip
-import urllib.error
-import urllib.parse
-import urllib.request
-import zlib
 from collections.abc import Callable
-from email.message import Message
 from pathlib import Path
-from typing import IO
 
 from pyvalue.universe.errors import FilingError
 from pyvalue.universe.funds import FundDefinition, read_pinned_filing
+from pyvalue.universe.http import fetch_https
 
 # The one host a contact string may be sent to.
 SEC_HOST: str = "www.sec.gov"
 
-# A holdings filing of a broad fund is up to about ten megabytes.
-_TIMEOUT_SECONDS: float = 120.0
-
 # What fetches a URL: (url, contact string) -> the bytes of the response. A
 # parameter of this type lets tests stand in for the network.
 type Fetch = Callable[[str, str], bytes]
-
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Refuse every redirect.
-
-    urllib would repeat the request, headers included, at whatever address a
-    redirect names. Declining to build that second request turns a redirect
-    into an HTTP error, so the contact string never leaves ``www.sec.gov``.
-    """
-
-    def redirect_request(
-        self,
-        req: urllib.request.Request,
-        fp: IO[bytes],
-        code: int,
-        msg: str,
-        headers: Message,
-        newurl: str,
-    ) -> urllib.request.Request | None:
-        """Build no follow-up request, whatever the redirect says."""
-        return None
 
 
 def fetch_from_sec(url: str, user_agent: str) -> bytes:
@@ -68,24 +38,9 @@ def fetch_from_sec(url: str, user_agent: str) -> bytes:
         FilingError: If the address is not on ``www.sec.gov`` over HTTPS, or
             the download fails.
     """
-    address = urllib.parse.urlsplit(url)
-    if address.scheme != "https" or address.hostname != SEC_HOST:
-        raise FilingError(f"refusing to fetch {url}: only https://{SEC_HOST}/ is allowed")
-    request = urllib.request.Request(
-        url, headers={"User-Agent": user_agent, "Accept-Encoding": "gzip"}
-    )
-    opener = urllib.request.build_opener(_NoRedirect)
-    try:
-        with opener.open(request, timeout=_TIMEOUT_SECONDS) as response:
-            body: bytes = response.read()
-            if response.headers.get("Content-Encoding") == "gzip":
-                body = gzip.decompress(body)
-    except (OSError, EOFError, zlib.error) as error:
-        # urllib's own errors derive from OSError; the other two are what a
-        # cut-off or damaged compressed body raises. None of them carries the
-        # request headers, so the message cannot leak the contact string.
-        raise FilingError(f"cannot download {url}: {error}") from error
-    return body
+    # The shared fetch refuses every other host and every redirect, which is
+    # what keeps the contact string where it belongs.
+    return fetch_https(url, SEC_HOST, {"User-Agent": user_agent}, FilingError)
 
 
 def download_filing(

@@ -13,7 +13,8 @@ Author: Emre Tezel
 
 import re
 
-from pyvalue.universe.nport import CONDITIONAL_CATEGORY, HoldingLine
+from pyvalue.universe.holdings import HoldingLine
+from pyvalue.universe.nport import CONDITIONAL_CATEGORY
 
 # The labels Dimensional gives its receipts in the conditional category. The
 # same category also holds units, rights and cash, which are not receipts.
