@@ -2,8 +2,9 @@
 
 The component keeps our list of exchanges and a provider's symbol lists
 (ADR 0018, ADR 0024): one operation downloads the lists into files, another
-loads the files into the database. The rule that gives a security its listing is ADR 0019
-and is not built yet.
+loads the files into the database. The rule that gives a security its listing
+(ADR 0019) is in ``pyvalue.listings.rule``; the command that runs it is not
+built yet.
 
 Author: Emre Tezel
 """
