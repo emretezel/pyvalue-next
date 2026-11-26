@@ -1,6 +1,6 @@
 # ADR 0013: A security can be kept out of the universe by a file the load applies
 
-- Status: Accepted. Its first use is replaced by ADR 0015: the receipts kept out here are now read as their ordinary shares, so their companies are back in the universe. The file and the mechanism stay. Since then the file holds one security, an exchange-traded fund that VXUS holds and the load had taken for a company.
+- Status: Accepted. Its first use is replaced by ADR 0015: the receipts kept out here are now read as their ordinary shares, so their companies are back in the universe. The file and the mechanism stay. Since then the file holds one security, an exchange-traded fund that VXUS holds and the load had taken for a company. On 2026-11-26 the two-fund review added 59 securities, and ADR 0023 keeps every fund and property trust out through the same file.
 - Date: 2026-11-21
 
 ## Decision
