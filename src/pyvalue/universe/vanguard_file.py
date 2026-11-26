@@ -25,8 +25,8 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from pyvalue.http import fetch_https
 from pyvalue.universe.errors import SponsorFileError
-from pyvalue.universe.http import fetch_https
 
 # The one host the holdings list is fetched from.
 VANGUARD_HOST: str = "investor.vanguard.com"

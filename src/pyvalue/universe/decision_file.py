@@ -19,8 +19,8 @@ from importlib import resources
 from pathlib import Path
 from typing import Protocol
 
+from pyvalue.identifiers import is_valid_isin
 from pyvalue.universe.errors import UniverseError
-from pyvalue.universe.identifiers import is_valid_isin
 
 
 class Decision(Protocol):

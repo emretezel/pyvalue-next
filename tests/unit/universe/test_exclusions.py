@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
+from pyvalue.identifiers import is_valid_isin
 from pyvalue.universe import Exclusion, UniverseError
 from pyvalue.universe.exclusions import packaged_exclusions, read_exclusions
-from pyvalue.universe.identifiers import is_valid_isin
 from pyvalue.universe.lei_decisions import packaged_lei_decisions
 from pyvalue.universe.name_decisions import packaged_name_decisions
 

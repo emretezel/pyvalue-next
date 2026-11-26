@@ -13,9 +13,9 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from pyvalue.identifiers import is_valid_lei
 from pyvalue.universe.decision_file import read_decisions, read_packaged, valid_day, valid_isin
 from pyvalue.universe.errors import UniverseError
-from pyvalue.universe.identifiers import is_valid_lei
 
 # The columns of the file, in order.
 _HEADER: tuple[str, ...] = ("isin", "lei", "company", "decided_on", "evidence")

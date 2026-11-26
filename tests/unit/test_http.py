@@ -1,4 +1,4 @@
-"""Tests for the requests pyvalue sends: ``http.py`` and the two fetches built on it.
+"""Tests for the requests pyvalue sends: ``pyvalue.http`` and the fetches built on it.
 
 No test here touches the network. A request is tested against a stand-in for
 urllib's opener, which records what would have been sent.
@@ -7,6 +7,7 @@ Author: Emre Tezel
 """
 
 import gzip
+import http.client
 import io
 import urllib.error
 import urllib.request
@@ -16,13 +17,18 @@ from typing import Self
 
 import pytest
 
+from pyvalue.errors import PyvalueError
+from pyvalue.http import _NoRedirect, fetch_https
 from pyvalue.universe import FilingError, SponsorFileError, UniverseError
-from pyvalue.universe.http import _NoRedirect, fetch_https
 from pyvalue.universe.sec import SEC_HOST, fetch_from_sec
 from pyvalue.universe.vanguard_file import VANGUARD_HOST, fetch_from_vanguard
 
 _CONTACT: str = "Sample Person sample@example.org"
 _HOST: str = "data.example.org"
+# Stands in for an API key. The space and the ampersand are there on purpose: a
+# key must not be able to break out of its place in the address.
+_KEY: str = "sample key&0123456789"
+_KEY_SENT: str = "sample+key%260123456789"
 _URL: str = "https://data.example.org/files/one.json"
 _SEC_URL: str = "https://www.sec.gov/Archives/edgar/data/1/2/primary_doc.xml"
 _VANGUARD_URL: str = (
@@ -206,6 +212,166 @@ def test_every_request_is_made_with_the_redirect_guard(monkeypatch: pytest.Monke
     fetch_from_vanguard(_VANGUARD_URL)
 
     assert built == [(_NoRedirect,)] * 3
+
+
+# --- Secret parts of an address --------------------------------------------------------------
+
+
+class _RequestError(PyvalueError):
+    """Stands in for a caller's own error."""
+
+
+class _NothingThereError(_RequestError):
+    """Stands in for a caller's error for a document the host does not have."""
+
+
+def test_a_secret_part_is_added_to_the_address_that_is_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A provider takes its key as part of the address, so that is where it goes."""
+    opener = _install(monkeypatch, _Response(b"[]", None))
+
+    fetch_https(_URL, _HOST, {}, _RequestError, secret_query={"api_token": _KEY})
+
+    (request,) = opener.requests
+    assert request.full_url == f"{_URL}?api_token={_KEY_SENT}"
+
+
+def test_a_secret_part_joins_the_parts_the_address_already_has(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An address with a query keeps it."""
+    opener = _install(monkeypatch, _Response(b"[]", None))
+
+    fetch_https(f"{_URL}?fmt=json", _HOST, {}, _RequestError, secret_query={"api_token": _KEY})
+
+    (request,) = opener.requests
+    assert request.full_url == f"{_URL}?fmt=json&api_token={_KEY_SENT}"
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        pytest.param(urllib.error.URLError("no route to host"), id="network"),
+        pytest.param(
+            urllib.error.HTTPError(
+                f"{_URL}?api_token={_KEY_SENT}", 401, "Unauthorized", Message(), io.BytesIO(b"")
+            ),
+            id="refused",
+        ),
+        pytest.param(TimeoutError("timed out"), id="timeout"),
+        pytest.param(
+            # What the standard library raises for an address it will not send:
+            # its text quotes the address, secret included.
+            http.client.InvalidURL(
+                f"URL can't contain control characters. '/files/one.json?api_token={_KEY}'"
+            ),
+            id="an address the library refuses, quoted plainly",
+        ),
+        pytest.param(
+            http.client.InvalidURL(f"nonnumeric port in '/one.json?api_token={_KEY_SENT}'"),
+            id="an address the library refuses, quoted as sent",
+        ),
+    ],
+)
+def test_a_secret_part_is_in_no_message_whatever_fails(
+    monkeypatch: pytest.MonkeyPatch, failure: Exception
+) -> None:
+    """The message names the address without its secret parts, and a cleaned cause."""
+    _install(monkeypatch, failure)
+
+    with pytest.raises(_RequestError, match="cannot download https://data.example.org/") as raised:
+        fetch_https(_URL, _HOST, {}, _RequestError, secret_query={"api_token": _KEY})
+
+    message = str(raised.value)
+    assert _KEY not in message
+    assert _KEY_SENT not in message
+    # The cause may quote the address that was requested, and a traceback
+    # would print it, so it is not kept.
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__
+
+
+def test_a_refused_address_is_reported_without_the_secret_part(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The host check runs on the address before the secret is added."""
+    opener = _install(monkeypatch, _Response(b"", None))
+
+    with pytest.raises(_RequestError, match="refusing to fetch") as raised:
+        fetch_https(
+            "https://elsewhere.example.org/x",
+            _HOST,
+            {},
+            _RequestError,
+            secret_query={"api_token": _KEY},
+        )
+
+    assert opener.requests == []
+    assert _KEY not in str(raised.value)
+    assert _KEY_SENT not in str(raised.value)
+
+
+def test_a_failure_without_a_secret_keeps_its_cause(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Nothing secret was sent, so the cause stays for whoever reads a traceback."""
+    failure = urllib.error.URLError("no route to host")
+    _install(monkeypatch, failure)
+
+    with pytest.raises(_RequestError) as raised:
+        fetch_https(_URL, _HOST, {}, _RequestError)
+
+    assert raised.value.__cause__ is failure
+
+
+def test_an_address_the_library_refuses_is_a_failed_download(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """It must not escape as a raw error: the command line prints only pyvalue's own."""
+    _install(monkeypatch, http.client.InvalidURL("URL can't contain control characters."))
+
+    with pytest.raises(_RequestError, match="cannot download"):
+        fetch_https(_URL, _HOST, {}, _RequestError)
+
+
+# --- A document the host does not have -------------------------------------------------------
+
+
+def _answered(status: int) -> urllib.error.HTTPError:
+    """Return the error urllib raises when a host answers with a failure status."""
+    return urllib.error.HTTPError(_URL, status, "No", Message(), io.BytesIO(b""))
+
+
+def test_not_found_is_told_apart_when_the_caller_asks_for_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A provider answers so for a list that is not in the subscription."""
+    _install(monkeypatch, _answered(404))
+
+    with pytest.raises(_NothingThereError, match="cannot download"):
+        fetch_https(_URL, _HOST, {}, _RequestError, not_found=_NothingThereError)
+
+
+@pytest.mark.parametrize("status", [401, 403, 500])
+def test_every_other_answer_is_the_ordinary_failure(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    """Only "not found" has a meaning of its own."""
+    _install(monkeypatch, _answered(status))
+
+    with pytest.raises(_RequestError) as raised:
+        fetch_https(_URL, _HOST, {}, _RequestError, not_found=_NothingThereError)
+
+    assert not isinstance(raised.value, _NothingThereError)
+
+
+def test_not_found_is_an_ordinary_failure_for_a_caller_that_does_not_ask(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A filing that is not there is a failed download like any other."""
+    _install(monkeypatch, _answered(404))
+
+    with pytest.raises(UniverseError, match="cannot download"):
+        fetch_https(_URL, _HOST, {}, UniverseError)
 
 
 # --- The SEC ---------------------------------------------------------------------------------

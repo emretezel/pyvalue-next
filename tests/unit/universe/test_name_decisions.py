@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from pyvalue.identifiers import is_valid_isin
 from pyvalue.universe import NameDecision, UniverseError
-from pyvalue.universe.identifiers import is_valid_isin
 from pyvalue.universe.name_decisions import packaged_name_decisions, read_name_decisions
 
 _HEADER: str = "isin,name,decided_on,evidence\n"

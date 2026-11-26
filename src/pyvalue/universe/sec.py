@@ -12,9 +12,9 @@ import contextlib
 from collections.abc import Callable
 from pathlib import Path
 
+from pyvalue.http import fetch_https
 from pyvalue.universe.errors import FilingError
 from pyvalue.universe.funds import FundDefinition, read_pinned_filing
-from pyvalue.universe.http import fetch_https
 
 # The one host a contact string may be sent to.
 SEC_HOST: str = "www.sec.gov"

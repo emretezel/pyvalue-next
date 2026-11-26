@@ -33,10 +33,10 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from pyvalue.db import Company, Database, Fund, Holding, UnitOfWork
+from pyvalue.identifiers import is_valid_isin, is_valid_lei
 from pyvalue.universe.errors import UniverseError
 from pyvalue.universe.exclusions import Exclusion
 from pyvalue.universe.holdings import FundHoldings, HoldingLine
-from pyvalue.universe.identifiers import is_valid_isin, is_valid_lei
 from pyvalue.universe.lei_decisions import LeiDecision
 from pyvalue.universe.name_decisions import NameDecision
 from pyvalue.universe.nport import CONDITIONAL_CATEGORY

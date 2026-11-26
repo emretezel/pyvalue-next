@@ -1,4 +1,4 @@
-"""Tests for ``pyvalue.universe.identifiers``: ISIN and legal-entity identifier checks.
+"""Tests for ``pyvalue.identifiers``: ISIN and legal-entity identifier checks.
 
 Author: Emre Tezel
 """
@@ -8,7 +8,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from pyvalue.db import Database, migrate
-from pyvalue.universe.identifiers import is_valid_isin, is_valid_lei
+from pyvalue.identifiers import is_valid_isin, is_valid_lei
 
 _LETTERS: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 _DIGITS: str = "0123456789"

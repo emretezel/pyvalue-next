@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from pyvalue.identifiers import is_valid_isin, is_valid_lei
 from pyvalue.universe import LeiDecision, UniverseError
-from pyvalue.universe.identifiers import is_valid_isin, is_valid_lei
 from pyvalue.universe.lei_decisions import packaged_lei_decisions, read_lei_decisions
 
 _HEADER: str = "isin,lei,company,decided_on,evidence\n"

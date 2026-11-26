@@ -40,7 +40,7 @@ flowchart LR
     db --> file
 ```
 
-An arrow means "calls". Nothing calls back up the arrows. Two small modules are left out of the picture because everything may use them: `pyvalue.errors`, the base of pyvalue's own errors, and `pyvalue.config`, the settings.
+An arrow means "calls". Nothing calls back up the arrows. Four small modules are left out of the picture because everything may use them: `pyvalue.errors`, the base of pyvalue's own errors; `pyvalue.config`, the settings; `pyvalue.http`, the one function every download goes through; and `pyvalue.identifiers`, the checks of an ISIN and of a legal-entity identifier.
 
 The pattern for database access is Repository with Unit of Work (ADR 0008). The working rules, with what to flag in review, are in the **Database Access** section of [`CLAUDE.md`](../CLAUDE.md).
 

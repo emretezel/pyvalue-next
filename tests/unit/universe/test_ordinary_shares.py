@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
+from pyvalue.identifiers import is_valid_isin
 from pyvalue.universe import OrdinaryShare, UniverseError
 from pyvalue.universe.exclusions import packaged_exclusions
-from pyvalue.universe.identifiers import is_valid_isin
 from pyvalue.universe.lei_decisions import packaged_lei_decisions
 from pyvalue.universe.name_decisions import packaged_name_decisions
 from pyvalue.universe.ordinary_shares import packaged_ordinary_shares, read_ordinary_shares
