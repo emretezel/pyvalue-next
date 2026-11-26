@@ -1,6 +1,6 @@
 # ADR 0005: A listing is filled by one narrow rule; every other case is decided by an agent
 
-- Status: Accepted
+- Status: Superseded by ADR 0019, which looks only at the security's home market and uses the fund's ticker as a second check. The measurements below on why other shortcuts fail still stand.
 - Date: 2026-11-20
 
 ## Decision

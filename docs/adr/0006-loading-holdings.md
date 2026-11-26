@@ -1,6 +1,6 @@
 # ADR 0006: Holdings are loaded straight into `company` and `instrument`
 
-- Status: Accepted. Two points left open here, where the load output goes and punctuation in name comparison, are settled by ADR 0009. ADR 0012 lets a decision replace a stored name that is a vendor placeholder; otherwise the stored name is still the first fund's spelling. ADR 0013 lets a decision keep a security out of the universe; the load still never deletes. ADR 0014 widens step 5: a receipt's company is also recognised by any name a fund files for the company's shares. ADR 0015 lets a decision read a receipt's lines as lines of its ordinary share.
+- Status: Accepted. Two points left open here, where the load output goes and punctuation in name comparison, are settled by ADR 0009. ADR 0012 lets a decision replace a stored name that is a vendor placeholder; otherwise the stored name is still the first fund's spelling. ADR 0013 lets a decision keep a security out of the universe; the load still never deletes. ADR 0014 widens step 5: a receipt's company is also recognised by any name a fund files for the company's shares. ADR 0015 lets a decision read a receipt's lines as lines of its ordinary share. ADR 0016 changes the funds read in step 1 to VTI and VXUS. ADR 0017 supersedes the decision that there is no table for funds and none for holdings lines; the loading rules stand.
 - Date: 2026-11-20
 
 ## Decision

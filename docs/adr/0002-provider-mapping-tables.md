@@ -1,6 +1,6 @@
 # ADR 0002: Provider identifiers live in mapping tables
 
-- Status: Accepted
+- Status: Accepted. ADR 0018 adds a table for a provider's symbol list and one more unique key on `provider_exchange`; the three tables and the view stand.
 - Date: 2026-11-20
 
 ## Decision

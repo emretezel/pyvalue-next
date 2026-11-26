@@ -10,9 +10,9 @@ Only what has been agreed is described as designed. Everything else is listed as
 |---|---|---|---|
 | Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections, migrations, the unit of work, and the repositories for `company` and `instrument`. A repository is added when a component first needs its table |
 | Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load` |
-| Universe load | `pyvalue.universe` | Downloads the three SEC holdings filings and reads them into `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0004, ADR 0006, ADR 0009 to ADR 0015) | Built |
+| Universe load | `pyvalue.universe` | Downloads the three SEC holdings filings and reads them into `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0004, ADR 0006, ADR 0009 to ADR 0015) | Built for the three funds of ADR 0004. Designed, not built: two Vanguard funds read through a sponsor adapter, with `fund` and `holding` tables (ADR 0016, ADR 0017) |
 | Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line |
-| Listings | `pyvalue.listings` | Looks up provider listings, applies the automatic rule and the decisions file (ADR 0005) | Planned |
+| Listings | `pyvalue.listings` | Stores the provider's symbol lists, applies the automatic rule and the decisions file (ADR 0018, ADR 0019) | Designed, not built |
 | Providers | `pyvalue.providers` | The EODHD client | Planned |
 | Prices, fundamentals, metrics, screens, data-quality reports, the agent that decides listings | | | Not designed yet |
 
@@ -58,14 +58,14 @@ The pattern for database access is Repository with Unit of Work (ADR 0008). The 
 
 ## The universe, as designed
 
-The data model and the steps are fixed by the records. Step 1 is built; the code for steps 2 to 4 is not written yet.
+The data model and the steps are fixed by the records. Step 1 is built as ADR 0004 had it: three funds (VTI, VXUS and DFAX), SEC filings only, no `fund` or `holding` table. The table below shows the design of 2026-11-26. The change to step 1 and the code for steps 2 to 4 are not written yet.
 
 | Step | What happens | Record |
 |---|---|---|
-| 1. Load | The SEC holdings filings of VTI, VXUS and DFAX are read into `company` and `instrument`. Where the funds file different legal-entity identifiers for a security, a decisions file chooses between them. Where a fund files a placeholder instead of a company name, a second decisions file gives the name. A third lists securities that are kept out of the universe, and a fourth reads a depositary receipt as its ordinary share | ADR 0004, ADR 0006, ADR 0009 to ADR 0015 |
-| 2. Look up | The provider's symbol lists are matched to instruments by ISIN | ADR 0005 |
-| 3. Fill | A listing is written when the automatic rule applies | ADR 0005 |
-| 4. Decide | An agent decides every other case; its decisions are kept in a committed file | ADR 0005 |
+| 1. Load | The SEC holdings filings of VTI and VXUS are read through a sponsor adapter, which adds ticker and SEDOL from Vanguard's own holdings file. The lines go into `fund` and `holding`, and from there into `company` and `instrument`. Where a fund files a placeholder instead of a company name, a decisions file gives the name. A second lists securities that are kept out of the universe, and a third reads a depositary receipt as its ordinary share. The file that chooses between legal-entity identifiers stays for the day two sponsors disagree | ADR 0016, ADR 0017, ADR 0006, ADR 0009 to ADR 0015 |
+| 2. Look up | The provider's exchange and symbol lists are downloaded and stored in `provider_symbol` | ADR 0018 |
+| 3. Fill | A listing is written when exactly one of the provider's lines in the security's home market carries its ISIN and the fund's ticker does not contradict it | ADR 0019 |
+| 4. Decide | An agent decides every other case; its decisions are kept in a committed file | ADR 0019 |
 
 ## Where things live
 
@@ -79,7 +79,10 @@ The data model and the steps are fixed by the records. Step 1 is built; the code
 | Decisions on company names | `src/pyvalue/universe/decisions/name.csv`, one row per security, shipped inside the package. For a company whose filed name is a vendor placeholder (ADR 0012) | Yes |
 | Securities kept out of the universe | `src/pyvalue/universe/decisions/excluded.csv`, one row per security, shipped inside the package. The load does not load them; a database that already holds one has to be rebuilt (ADR 0013) | Yes |
 | Receipts read as their ordinary share | `src/pyvalue/universe/decisions/ordinary_share.csv`, one row per receipt, shipped inside the package. The load reads the receipt's lines under the ordinary share's ISIN; a database that already holds the receipt has to be rebuilt (ADR 0015) | Yes |
-| The agent's listing decisions | A file under version control, expected in the same folder; settled when listings are built | Yes |
+| The agent's listing decisions | `src/pyvalue/listings/decisions/listing.csv`, one row per security, shipped inside the package (ADR 0019). Not built yet | Yes |
+| Vanguard's own holdings files | `data/vanguard/`, one file per fund (ADR 0016). Not built yet | No |
+| The exchange reference files | `src/pyvalue/listings/reference/exchange.csv` for our exchanges and `src/pyvalue/providers/eodhd_exchange.csv` for the provider's codes (ADR 0018). Not built yet | Yes |
+| The provider's downloaded lists | `data/eodhd/`, the exchange list and one symbol list per exchange code (ADR 0018). Not built yet | No |
 | Credentials and the SEC contact line | `private/config.toml` | No |
 | Table documentation | `docs/database/`, one file per table | Yes |
 | What the universe holds | `docs/universe.md`: the counts, the companies by country, how that compares with what is listed, and the points carried into the listing step. A record of 2026-11-22, not regenerated by a command | Yes |

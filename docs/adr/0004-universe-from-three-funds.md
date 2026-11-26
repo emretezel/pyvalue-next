@@ -1,6 +1,6 @@
 # ADR 0004: The universe comes from the SEC holdings filings of three funds
 
-- Status: Accepted
+- Status: Superseded by ADR 0016, which keeps VTI and VXUS, drops DFAX and adds Vanguard's own holdings file. The measurements below still stand.
 - Date: 2026-11-20
 
 ## Decision
