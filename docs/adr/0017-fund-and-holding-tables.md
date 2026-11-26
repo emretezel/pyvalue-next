@@ -1,6 +1,6 @@
 # ADR 0017: Funds and their holding lines are stored
 
-- Status: Accepted
+- Status: Accepted. ADR 0021 supersedes one part: a line that was not loaded is no longer stored, so `holding` has no `not_loaded_reason` column and `instrument_id` is required.
 - Date: 2026-11-26
 - Supersedes: the decision of ADR 0006 that there is no table for funds and none for holdings lines. The loading rules of ADR 0006 stand: how a line finds its company, the receipt check, and that a company or an instrument is never deleted.
 

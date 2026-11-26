@@ -1,9 +1,9 @@
 """Tests for what ``pyvalue.universe.load`` records: the ``fund`` and ``holding`` rows.
 
 The rules that decide which lines become companies and instruments are tested
-in ``test_load.py``. These tests pin ADR 0017: which lines get a holding row,
-what the row says, which instrument it points at, and that a fund's rows are
-replaced as a whole.
+in ``test_load.py``. These tests pin ADR 0017 and ADR 0021: which lines get a
+holding row (the loaded ones), what the row says, which instrument it points
+at, and that a fund's rows are replaced as a whole.
 
 Author: Emre Tezel
 """
@@ -105,9 +105,8 @@ def _fund(
 def _row(
     fund: str = "VTI",
     number: int = 1,
-    instrument_id: int | None = 1,
+    instrument_id: int = 1,
     *,
-    reason: str | None = None,
     isin: str = _ISIN,
     issuer_name: str = "ALPHA CORP",
     title: str | None = "ALPHA CORP COM",
@@ -126,7 +125,6 @@ def _row(
         fund_code=fund,
         line_number=number,
         instrument_id=instrument_id,
-        not_loaded_reason=reason,
         isin=isin,
         issuer_name=issuer_name,
         title=title,
@@ -349,34 +347,22 @@ def test_a_line_in_the_conditional_category_keeps_its_label(database: Database) 
 # --- Lines that were not loaded --------------------------------------------------------------
 
 
-def test_a_line_kept_out_by_a_decision_is_recorded_without_an_instrument(
-    database: Database,
-) -> None:
-    """The table shows that the fund holds it, and why it is not in the universe."""
+def test_a_line_kept_out_by_a_decision_gets_no_row(database: Database) -> None:
+    """ADR 0021: the line is in the result and in the output file, not in the table."""
     funds = [_fund(_VTI, _line(), _line("BETA INC", _SECOND_ISIN, title="BETA"))]
 
     result = load_holdings(database, funds, exclusions=[_exclusion(_SECOND_ISIN)])
 
-    assert _holdings(database) == (
-        _row("VTI", 1, 1),
-        _row(
-            "VTI",
-            2,
-            None,
-            reason="excluded_by_decision",
-            isin=_SECOND_ISIN,
-            issuer_name="BETA INC",
-            title="BETA",
-        ),
-    )
-    assert result.holdings_stored == 2
+    assert _holdings(database) == (_row("VTI", 1, 1),)
+    assert result.holdings_stored == 1
+    assert [(entry.fund, entry.line.number, entry.reason.value) for entry in result.not_loaded] == [
+        ("VTI", 2, "excluded_by_decision")
+    ]
     assert [instrument.isin for instrument in _instruments(database)] == [_ISIN]
 
 
-def test_a_receipt_whose_company_is_already_loaded_is_recorded_without_an_instrument(
-    database: Database,
-) -> None:
-    """ADR 0006: the receipt adds nothing to the universe, but the fund does hold it."""
+def test_a_receipt_whose_company_is_already_loaded_gets_no_row(database: Database) -> None:
+    """ADR 0006 and ADR 0021: the receipt adds nothing to the universe, so it is not recorded."""
     funds = [
         _fund(
             _VXUS,
@@ -385,14 +371,15 @@ def test_a_receipt_whose_company_is_already_loaded_is_recorded_without_an_instru
         )
     ]
 
-    load_holdings(database, funds)
+    result = load_holdings(database, funds)
 
     rows = _holdings(database)
-    assert [(row.line_number, row.instrument_id, row.not_loaded_reason) for row in rows] == [
-        (1, None, "receipt_company_already_loaded"),
-        (2, 1, None),
+    assert [(row.line_number, row.instrument_id, row.isin) for row in rows] == [
+        (2, 1, _ORDINARY_ISIN)
     ]
-    assert rows[0].isin == _RECEIPT_ISIN
+    assert [(entry.line.number, entry.reason.value) for entry in result.not_loaded] == [
+        (1, "receipt_company_already_loaded")
+    ]
 
 
 def test_a_receipt_that_is_the_companys_only_line_is_recorded_with_its_instrument(
@@ -402,7 +389,7 @@ def test_a_receipt_that_is_the_companys_only_line_is_recorded_with_its_instrumen
     load_holdings(database, [_fund(_VXUS, _line("ETA LTD", _RECEIPT_ISIN, title="ETA LTD ADR"))])
 
     (row,) = _holdings(database)
-    assert (row.instrument_id, row.not_loaded_reason, row.isin) == (1, None, _RECEIPT_ISIN)
+    assert (row.instrument_id, row.isin) == (1, _RECEIPT_ISIN)
 
 
 def test_a_receipt_read_as_its_ordinary_share_keeps_its_filed_isin(database: Database) -> None:
@@ -414,7 +401,6 @@ def test_a_receipt_read_as_its_ordinary_share_keeps_its_filed_isin(database: Dat
     assert _instruments(database) == (Instrument(1, 1, _ORDINARY_ISIN),)
     (row,) = _holdings(database)
     assert (row.instrument_id, row.isin, row.ticker) == (1, _RECEIPT_ISIN, "ZETA")
-    assert row.not_loaded_reason is None
 
 
 @pytest.mark.parametrize(
@@ -427,7 +413,7 @@ def test_a_receipt_read_as_its_ordinary_share_keeps_its_filed_isin(database: Dat
     ],
 )
 def test_a_line_that_is_no_share_line_gets_no_row(database: Database, line: HoldingLine) -> None:
-    """Such a line stays in the output file; the table holds share lines with a valid ISIN."""
+    """Such a line stays in the output file; the table holds the lines that were loaded."""
     result = load_holdings(database, [_fund(_VTI, _line(), line)])
 
     assert [row.line_number for row in _holdings(database)] == [1]
@@ -477,7 +463,7 @@ def test_the_result_counts_the_rows_and_what_they_carry(database: Database) -> N
 
 
 def _mixed() -> list[FundHoldings]:
-    """Two funds with a loaded line each, an excluded line and a line with no ISIN."""
+    """Two funds with three lines that can be loaded and one line with no ISIN."""
     return [
         _fund(
             _VTI,
@@ -499,7 +485,7 @@ def test_a_second_run_leaves_both_tables_exactly_as_they_were(database: Database
 
     assert (_funds(database), _holdings(database), _instruments(database)) == before
     assert (second.companies_added, second.instruments_added) == (0, 0)
-    assert second.holdings_stored == first.holdings_stored == 3
+    assert second.holdings_stored == first.holdings_stored == 2
 
 
 def test_a_newer_filing_replaces_the_funds_lines_and_keeps_the_instruments(

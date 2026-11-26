@@ -89,7 +89,6 @@ def test_save_updates_a_fund_whose_holding_lines_point_at_it(database: Database)
         fund_code="VTI",
         line_number=1,
         instrument_id=1,
-        not_loaded_reason=None,
         isin=_ISIN,
         issuer_name="ALPHA CORP",
         title=None,

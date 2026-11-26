@@ -39,7 +39,6 @@ _FULL: Holding = Holding(
     fund_code="VTI",
     line_number=1,
     instrument_id=1,
-    not_loaded_reason=None,
     isin=_ISIN,
     issuer_name="ALPHA CORP",
     title="ALPHA CORP COM",
@@ -58,7 +57,6 @@ _BARE: Holding = Holding(
     fund_code="VXUS",
     line_number=2,
     instrument_id=2,
-    not_loaded_reason=None,
     isin=_SECOND_ISIN,
     issuer_name="DELTA PLC",
     title=None,
@@ -72,12 +70,12 @@ _BARE: Holding = Holding(
     trading_country="GB",
     currency="GBP",
 )
-# A labelled receipt that was not loaded.
-_NOT_LOADED: Holding = Holding(
+# A receipt read as its ordinary share: it points at the share's instrument and
+# keeps the ISIN and the label its fund filed.
+_RECEIPT: Holding = Holding(
     fund_code="VXUS",
     line_number=1,
-    instrument_id=None,
-    not_loaded_reason="receipt_company_already_loaded",
+    instrument_id=2,
     isin=_RECEIPT_ISIN,
     issuer_name="DELTA PLC",
     title="DELTA PLC ADR",
@@ -129,14 +127,16 @@ def test_an_empty_value_reads_back_as_none(database: Database) -> None:
         assert work.holdings.all() == (_BARE,)
 
 
-def test_a_line_that_was_not_loaded_has_a_reason_and_no_instrument(database: Database) -> None:
-    """The table shows everything the fund holds in shares, and why something is out."""
+def test_a_line_keeps_the_isin_and_the_label_its_fund_filed(database: Database) -> None:
+    """The filed ISIN may differ from the instrument's: a receipt read as its ordinary share."""
     with database.unit_of_work() as work:
         _seed(work)
-        work.holdings.add(_NOT_LOADED)
+        work.holdings.add(_RECEIPT)
 
     with database.unit_of_work() as work:
-        assert work.holdings.all() == (_NOT_LOADED,)
+        assert work.holdings.all() == (_RECEIPT,)
+        instrument = work.instruments.all()[1]
+    assert (instrument.instrument_id, instrument.isin) == (2, _SECOND_ISIN)
 
 
 def test_all_orders_the_lines_by_fund_and_then_by_position(database: Database) -> None:
@@ -144,11 +144,11 @@ def test_all_orders_the_lines_by_fund_and_then_by_position(database: Database) -
     with database.unit_of_work() as work:
         _seed(work)
         work.holdings.add(_BARE)
-        work.holdings.add(_NOT_LOADED)
+        work.holdings.add(_RECEIPT)
         work.holdings.add(_FULL)
 
     with database.unit_of_work() as work:
-        assert work.holdings.all() == (_FULL, _NOT_LOADED, _BARE)
+        assert work.holdings.all() == (_FULL, _RECEIPT, _BARE)
 
 
 def test_two_lines_may_point_at_one_instrument(database: Database) -> None:
@@ -168,7 +168,7 @@ def test_remove_of_fund_removes_that_funds_lines_only(database: Database) -> Non
     with database.unit_of_work() as work:
         _seed(work)
         work.holdings.add(_FULL)
-        work.holdings.add(_NOT_LOADED)
+        work.holdings.add(_RECEIPT)
         work.holdings.add(_BARE)
 
         work.holdings.remove_of_fund("VXUS")
@@ -241,13 +241,6 @@ def test_add_refuses_a_second_line_with_the_same_number(database: Database) -> N
 @pytest.mark.parametrize(
     "holding",
     [
-        pytest.param(
-            replace(_FULL, not_loaded_reason="excluded_by_decision"), id="loaded and a reason"
-        ),
-        pytest.param(replace(_FULL, instrument_id=None), id="not loaded and no reason"),
-        pytest.param(
-            replace(_FULL, instrument_id=None, not_loaded_reason="because"), id="unknown reason"
-        ),
         pytest.param(replace(_FULL, isin="N/A"), id="placeholder ISIN"),
         pytest.param(replace(_FULL, lei="N/A"), id="placeholder identifier"),
         pytest.param(replace(_FULL, cusip="N/A"), id="placeholder CUSIP"),

@@ -11,18 +11,16 @@ from pyvalue.db.repository import Repository
 
 @dataclass(frozen=True, slots=True)
 class Holding:
-    """One row of ``holding``: one share line of a fund's loaded filing (ADR 0017).
+    """One row of ``holding``: one loaded share line of a fund's filing (ADR 0017, ADR 0021).
 
     The row records what the fund's documents say about the line. The one
-    thing in it that pyvalue decided is ``instrument_id``.
+    thing in it that pyvalue decided is ``instrument_id``. A line that was not
+    loaded has no row.
 
     Attributes:
         fund_code: The fund that reports the line.
         line_number: The line's position in the filing, counted from 1.
-        instrument_id: The security the line was loaded as, or ``None`` when
-            the line was not loaded.
-        not_loaded_reason: Why the line was not loaded; ``None`` exactly when
-            ``instrument_id`` is set.
+        instrument_id: The security the line was loaded as.
         isin: The ISIN as filed. It differs from the instrument's ISIN for a
             depositary receipt read as its ordinary share (ADR 0015).
         issuer_name: The issuer's name as filed.
@@ -44,8 +42,7 @@ class Holding:
 
     fund_code: str
     line_number: int
-    instrument_id: int | None
-    not_loaded_reason: str | None
+    instrument_id: int
     isin: str
     issuer_name: str
     title: str | None
@@ -73,16 +70,15 @@ class HoldingRepository(Repository):
     def all(self) -> tuple[Holding, ...]:
         """Return every holding line, by fund and then in the order of its filing."""
         rows = self._execute(
-            "SELECT fund_code, line_number, instrument_id, not_loaded_reason, isin, issuer_name, "
-            "title, lei, cusip, sedol, ticker, asset_category, asset_category_label, issuer_type, "
-            "trading_country, currency FROM holding ORDER BY fund_code, line_number"
+            "SELECT fund_code, line_number, instrument_id, isin, issuer_name, title, lei, cusip, "
+            "sedol, ticker, asset_category, asset_category_label, issuer_type, trading_country, "
+            "currency FROM holding ORDER BY fund_code, line_number"
         ).fetchall()
         return tuple(
             Holding(
                 fund_code=str(fund_code),
                 line_number=int(line_number),
-                instrument_id=None if instrument_id is None else int(instrument_id),
-                not_loaded_reason=_text(not_loaded_reason),
+                instrument_id=int(instrument_id),
                 isin=str(isin),
                 issuer_name=str(issuer_name),
                 title=_text(title),
@@ -100,7 +96,6 @@ class HoldingRepository(Repository):
                 fund_code,
                 line_number,
                 instrument_id,
-                not_loaded_reason,
                 isin,
                 issuer_name,
                 title,
@@ -124,20 +119,17 @@ class HoldingRepository(Repository):
 
         Raises:
             ConstraintError: If a value has the wrong shape, the fund or the
-                instrument does not exist, the fund already has a line with
-                this number, or the line both names an instrument and gives a
-                reason for not being loaded (or does neither).
+                instrument does not exist, or the fund already has a line with
+                this number.
         """
         self._execute(
-            "INSERT INTO holding (fund_code, line_number, instrument_id, not_loaded_reason, isin, "
-            "issuer_name, title, lei, cusip, sedol, ticker, asset_category, asset_category_label, "
-            "issuer_type, trading_country, currency) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO holding (fund_code, line_number, instrument_id, isin, issuer_name, title, "
+            "lei, cusip, sedol, ticker, asset_category, asset_category_label, issuer_type, "
+            "trading_country, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 holding.fund_code,
                 holding.line_number,
                 holding.instrument_id,
-                holding.not_loaded_reason,
                 holding.isin,
                 holding.issuer_name,
                 holding.title,

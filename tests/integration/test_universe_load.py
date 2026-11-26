@@ -15,7 +15,13 @@ from pathlib import Path
 import pytest
 
 from pyvalue.db import Company, Database, Fund, Holding, Instrument, migrate
-from pyvalue.universe import Sponsor, SponsorAdapter, UniverseError, load_universe
+from pyvalue.universe import (
+    NotLoadedReason,
+    Sponsor,
+    SponsorAdapter,
+    UniverseError,
+    load_universe,
+)
 from pyvalue.universe.exclusions import read_exclusions
 from pyvalue.universe.lei_decisions import read_lei_decisions
 from pyvalue.universe.name_decisions import read_name_decisions
@@ -640,7 +646,7 @@ def test_a_swap_added_later_is_refused_until_the_database_is_rebuilt(
     assert _tables(database) == (_EXPECTED_COMPANIES, _EXPECTED_INSTRUMENTS)
 
 
-# --- The funds and their holding lines (ADR 0017) -------------------------------------------
+# --- The funds and their holding lines (ADR 0017, ADR 0021) ---------------------------------
 
 
 def _recorded(database: Database) -> tuple[tuple[Fund, ...], tuple[Holding, ...]]:
@@ -655,7 +661,7 @@ def test_the_sample_documents_are_recorded_line_by_line(
     tmp_path: Path,
     adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
-    """Every share line with a valid ISIN, pointing at the instrument it was loaded as."""
+    """Every line that was loaded, pointing at the instrument it was loaded as."""
     outcome = load_universe(
         database,
         filings_dir,
@@ -686,32 +692,24 @@ def test_the_sample_documents_are_recorded_line_by_line(
             sponsor_file_date=date(2026, 10, 31),
         ),
     )
-    # 31 lines, less the 7 that are debt, derivatives or without a valid ISIN.
+    # 31 lines, less the 7 that are debt, derivatives or without a valid ISIN,
+    # and less the 4 receipts of a company already loaded (VXUS 3, 16, 18, 22).
     assert [(row.fund_code, row.line_number) for row in holdings] == [
         *[("VTI", number) for number in (1, 2, 3, 4)],
-        *[("VXUS", number) for number in (1, 2, 3, 4, 5, 8, 9, 10)],
-        *[("VXUS", number) for number in (11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 24)],
+        *[("VXUS", number) for number in (1, 2, 4, 5, 8, 9, 10)],
+        *[("VXUS", number) for number in (11, 12, 13, 14, 15, 17, 19, 20, 24)],
     ]
     # A loaded line points at the instrument with its own ISIN.
     instrument_of = {
         instrument.isin: instrument.instrument_id for instrument in _EXPECTED_INSTRUMENTS
     }
-    not_loaded = {
-        (row.fund_code, row.line_number): row.not_loaded_reason
-        for row in holdings
-        if row.instrument_id is None
-    }
-    assert not_loaded == {
-        ("VXUS", 3): "receipt_company_already_loaded",
-        ("VXUS", 16): "receipt_company_already_loaded",
-        ("VXUS", 18): "receipt_company_already_loaded",
-        ("VXUS", 22): "receipt_company_already_loaded",
-    }
-    assert all(
-        row.instrument_id == instrument_of[row.isin]
-        for row in holdings
-        if row.instrument_id is not None
-    )
+    assert all(row.instrument_id == instrument_of[row.isin] for row in holdings)
+    # The four receipts are in the result, which the output file is written from.
+    assert sorted(
+        (entry.fund, entry.line.number)
+        for entry in outcome.result.not_loaded
+        if entry.reason is NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED
+    ) == [("VXUS", 3), ("VXUS", 16), ("VXUS", 18), ("VXUS", 22)]
     # The sample Vanguard files give a ticker where one line meets one row.
     assert {(row.fund_code, row.line_number): row.ticker for row in holdings if row.ticker} == {
         ("VTI", 1): "ALPH",
@@ -720,23 +718,22 @@ def test_the_sample_documents_are_recorded_line_by_line(
         ("VXUS", 5): "ETA",
         ("VXUS", 10): "LAMBDA",
         ("VXUS", 13): "EPS B",
-        ("VXUS", 16): "KAPPA",
         ("VXUS", 17): "000990",
         ("VXUS", 19): "MUP",
         ("VXUS", 24): "OMC",
     }
-    assert [(row.trading_country, row.currency) for row in holdings[4:9]] == [
+    assert [(row.trading_country, row.currency) for row in holdings[4:8]] == [
         ("GB", "GBP"),
         ("FR", "EUR"),
-        ("US", "USD"),
         ("HK", "HKD"),
         ("US", "USD"),
     ]
     result = outcome.result
+    # VXUS line 16, one of the receipts that get no row, carried a ticker and a SEDOL.
     assert (result.holdings_stored, result.holdings_with_ticker, result.holdings_with_sedol) == (
-        24,
-        10,
-        10,
+        20,
+        9,
+        9,
     )
     assert result.instruments_not_held == 0
 
@@ -777,7 +774,7 @@ def test_the_sample_exclusion_and_swap_show_in_the_recorded_lines(
     tmp_path: Path,
     adapters: Mapping[Sponsor, SponsorAdapter],
 ) -> None:
-    """A line kept out says why; a receipt read as its share keeps the ISIN the fund filed."""
+    """A line kept out gets no row; a receipt read as its share keeps the ISIN the fund filed."""
     exclusions = read_exclusions(nport_samples / "decisions" / "excluded.csv")
     swaps = read_ordinary_shares(nport_samples / "decisions" / "ordinary_share.csv")
 
@@ -800,13 +797,10 @@ def test_the_sample_exclusion_and_swap_show_in_the_recorded_lines(
         instrument_of = {
             instrument.isin: instrument.instrument_id for instrument in work.instruments.all()
         }
-    excluded = by_line[("VXUS", 5)]
-    assert (excluded.isin, excluded.instrument_id, excluded.not_loaded_reason) == (
-        "US00000H0017",
-        None,
-        "excluded_by_decision",
-    )
+    # The excluded security, US00000H0017, is VXUS line 5.
+    assert ("VXUS", 5) not in by_line
+    assert "US00000H0017" not in {row.isin for row in holdings}
     swapped = by_line[("VXUS", 24)]
-    assert (swapped.isin, swapped.not_loaded_reason) == ("US00000O0018", None)
+    assert swapped.isin == "US00000O0018"
     assert swapped.instrument_id == instrument_of["SG00000O0017"]
     assert "US00000O0018" not in instrument_of

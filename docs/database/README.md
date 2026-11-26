@@ -11,7 +11,7 @@ The pyvalue database is one SQLite file, `data/pyvalue.db` by default. Its schem
 | [`instrument`](instrument.md) | One security of a company, identified by its ISIN | ADR 0003 |
 | [`listing`](listing.md) | The primary exchange line of an instrument | ADR 0003 |
 | [`fund`](fund.md) | A fund whose holdings are loaded | ADR 0017 |
-| [`holding`](holding.md) | One share line of a fund's loaded filing | ADR 0017 |
+| [`holding`](holding.md) | One loaded share line of a fund's filing | ADR 0017, ADR 0021 |
 | [`provider`](provider.md) | A data provider, such as EODHD | ADR 0002 |
 | [`provider_exchange`](provider_exchange.md) | The code one provider uses for one of our exchanges | ADR 0002 |
 | [`provider_listing`](provider_listing.md) | The symbol one provider uses for one of our listings | ADR 0002 |
@@ -30,7 +30,7 @@ erDiagram
     company ||--o{ instrument : "issues"
     instrument ||--o| listing : "has at most one"
     fund ||--o{ holding : "reports"
-    instrument |o--o{ holding : "was loaded from"
+    instrument ||--o{ holding : "was loaded from"
     exchange ||--o{ listing : "lists"
     provider ||--o{ provider_exchange : "has a code for"
     exchange ||--o{ provider_exchange : "is coded by"
@@ -71,11 +71,17 @@ erDiagram
     holding {
         TEXT fund_code PK, FK "the fund"
         INTEGER line_number PK "position in the filing"
-        INTEGER instrument_id FK "optional, the security it was loaded as"
-        TEXT not_loaded_reason "only when not loaded"
+        INTEGER instrument_id FK "required, the security it was loaded as"
         TEXT isin "required, as filed"
         TEXT issuer_name "required, as filed"
+        TEXT title "optional"
+        TEXT lei "optional"
+        TEXT cusip "optional"
+        TEXT sedol "optional, from the sponsor's file"
         TEXT ticker "optional, from the sponsor's file"
+        TEXT asset_category "required"
+        TEXT asset_category_label "optional, only with OTHER"
+        TEXT issuer_type "required"
         TEXT trading_country "required"
         TEXT currency "required"
     }
@@ -101,7 +107,7 @@ erDiagram
     }
 ```
 
-`PK` is a primary key, `FK` a foreign key, `UK` a unique column. `schema_migration` stands alone: it describes the database itself, not the data in it. `holding` is shown with its main columns only; the rest are in its own file.
+`PK` is a primary key, `FK` a foreign key, `UK` a unique column. `schema_migration` stands alone: it describes the database itself, not the data in it.
 
 ## How to read the table files
 

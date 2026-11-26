@@ -1,16 +1,23 @@
-"""Tests for the ``fund`` and ``holding`` tables created by migration 0002.
+"""Tests for the ``fund`` and ``holding`` tables.
 
-They pin what ADR 0017 promises: which rows the database accepts, which it
-refuses and by which constraint, what happens to holding lines when a fund or
-an instrument changes, and which index the listing rule's lookup uses.
+Migration 0002 creates them (ADR 0017) and migration 0003 rebuilds ``holding``
+so that it keeps only the lines that were loaded (ADR 0021). The tests pin
+which rows the database accepts, which it refuses and by which constraint,
+what happens to holding lines when a fund or an instrument changes, which
+index the listing rule's lookup uses, and what migration 0003 does to rows
+that are already there.
 
 Author: Emre Tezel
 """
 
 import sqlite3
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
+
+from pyvalue.db import migrate, packaged_migrations
+from pyvalue.db.connection import connect
 
 _CHECK = "CHECK constraint failed"
 _FOREIGN_KEY = "FOREIGN KEY constraint failed"
@@ -20,10 +27,9 @@ _NOT_NULL = "NOT NULL constraint failed"
 # Valid rows. Ids are assigned in insertion order:
 #   company    1 SK Hynix, 2 Qfin Holdings
 #   instrument 1 SK Hynix, 2 Qfin's ordinary share
-#   holding    VXUS 4 a loaded line with every sponsor value,
+#   holding    VXUS 4 a line with every sponsor value,
 #              VXUS 5 a receipt read as the ordinary share (another ISIN than the instrument's),
-#              VXUS 6 a line kept out by a decision,
-#              VXUS 7 a labelled receipt whose company is already loaded,
+#              VXUS 6 a line in the filer's own category, with its label,
 #              VTI 4  a line of the other fund
 _SEED: tuple[str, ...] = (
     "INSERT INTO company (name, lei) VALUES "
@@ -35,19 +41,16 @@ _SEED: tuple[str, ...] = (
     "'0000736054-26-000275', '2026-07-31', '2026-10-31'), "
     "('VTI', 'Vanguard Total Stock Market Index Fund', 'US', 'S000002848', "
     "'0000036405-26-000480', '2026-06-30', NULL)",
-    "INSERT INTO holding (fund_code, line_number, instrument_id, not_loaded_reason, isin, "
-    "issuer_name, title, lei, cusip, sedol, ticker, asset_category, asset_category_label, "
-    "issuer_type, trading_country, currency) VALUES "
-    "('VXUS', 4, 1, NULL, 'KR7000660001', 'SK hynix Inc', 'SK HYNIX INC', "
-    "'988400XAIK6XISWQV045', NULL, '6450267', '000660', 'EC', NULL, 'CORP', 'KR', 'KRW'), "
-    "('VXUS', 5, 2, NULL, 'US88557W1018', 'Qfin Holdings Inc', NULL, NULL, NULL, NULL, NULL, "
+    "INSERT INTO holding (fund_code, line_number, instrument_id, isin, issuer_name, title, lei, "
+    "cusip, sedol, ticker, asset_category, asset_category_label, issuer_type, trading_country, "
+    "currency) VALUES "
+    "('VXUS', 4, 1, 'KR7000660001', 'SK hynix Inc', 'SK HYNIX INC', '988400XAIK6XISWQV045', "
+    "NULL, '6450267', '000660', 'EC', NULL, 'CORP', 'KR', 'KRW'), "
+    "('VXUS', 5, 2, 'US88557W1018', 'Qfin Holdings Inc', NULL, NULL, '88557W101', NULL, NULL, "
     "'EC', NULL, 'CORP', 'US', 'USD'), "
-    "('VXUS', 6, NULL, 'excluded_by_decision', 'US9220428588', "
-    "'Vanguard FTSE Emerging Markets ETF', NULL, NULL, '922042858', NULL, NULL, 'EC', NULL, "
-    "'RF', 'US', 'USD'), "
-    "('VXUS', 7, NULL, 'receipt_company_already_loaded', 'US7223041028', 'PDD Holdings Inc', "
-    "NULL, NULL, NULL, NULL, NULL, 'OTHER', 'ADR', 'CORP', 'US', 'USD'), "
-    "('VTI', 4, 1, NULL, 'KR7000660001', 'SK hynix Inc', NULL, NULL, NULL, NULL, 'BRK.B', "
+    "('VXUS', 6, 2, 'KYG8851G1001', 'Qfin Holdings Inc', NULL, NULL, NULL, NULL, NULL, "
+    "'OTHER', 'UNITS', 'RF', 'HK', 'HKD'), "
+    "('VTI', 4, 1, 'KR7000660001', 'SK hynix Inc', NULL, NULL, NULL, NULL, 'BRK.B', "
     "'EP', NULL, 'CORP', 'US', 'USD')",
 )
 
@@ -84,7 +87,6 @@ def _holding(
     fund: str = "'VXUS'",
     line: str = "9",
     instrument: str = "1",
-    reason: str = "NULL",
     isin: str = "'KR7000660001'",
     name: str = "'SK hynix Inc'",
     title: str = "NULL",
@@ -100,18 +102,18 @@ def _holding(
 ) -> str:
     """Return an insert of one holding line, valid unless an argument makes it otherwise."""
     return (
-        "INSERT INTO holding (fund_code, line_number, instrument_id, not_loaded_reason, isin, "
-        "issuer_name, title, lei, cusip, sedol, ticker, asset_category, asset_category_label, "
-        f"issuer_type, trading_country, currency) VALUES ({fund}, {line}, {instrument}, {reason}, "
-        f"{isin}, {name}, {title}, {lei}, {cusip}, {sedol}, {ticker}, {category}, {label}, "
-        f"{issuer_type}, {country}, {currency})"
+        "INSERT INTO holding (fund_code, line_number, instrument_id, isin, issuer_name, title, "
+        "lei, cusip, sedol, ticker, asset_category, asset_category_label, issuer_type, "
+        f"trading_country, currency) VALUES ({fund}, {line}, {instrument}, {isin}, {name}, "
+        f"{title}, {lei}, {cusip}, {sedol}, {ticker}, {category}, {label}, {issuer_type}, "
+        f"{country}, {currency})"
     )
 
 
 def test_the_example_rows_are_accepted(seeded: sqlite3.Connection) -> None:
     """Every kind of row ADR 0017 describes fits the schema."""
     assert seeded.execute("SELECT COUNT(*) FROM fund").fetchone() == (2,)
-    assert seeded.execute("SELECT COUNT(*) FROM holding").fetchone() == (5,)
+    assert seeded.execute("SELECT COUNT(*) FROM holding").fetchone() == (4,)
 
 
 def test_the_helpers_build_valid_rows(seeded: sqlite3.Connection) -> None:
@@ -163,13 +165,7 @@ def test_fund_refuses_a_row_that_breaks_a_rule(
         pytest.param(_holding(line="4"), _UNIQUE, id="the same line twice"),
         pytest.param(_holding(line="0"), _CHECK, id="line zero"),
         pytest.param(_holding(instrument="99"), _FOREIGN_KEY, id="an instrument that is not there"),
-        pytest.param(
-            _holding(reason="'excluded_by_decision'"), _CHECK, id="loaded and a reason as well"
-        ),
-        pytest.param(_holding(instrument="NULL"), _CHECK, id="not loaded and no reason"),
-        pytest.param(
-            _holding(instrument="NULL", reason="'because'"), _CHECK, id="a reason of its own"
-        ),
+        pytest.param(_holding(instrument="NULL"), _NOT_NULL, id="a line that was not loaded"),
         pytest.param(_holding(isin="NULL"), _NOT_NULL, id="no ISIN"),
         pytest.param(_holding(isin="'N/A'"), _CHECK, id="a placeholder for the ISIN"),
         pytest.param(_holding(name="''"), _CHECK, id="empty issuer name"),
@@ -244,7 +240,7 @@ def test_a_corrected_fund_code_follows_through(seeded: sqlite3.Connection) -> No
     rows = seeded.execute(
         "SELECT fund_code, COUNT(*) FROM holding GROUP BY fund_code ORDER BY fund_code"
     ).fetchall()
-    assert rows == [("VTI", 1), ("VXUS2", 4)]
+    assert rows == [("VTI", 1), ("VXUS2", 3)]
 
 
 def test_a_fund_can_be_deleted_once_its_lines_are_gone(seeded: sqlite3.Connection) -> None:
@@ -275,3 +271,117 @@ def test_the_lines_of_a_fund_are_found_through_the_primary_key(seeded: sqlite3.C
     assert len(plan) == 1
     assert plan[0][3].startswith("SEARCH holding USING")
     assert "(fund_code=?)" in plan[0][3]
+
+
+# --- Migration 0003: only the lines that were loaded (ADR 0021) ---------------------------------
+
+_HOLDING_COLUMNS: list[str] = [
+    "fund_code",
+    "line_number",
+    "instrument_id",
+    "isin",
+    "issuer_name",
+    "title",
+    "lei",
+    "cusip",
+    "sedol",
+    "ticker",
+    "asset_category",
+    "asset_category_label",
+    "issuer_type",
+    "trading_country",
+    "currency",
+]
+
+
+def test_holding_has_no_column_for_a_line_that_was_not_loaded(
+    migrated_db: sqlite3.Connection,
+) -> None:
+    """Every row is a line of a security: no reason column, and the instrument is required."""
+    columns = migrated_db.execute("PRAGMA table_info(holding)").fetchall()
+
+    assert [column[1] for column in columns] == _HOLDING_COLUMNS
+    assert {column[1]: column[3] for column in columns}["instrument_id"] == 1
+
+
+def test_migration_0003_keeps_loaded_lines_and_drops_the_others(tmp_path: Path) -> None:
+    """A database loaded under ADR 0017 keeps every line that points at an instrument, as it is."""
+    path = tmp_path / "pyvalue.db"
+    migrate(path, packaged_migrations()[:2])
+    connection = connect(path)
+    try:
+        for statement in _SEED[:3]:
+            connection.execute(statement)
+        # Rows as migration 0002 stored them: two loaded, one of each kind that was not.
+        connection.execute(
+            "INSERT INTO holding (fund_code, line_number, instrument_id, not_loaded_reason, isin, "
+            "issuer_name, title, lei, cusip, sedol, ticker, asset_category, asset_category_label, "
+            "issuer_type, trading_country, currency) VALUES "
+            "('VXUS', 4, 1, NULL, 'KR7000660001', 'SK hynix Inc', 'SK HYNIX INC', "
+            "'988400XAIK6XISWQV045', NULL, '6450267', '000660', 'EC', NULL, 'CORP', 'KR', 'KRW'), "
+            "('VXUS', 5, 2, NULL, 'US88557W1018', 'Qfin Holdings Inc', NULL, NULL, NULL, NULL, "
+            "NULL, 'OTHER', 'ADR', 'CORP', 'US', 'USD'), "
+            "('VXUS', 6, NULL, 'excluded_by_decision', 'US9220428588', "
+            "'Vanguard FTSE Emerging Markets ETF', NULL, NULL, '922042858', NULL, NULL, 'EC', "
+            "NULL, 'RF', 'US', 'USD'), "
+            "('VXUS', 7, NULL, 'receipt_company_already_loaded', 'US7223041028', "
+            "'PDD Holdings Inc', NULL, NULL, NULL, NULL, 'PDD', 'EC', NULL, 'CORP', 'US', 'USD')"
+        )
+    finally:
+        connection.close()
+
+    report = migrate(path)
+
+    assert [migration.label for migration in report.applied] == ["0003_holding_loaded_lines_only"]
+    connection = connect(path)
+    try:
+        rows = connection.execute(
+            f"SELECT {', '.join(_HOLDING_COLUMNS)} FROM holding ORDER BY fund_code, line_number"
+        ).fetchall()
+        objects = connection.execute(
+            "SELECT type, name FROM sqlite_schema WHERE name LIKE 'holding%' ORDER BY type, name"
+        ).fetchall()
+        broken = connection.execute("PRAGMA foreign_key_check").fetchall()
+        funds = connection.execute("SELECT COUNT(*) FROM fund").fetchone()
+    finally:
+        connection.close()
+    assert rows == [
+        (
+            "VXUS",
+            4,
+            1,
+            "KR7000660001",
+            "SK hynix Inc",
+            "SK HYNIX INC",
+            "988400XAIK6XISWQV045",
+            None,
+            "6450267",
+            "000660",
+            "EC",
+            None,
+            "CORP",
+            "KR",
+            "KRW",
+        ),
+        (
+            "VXUS",
+            5,
+            2,
+            "US88557W1018",
+            "Qfin Holdings Inc",
+            None,
+            None,
+            None,
+            None,
+            None,
+            "OTHER",
+            "ADR",
+            "CORP",
+            "US",
+            "USD",
+        ),
+    ]
+    # The rebuilt table has its index again, and nothing else was touched.
+    assert objects == [("index", "holding_instrument_id"), ("table", "holding")]
+    assert broken == []
+    assert funds == (2,)

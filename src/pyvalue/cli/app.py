@@ -100,14 +100,9 @@ def _universe_load(arguments: argparse.Namespace) -> int:
         f"The database now holds {result.companies:,} companies and "
         f"{result.instruments:,} instruments"
     )
-    excluded = result.not_loaded_for(NotLoadedReason.EXCLUDED_BY_DECISION)
-    receipts = result.not_loaded_for(NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED)
     print(
-        f"Holding lines stored: {result.holdings_stored:,} "
-        f"({result.holdings_stored - excluded - receipts:,} loaded, "
-        f"{excluded:,} kept out by decision, "
-        f"{receipts:,} receipt of a company already loaded); "
-        f"{result.holdings_with_ticker:,} with a ticker, "
+        f"Holding lines stored: {result.holdings_stored:,}, "
+        f"{result.holdings_with_ticker:,} with a ticker and "
         f"{result.holdings_with_sedol:,} with a SEDOL"
     )
     # Not zero on a database that was loaded from more funds than today: the

@@ -1,6 +1,6 @@
 # `holding`
 
-One row per share line of a fund's loaded filing that carries a valid ISIN. Decided in ADR 0017. Created by migration `0002_fund_and_holding`.
+One row per line of a fund's loaded filing that became a security of the universe, or met one already there. A line that was not loaded has no row. Decided in ADR 0017 and ADR 0021. Created by migration `0002_fund_and_holding` and rebuilt by migration `0003_holding_loaded_lines_only`, which removed the rows of lines that were not loaded.
 
 A row records what the fund's documents say about the line. The only thing in it that pyvalue decided is which instrument the line was loaded as.
 
@@ -12,8 +12,7 @@ A row records what the fund's documents say about the line. The only thing in it
 |---|---|---|---|---|---|---|
 | `fund_code` | TEXT | PK, FK → `fund.fund_code` | yes | | The fund must exist | The fund that reports the line |
 | `line_number` | INTEGER | PK | yes | SEC | Greater than zero | The line's position in the filing, counted from 1 |
-| `instrument_id` | INTEGER | FK → `instrument.instrument_id` | no | | The instrument must exist | The security the line was loaded as. Empty when the line was not loaded |
-| `not_loaded_reason` | TEXT | | only when `instrument_id` is empty | | `excluded_by_decision` or `receipt_company_already_loaded`; present exactly when `instrument_id` is empty | Why the line was not loaded |
+| `instrument_id` | INTEGER | FK → `instrument.instrument_id` | yes | | The instrument must exist | The security the line was loaded as |
 | `isin` | TEXT | | yes | SEC | 12 characters: two letters, nine letters or digits, one digit | The ISIN as filed |
 | `issuer_name` | TEXT | | yes | SEC | Not empty, no leading or trailing spaces | The issuer's name as filed |
 | `title` | TEXT | | no | SEC | Not empty when present | The security's title. Empty when the filing gives none |
@@ -29,31 +28,34 @@ A row records what the fund's documents say about the line. The only thing in it
 
 ## Example rows
 
-Columns that are empty in all three rows are left out.
+Columns that are empty in both rows are left out.
 
-| `fund_code` | `line_number` | `instrument_id` | `not_loaded_reason` | `isin` | `issuer_name` | `lei` | `sedol` | `ticker` | `asset_category` | `issuer_type` | `trading_country` | `currency` |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `VXUS` | 8803 | 5210 (SK Hynix) | | `KR7000660001` | SK hynix Inc | `988400XAIK6XISWQV045` | `6450267` | `000660` | `EC` | `CORP` | `KR` | `KRW` |
-| `VXUS` | 3618 | 6034 (Qfin Holdings, ordinary share `KYG8851G1001`) | | `US88557W1018` | Qfin Holdings Inc | `836800R59NKEPDR6I240` | | | `EC` | `CORP` | `US` | `USD` |
-| `VXUS` | 6798 | | `excluded_by_decision` | `US9220428588` | Vanguard FTSE Emerging Markets ETF | | | | `EC` | `RF` | `US` | `USD` |
+| `fund_code` | `line_number` | `instrument_id` | `isin` | `issuer_name` | `lei` | `sedol` | `ticker` | `asset_category` | `issuer_type` | `trading_country` | `currency` |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `VXUS` | 8803 | 5210 (SK Hynix) | `KR7000660001` | SK hynix Inc | `988400XAIK6XISWQV045` | `6450267` | `000660` | `EC` | `CORP` | `KR` | `KRW` |
+| `VXUS` | 3618 | 6034 (Qfin Holdings, ordinary share `KYG8851G1001`) | `US88557W1018` | Qfin Holdings Inc | `836800R59NKEPDR6I240` | | | `EC` | `CORP` | `US` | `USD` |
 
 The lines are those of the VXUS filing of 31 July 2026; the instrument ids are made up, and so is which sponsor values are empty. The second row is a depositary receipt read as its ordinary share (ADR 0015): the line keeps the receipt's ISIN, country and currency, and points at the instrument of the ordinary share.
 
 ## Which lines get a row
 
-| Line of the filing | Row | `instrument_id` |
-|---|---|---|
-| A share line that the load turns into an instrument, or that names an instrument already there | Yes | The instrument |
-| A share line of a security kept out by `excluded.csv` (ADR 0013) | Yes | Empty, reason `excluded_by_decision` |
-| A depositary receipt whose company is already in the universe through its own shares (ADR 0006, ADR 0014) | Yes | Empty, reason `receipt_company_already_loaded` |
-| A line without a valid ISIN | No. It stays in `lines_not_loaded.csv` (ADR 0009) | |
-| A line the filing classifies as debt or as a derivative | No. It stays in `lines_not_loaded.csv` | |
+| Line of the filing | Row |
+|---|---|
+| A share line that the load turns into an instrument, or that names an instrument already there | Yes |
+| A depositary receipt read as its ordinary share (ADR 0015) | Yes. It points at the ordinary share and keeps the ISIN the fund filed |
+| A share line of a security kept out by `excluded.csv` (ADR 0013) | No |
+| A depositary receipt whose company is already in the universe through its own shares (ADR 0006, ADR 0014, ADR 0020) | No |
+| A line without a valid ISIN | No |
+| A line the filing classifies as debt or as a derivative | No |
+
+Every line that gets no row is listed with its reason in `data/universe/lines_not_loaded.csv`, which each load writes (ADR 0009).
 
 The number of shares, the value and the share of the fund are not stored for any line.
 
 ## Notes
 
 - **The key is the pair `fund_code` plus `line_number`.** It is the line's own identity in the filing, so no numeric id is added. Nothing refers to a holding row.
+- **Every row is a line of a security in the universe.** `instrument_id` is never empty, so the lines of a security are simply the rows that point at it.
 - **`isin` is what the fund filed.** It equals the instrument's ISIN except for a receipt read as its ordinary share.
 - **`lei` and `issuer_name` are what the fund filed.** The company's stored identifier and name can differ, where a decision of ADR 0010 or ADR 0012 applies.
 - **A placeholder is stored as empty,** never as the text `N/A`.

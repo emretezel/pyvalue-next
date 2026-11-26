@@ -4,8 +4,9 @@ The load has three parts. Sorting is pure: it decides for every line whether
 it is left out, is an ordinary security or is a depositary receipt, and needs
 no database. Placing writes: it finds or adds the company of each line and
 adds the instrument. Recording writes what the funds' documents say: one
-``fund`` row per fund and one ``holding`` row per share line, each pointing at
-the instrument its line was loaded as (ADR 0017). Placing and recording share
+``fund`` row per fund and one ``holding`` row per line that was loaded, each
+pointing at the instrument its line was loaded as (ADR 0017, ADR 0021). Placing
+and recording share
 one unit of work, so a load is saved whole or not at all (ADR 0009).
 
 Two kinds of decision overrule the filings, each for the security it names.
@@ -153,8 +154,8 @@ class LoadResult:
             decision reads as lines of their ordinary share.
         companies: Companies in the database after the load.
         instruments: Instruments in the database after the load.
-        holdings_stored: Holding lines the load wrote: every share line with
-            a valid ISIN, loaded or not.
+        holdings_stored: Holding lines the load wrote: every line that
+            became, or met, an instrument.
         holdings_with_ticker: Of those, the lines that carry a ticker.
         holdings_with_sedol: Of those, the lines that carry a SEDOL.
         instruments_not_held: Instruments in the database that no holding
@@ -311,7 +312,7 @@ def _sort_lines(
             elif line.isin is None or not is_valid_isin(line.isin):
                 left_out.append(NotLoadedLine(fund, line, NotLoadedReason.NO_VALID_ISIN))
             elif line.trading_country is None:
-                # Such a line would get a holding row, and the row says where
+                # Such a line may get a holding row, and the row says where
                 # the line trades (ADR 0017). No share line of a filing lacks
                 # the country; guessing one would mislead the listing rule.
                 raise UniverseError(
@@ -634,10 +635,8 @@ def _fitting(value: str | None, shape: re.Pattern[str]) -> str | None:
     return value if value is not None and shape.fullmatch(value) else None
 
 
-def _holding(
-    fund: str, line: HoldingLine, instrument_id: int | None, reason: NotLoadedReason | None
-) -> Holding:
-    """Build the ``holding`` row of one line (ADR 0017).
+def _holding(fund: str, line: HoldingLine, instrument_id: int) -> Holding:
+    """Build the ``holding`` row of one loaded line (ADR 0017, ADR 0021).
 
     The row records what the fund's documents say, so the ISIN, the name and
     the identifier are the filed ones, not the decided ones: a receipt read as
@@ -647,11 +646,8 @@ def _holding(
     Args:
         fund: The code of the fund whose filing holds the line.
         line: A line with a valid ISIN and a trading country: one that
-            ``_sort_lines`` made a candidate or left out for one of the two
-            reasons below.
-        instrument_id: The instrument the line was loaded as, or ``None``
-            when it was not loaded.
-        reason: Why it was not loaded; ``None`` when it was.
+            ``_sort_lines`` made a candidate.
+        instrument_id: The instrument the line was loaded as.
     """
     # Both are guaranteed by the sorting; the assertions say so to the reader
     # and to the type checker.
@@ -661,7 +657,6 @@ def _holding(
         fund_code=fund,
         line_number=line.number,
         instrument_id=instrument_id,
-        not_loaded_reason=None if reason is None else reason.value,
         isin=line.isin,
         issuer_name=line.issuer_name.strip(),
         title=line.title.strip() or None,
@@ -680,14 +675,6 @@ def _holding(
         trading_country=line.trading_country,
         currency=line.currency,
     )
-
-
-# The two reasons for which a line that was not loaded still gets a holding
-# row: it is a share line the fund really holds. A line without a valid ISIN,
-# and a debt or derivative line, gets none and stays in the output file.
-_RECORDED_REASONS: frozenset[NotLoadedReason] = frozenset(
-    {NotLoadedReason.EXCLUDED_BY_DECISION, NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED}
-)
 
 
 def _refuse_contradictions(
@@ -764,10 +751,11 @@ def load_holdings(
     loaded as that share (ADR 0015). The load never deletes: a database that
     already holds a security of either kind is refused and has to be rebuilt.
 
-    The funds and their lines are recorded as well (ADR 0017): one ``fund``
-    row per fund, and one ``holding`` row per share line with a valid ISIN,
-    whether the line was loaded or not. A fund's rows are a copy of its
-    filing, so each load replaces them as a whole.
+    The funds and their lines are recorded as well (ADR 0017, ADR 0021): one
+    ``fund`` row per fund, and one ``holding`` row per line that was loaded.
+    A line that was not loaded gets no row; it is in the result, and in the
+    output file written from it. A fund's rows are a copy of the loaded part
+    of its filing, so each load replaces them as a whole.
 
     Everything is written in one unit of work. Loading the same holdings
     with the same decisions again changes nothing: no company or instrument
@@ -888,19 +876,14 @@ def load_holdings(
                     placer.place(candidate)
                     placed.append(candidate)
 
-        # Recording (ADR 0017). Every instrument exists by now, so each line
-        # can point at the one it was loaded as: for a receipt read as its
-        # ordinary share that is the share, found by the candidate's ISIN,
-        # while the row keeps the ISIN the fund filed.
+        # Recording (ADR 0017, ADR 0021). Every instrument exists by now, so
+        # each loaded line can point at the one it was loaded as: for a
+        # receipt read as its ordinary share that is the share, found by the
+        # candidate's ISIN, while the row keeps the ISIN the fund filed.
         rows = [
-            _holding(candidate.fund, candidate.line, placer.instrument_id(candidate.isin), None)
+            _holding(candidate.fund, candidate.line, placer.instrument_id(candidate.isin))
             for candidate in placed
         ]
-        rows.extend(
-            _holding(entry.fund, entry.line, None, entry.reason)
-            for entry in not_loaded
-            if entry.reason in _RECORDED_REASONS
-        )
         for holdings in funds:
             definition = holdings.fund
             work.funds.save(
@@ -921,9 +904,7 @@ def load_holdings(
             work.holdings.add(row)
         # Read back, not counted from this run's rows: the table may hold the
         # lines of a fund that an earlier version of the load knew.
-        held_instruments = {
-            row.instrument_id for row in work.holdings.all() if row.instrument_id is not None
-        }
+        held_instruments = {row.instrument_id for row in work.holdings.all()}
         instruments_not_held = placer.instrument_count - len(held_instruments)
 
     return LoadResult(

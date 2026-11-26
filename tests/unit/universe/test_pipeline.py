@@ -497,5 +497,10 @@ def test_a_receipt_only_the_sponsors_file_names_is_recognised_from_file_to_datab
     assert (result.receipts_recognised, result.receipts_not_loaded) == (6, 4)
     with database.unit_of_work() as work:
         assert "US00000A0022" not in {instrument.isin for instrument in work.instruments.all()}
-        (row,) = [row for row in work.holdings.all() if row.isin == "US00000A0022"]
-    assert (row.instrument_id, row.not_loaded_reason) == (None, "receipt_company_already_loaded")
+        # A line that was not loaded gets no holding row (ADR 0021); the result names it.
+        assert "US00000A0022" not in {row.isin for row in work.holdings.all()}
+    assert [
+        (entry.fund, entry.reason.value)
+        for entry in result.not_loaded
+        if entry.line.isin == "US00000A0022"
+    ] == [("VTI", "receipt_company_already_loaded")]
