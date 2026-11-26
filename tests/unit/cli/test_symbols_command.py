@@ -1,15 +1,25 @@
-"""Tests for ``pyvalue symbols load``.
+"""Tests for ``pyvalue symbols load`` and ``pyvalue symbols download``.
 
-The command reads and writes under the folder it is run from, so every test
-runs it in a temporary folder. It uses the exchange files shipped with
-pyvalue and the made-up sample lists of ``tests/fixtures/eodhd``. No test
-touches the network, and the command could not: it only reads files.
+The commands read and write under the folder they are run from, so every test
+runs them in a temporary folder. They use the exchange files shipped with
+pyvalue and the made-up sample lists of ``tests/fixtures/eodhd``.
+
+No test touches the network. The load could not: it only reads files. The
+download is run against a stand-in for urllib's opener, which answers from
+the sample lists and records what would have been sent.
 
 Author: Emre Tezel
 """
 
+import io
 import shutil
+import urllib.error
+import urllib.parse
+import urllib.request
+from email.message import Message
 from pathlib import Path
+from types import TracebackType
+from typing import Self
 
 import pytest
 
@@ -168,3 +178,229 @@ def test_load_takes_another_database_path(
     assert main(["symbols", "load", "--db", str(other)]) == 0
 
     assert capsys.readouterr().out.splitlines()[0] == f"Database: {other}"
+
+
+# --- The download ------------------------------------------------------------------------------
+
+
+class _Response:
+    """What urllib hands back for one request: a body and its headers."""
+
+    def __init__(self, body: bytes) -> None:
+        self._body = body
+        self.headers = Message()
+
+    def read(self) -> bytes:
+        """Return the body."""
+        return self._body
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        kind: type[BaseException] | None,
+        error: BaseException | None,
+        trace: TracebackType | None,
+    ) -> None:
+        return None
+
+
+class _Eodhd:
+    """Stands in for urllib's opener and for EODHD behind it.
+
+    It serves the sample lists by the path of the request, answers "not
+    found" for every other list, and records each request.
+    """
+
+    def __init__(self, samples: Path, refuse_with: int | None = None) -> None:
+        """Prepare the sample answers; ``refuse_with`` makes every request fail with a status."""
+        self._samples = samples
+        self._refuse_with = refuse_with
+        self.requests: list[urllib.request.Request] = []
+
+    def open(self, request: urllib.request.Request, timeout: float) -> _Response:
+        """Record the request and answer it from the sample lists."""
+        self.requests.append(request)
+        address = urllib.parse.urlsplit(request.full_url)
+        assert address.scheme == "https"
+        assert address.hostname == "eodhd.com"
+        if self._refuse_with is not None:
+            raise urllib.error.HTTPError(
+                request.full_url, self._refuse_with, "Unauthorized", Message(), io.BytesIO(b"")
+            )
+        name = (
+            "exchanges.json"
+            if address.path == "/api/exchanges-list/"
+            else f"symbols_{address.path.rsplit('/', 1)[-1]}.json"
+        )
+        sample = self._samples / name
+        if not sample.is_file():
+            raise urllib.error.HTTPError(
+                request.full_url, 404, "Not Found", Message(), io.BytesIO(b"")
+            )
+        return _Response(sample.read_bytes())
+
+
+def _install(monkeypatch: pytest.MonkeyPatch, eodhd: _Eodhd) -> None:
+    """Make every request of the command go to the stand-in."""
+
+    def build_opener(*handlers: type[urllib.request.BaseHandler]) -> _Eodhd:
+        return eodhd
+
+    monkeypatch.setattr(urllib.request, "build_opener", build_opener)
+
+
+@pytest.fixture
+def subscriber(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Return a temporary working folder with a key in its settings and nothing else.
+
+    No database and no saved list: the download needs neither.
+    """
+    monkeypatch.chdir(tmp_path)
+    private = tmp_path / "private"
+    private.mkdir()
+    (private / "config.toml").write_text(f'[eodhd]\napi_key = "{_KEY}"\n', encoding="utf-8")
+    return tmp_path
+
+
+def test_download_saves_the_lists_and_says_what_it_did(
+    subscriber: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    eodhd_samples: Path,
+) -> None:
+    """Against the sample lists: six codes offered, three of them with a list to save.
+
+    The stand-in offers ``KO``, ``US``, ``LSE``, ``F``, ``CC`` and ``HK``.
+    The shipped file maps 59 codes, of which the stand-in offers three.
+    """
+    _install(monkeypatch, _Eodhd(eodhd_samples))
+
+    status = main(["symbols", "download"])
+
+    output = capsys.readouterr()
+    not_offered = _without_a_list()
+    assert status == 0
+    assert output.err == ""
+    assert output.out.splitlines() == [
+        f"Lists folder: {Path('data') / 'eodhd'}",
+        "Exchange codes EODHD offers: 6",
+        "Offered and not in the exchange file: 1 (HK)",
+        f"In the exchange file and no longer offered: 56 ({', '.join(not_offered)})",
+        "Symbol lists saved: 3 of 59, 18 lines",
+        "  KO: 5 lines",
+        "  LSE: 5 lines",
+        "  US: 8 lines",
+        "Not in the subscription: 0",
+        "Refused as suspiciously short: 0",
+        "Nothing was stored in the database. Run `pyvalue symbols load` to store the lists",
+    ]
+    saved = sorted(path.name for path in (subscriber / "data" / "eodhd").iterdir())
+    assert saved == ["exchanges.json", "symbols_KO.json", "symbols_LSE.json", "symbols_US.json"]
+
+
+def test_download_sends_the_key_to_eodhd_and_shows_it_nowhere(
+    subscriber: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    eodhd_samples: Path,
+) -> None:
+    """In every request, and in no output, no file name and no saved file."""
+    eodhd = _Eodhd(eodhd_samples)
+    _install(monkeypatch, eodhd)
+
+    assert main(["symbols", "download"]) == 0
+
+    output = capsys.readouterr()
+    assert len(eodhd.requests) == 4
+    assert all(f"api_token={_KEY}" in request.full_url for request in eodhd.requests)
+    assert _KEY not in output.out
+    assert _KEY not in output.err
+    for path in (subscriber / "data" / "eodhd").iterdir():
+        assert _KEY not in path.name
+        assert _KEY.encode() not in path.read_bytes()
+
+
+def test_download_does_not_touch_the_database(
+    subscriber: Path, monkeypatch: pytest.MonkeyPatch, eodhd_samples: Path
+) -> None:
+    """It needs none and creates none: storing the lists is the load's job."""
+    _install(monkeypatch, _Eodhd(eodhd_samples))
+
+    assert main(["symbols", "download"]) == 0
+
+    assert not (subscriber / "data" / "pyvalue.db").exists()
+
+
+def test_the_lists_a_download_saved_are_what_the_load_stores(
+    subscriber: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    eodhd_samples: Path,
+) -> None:
+    """The two commands in the order a person runs them."""
+    _install(monkeypatch, _Eodhd(eodhd_samples))
+    assert main(["db", "migrate"]) == 0
+    assert main(["symbols", "download"]) == 0
+    capsys.readouterr()
+
+    assert main(["symbols", "load"]) == 0
+
+    assert "Lists stored: 3 of 59, 12 lines" in capsys.readouterr().out.splitlines()
+
+
+def test_download_without_a_key_says_what_to_add_and_asks_nothing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    eodhd_samples: Path,
+) -> None:
+    """One line, status 1, and no request."""
+    monkeypatch.chdir(tmp_path)
+    eodhd = _Eodhd(eodhd_samples)
+    _install(monkeypatch, eodhd)
+
+    status = main(["symbols", "download"])
+
+    output = capsys.readouterr()
+    assert status == 1
+    assert output.out == ""
+    assert output.err.startswith("pyvalue: error: ")
+    assert "add a section [eodhd] with the line api_key" in output.err
+    assert eodhd.requests == []
+
+
+@pytest.mark.parametrize("status_sent", [401, 402, 403], ids=["no key", "payment", "forbidden"])
+def test_a_key_that_is_not_accepted_stops_the_download_at_the_first_request(
+    subscriber: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    eodhd_samples: Path,
+    status_sent: int,
+) -> None:
+    """An expired subscription would refuse all sixty requests; one is enough to know."""
+    eodhd = _Eodhd(eodhd_samples, refuse_with=status_sent)
+    _install(monkeypatch, eodhd)
+
+    status = main(["symbols", "download"])
+
+    output = capsys.readouterr()
+    assert status == 1
+    assert output.out == ""
+    assert output.err == (
+        "pyvalue: error: cannot download https://eodhd.com/api/exchanges-list/?fmt=json: "
+        f"HTTP Error {status_sent}: Unauthorized\n"
+    )
+    assert _KEY not in output.err
+    assert len(eodhd.requests) == 1
+    assert not (subscriber / "data").exists()
+
+
+def test_download_takes_no_database_option(capsys: pytest.CaptureFixture[str]) -> None:
+    """There is no database for it to be pointed at."""
+    with pytest.raises(SystemExit) as stopped:
+        main(["symbols", "download", "--db", "other.db"])
+
+    assert stopped.value.code == 2
+    assert "unrecognized arguments" in capsys.readouterr().err

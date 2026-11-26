@@ -21,11 +21,12 @@ ADR 0018 decided what is stored. This record decides how it gets there.
 
 | Rule | What it means |
 |---|---|
-| What is requested | The exchange list, then the symbol list of every code that has a market in `eodhd_exchange.csv`. About 60 requests |
+| What is requested | The exchange list, then the symbol list of every code that has a market in `eodhd_exchange.csv` and that the exchange list still offers. About 60 requests |
+| A code the provider no longer offers | Its symbol list is not requested: for a dropped exchange EODHD once answered with a stub in place of an error (ADR 0018). The list saved earlier stays |
 | A file is whole or absent | An answer is written under a temporary name. It gets its final name only once it reads back as a list of the provider's shape |
-| A suspiciously short answer does not replace a saved file | When the new list has at least 20 fewer lines than the saved one and fewer than half as many, the saved file stays and the code is reported. It is the test ADR 0018 has for the table |
+| A suspiciously short answer does not replace a saved file | When the new list has at least 20 fewer lines than the saved one and fewer than half as many, the saved file stays and the code is reported. It is the test ADR 0018 has for the table. A saved file that cannot be read as a symbol list protects nothing and is replaced |
 | "Not found" | The provider answers so for an exchange that is not in the subscription. The code is reported and the other downloads go on |
-| Any other failure | The run stops. What was saved before stays |
+| Any other failure | The run stops: a key that is not accepted, a request that fails, or an answer that is not a list of the provider's shape. What was saved before stays |
 | The live exchange list is compared with the file | Reported: a code the provider offers that the file does not have, and a code the file maps to a market that the provider no longer offers. A code the file leaves out on purpose is not reported |
 | The database | Not opened |
 

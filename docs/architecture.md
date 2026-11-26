@@ -9,11 +9,11 @@ Only what has been agreed is described as designed. Everything else is listed as
 | Component | Package | What it does | Status |
 |---|---|---|---|
 | Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections, migrations, the unit of work, and the repositories for `company`, `instrument`, `fund`, `holding`, `exchange`, `provider`, `provider_exchange` and `provider_symbol`. A repository is added when a component first needs its table |
-| Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load`, `pyvalue symbols load` |
+| Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load`, `pyvalue symbols download`, `pyvalue symbols load` |
 | Universe load | `pyvalue.universe` | Downloads the SEC holdings filings of VTI and VXUS and Vanguard's own holdings files, reads each fund through its sponsor's adapter, records the funds and the share lines that were loaded in `fund` and `holding`, and fills `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0016, ADR 0017, ADR 0021, ADR 0022, ADR 0006, ADR 0009 to ADR 0015, ADR 0023) | Built |
 | Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line and the EODHD key |
-| Listings | `pyvalue.listings` | Keeps our exchanges, stores the provider's symbol lists, applies the automatic rule and the decisions file (ADR 0018, ADR 0019, ADR 0024) | Built: the reader of our exchanges file, and the symbols load, which fills `exchange`, `provider` and `provider_exchange` from the two committed files and stores the saved symbol lists in `provider_symbol`. The download of the lists and the listing rule are designed, not built |
-| Providers | `pyvalue.providers` | A provider's exchange codes and its client | Built: the reader of a provider's exchange file, and the EODHD client for its exchange list and its symbol lists. Nothing has been requested from EODHD yet (ADR 0024) |
+| Listings | `pyvalue.listings` | Keeps our exchanges, stores the provider's symbol lists, applies the automatic rule and the decisions file (ADR 0018, ADR 0019, ADR 0024) | Built: the reader of our exchanges file; the symbols download, which keeps the provider's exchange list and symbol lists as files; and the symbols load, which fills `exchange`, `provider` and `provider_exchange` from the two committed files and stores the saved symbol lists in `provider_symbol`. The listing rule is designed, not built |
+| Providers | `pyvalue.providers` | A provider's exchange codes and its client | Built: the reader of a provider's exchange file, and the EODHD client for its exchange list and its symbol lists. No request has been made to EODHD yet: the first download is run by the author in a subscription month (ADR 0024) |
 | Prices, fundamentals, metrics, screens, data-quality reports, the agent that decides listings | | | Not designed yet |
 
 ## How the components fit together
@@ -22,12 +22,13 @@ Only what has been agreed is described as designed. Everything else is listed as
 flowchart LR
     cli["Command line<br/>pyvalue.cli"]
     universe["Universe load<br/>pyvalue.universe"]
-    listings["Listings<br/>planned"]
-    providers["Providers<br/>planned"]
+    listings["Listings<br/>pyvalue.listings"]
+    providers["Providers<br/>pyvalue.providers"]
     db["Database<br/>pyvalue.db"]
     file[("data/pyvalue.db")]
     sec(("sec.gov"))
     sponsor(("investor.vanguard.com"))
+    eodhd(("eodhd.com"))
 
     cli --> db
     cli --> universe
@@ -37,6 +38,7 @@ flowchart LR
     universe --> sponsor
     listings --> db
     listings --> providers
+    providers --> eodhd
     db --> file
 ```
 
@@ -60,7 +62,7 @@ The pattern for database access is Repository with Unit of Work (ADR 0008). The 
 
 ## The universe, as designed
 
-The data model and the steps are fixed by the records. Step 1 is built, and of step 2 the load of the saved lists. The download of the lists and the code for steps 3 and 4 are not written yet.
+The data model and the steps are fixed by the records. Steps 1 and 2 are built; the lists of step 2 have not been downloaded yet. The code for steps 3 and 4 is not written yet.
 
 | Step | What happens | Record |
 |---|---|---|
@@ -84,7 +86,7 @@ The data model and the steps are fixed by the records. Step 1 is built, and of s
 | The agent's listing decisions | `src/pyvalue/listings/decisions/listing.csv`, one row per security, shipped inside the package (ADR 0019). Not built yet | Yes |
 | Vanguard's own holdings files | `data/vanguard/`, one file per fund, named by fund code (ADR 0016) | No |
 | The exchange reference files | `src/pyvalue/listings/reference/exchange.csv` for our exchanges and `src/pyvalue/providers/eodhd_exchange.csv` for the provider's codes, both shipped inside the package (ADR 0018). In the provider's file a row without a market leaves a code, or the lines with one venue label, out on purpose (ADR 0024) | Yes |
-| The provider's downloaded lists | `data/eodhd/`: `exchanges.json` and one `symbols_<CODE>.json` per exchange code, each the provider's answer as it arrived (ADR 0018, ADR 0024). `pyvalue symbols load` reads them. The download that writes them is not built yet | No |
+| The provider's downloaded lists | `data/eodhd/`: `exchanges.json` and one `symbols_<CODE>.json` per exchange code, each the provider's answer as it arrived (ADR 0018, ADR 0024). `pyvalue symbols download` writes them and `pyvalue symbols load` reads them | No |
 | Credentials and the SEC contact line | `private/config.toml` | No |
 | Table documentation | `docs/database/`, one file per table | Yes |
 | What the universe holds | `docs/universe.md`: the counts, the companies by country, how that compares with what is listed, what the review of 2026-11-26 found, and the points carried into the listing step. A record of 2026-11-26, not regenerated by a command | Yes |

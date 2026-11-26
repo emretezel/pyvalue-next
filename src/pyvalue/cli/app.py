@@ -13,10 +13,17 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from pyvalue import __version__
-from pyvalue.config import sec_user_agent
+from pyvalue.config import eodhd_api_key, sec_user_agent
 from pyvalue.db import DEFAULT_DATABASE_PATH, Database, migrate
 from pyvalue.errors import PyvalueError
-from pyvalue.listings import DEFAULT_LISTS_DIR, NotStoredReason, load_symbols
+from pyvalue.listings import (
+    DEFAULT_LISTS_DIR,
+    DownloadStatus,
+    ListDownload,
+    NotStoredReason,
+    download_symbols,
+    load_symbols,
+)
 from pyvalue.providers.eodhd import PROVIDER_NAME
 from pyvalue.universe import (
     DEFAULT_FILINGS_DIR,
@@ -116,6 +123,44 @@ def _universe_load(arguments: argparse.Namespace) -> int:
         f"Cases for the agent: {len(result.agent_cases):,}, "
         f"listed in {outcome.output.cases_for_agent}"
     )
+    return 0
+
+
+def _codes(lists: Sequence[ListDownload]) -> str:
+    """Name the codes of some lists in brackets, or nothing when there are none."""
+    return f" ({', '.join(each.provider_exchange_code for each in lists)})" if lists else ""
+
+
+def _symbols_download(arguments: argparse.Namespace) -> int:
+    """Download the provider's lists into files and say what was done."""
+    # The one place the key is read. It goes to the download and nowhere else.
+    outcome = download_symbols(eodhd_api_key(), DEFAULT_LISTS_DIR)
+    saved = outcome.with_status(DownloadStatus.SAVED)
+    not_offered = outcome.with_status(DownloadStatus.NOT_OFFERED)
+    not_in_subscription = outcome.with_status(DownloadStatus.NOT_IN_SUBSCRIPTION)
+    refused = outcome.with_status(DownloadStatus.REFUSED_AS_SHORT)
+
+    print(f"Lists folder: {DEFAULT_LISTS_DIR}")
+    print(f"Exchange codes {PROVIDER_NAME} offers: {len(outcome.offered):,}")
+    print(
+        f"Offered and not in the exchange file: {len(outcome.offered_not_in_file):,}"
+        + (f" ({', '.join(outcome.offered_not_in_file)})" if outcome.offered_not_in_file else "")
+    )
+    print(f"In the exchange file and no longer offered: {len(not_offered):,}{_codes(not_offered)}")
+    print(
+        f"Symbol lists saved: {len(saved):,} of {len(outcome.lists):,}, "
+        f"{sum(each.lines or 0 for each in saved):,} lines"
+    )
+    for each in saved:
+        print(f"  {each.provider_exchange_code}: {each.lines:,} lines")
+    print(f"Not in the subscription: {len(not_in_subscription):,}{_codes(not_in_subscription)}")
+    print(f"Refused as suspiciously short: {len(refused):,}")
+    for each in refused:
+        print(
+            f"  {each.provider_exchange_code}: {each.lines:,} lines against "
+            f"{each.saved_before:,} saved; the saved list was kept"
+        )
+    print("Nothing was stored in the database. Run `pyvalue symbols load` to store the lists")
     return 0
 
 
@@ -240,6 +285,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_database_option(symbols_load)
     symbols_load.set_defaults(run=_symbols_load)
+    symbols_download = symbols_commands.add_parser(
+        "download",
+        help="download the provider's exchange list and symbol lists (contacts EODHD)",
+        description=(
+            f"Download {PROVIDER_NAME}'s list of exchange codes and the symbol list of every "
+            f"code the exchange file gives a market, and keep them in {DEFAULT_LISTS_DIR}. This "
+            f"is the only command that contacts {PROVIDER_NAME}: it needs an active subscription "
+            "and the line api_key in the section [eodhd] of private/config.toml, and makes "
+            "about 60 requests. A saved list is replaced, unless the new one is suspiciously "
+            "short. The database is not touched; `pyvalue symbols load` stores the lists."
+        ),
+    )
+    symbols_download.set_defaults(run=_symbols_download)
     return parser
 
 
