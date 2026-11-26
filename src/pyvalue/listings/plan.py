@@ -17,6 +17,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
+from pyvalue.errors import REBUILD_STEPS
 from pyvalue.listings.decisions import ListingDecision
 from pyvalue.listings.errors import ListingsError
 from pyvalue.listings.rule import (
@@ -36,11 +37,7 @@ _NAMED_AT_MOST: int = 10
 
 # What a person does when the database and the decisions file disagree. The
 # fill never changes a listing (ADR 0019), so the listings are derived again.
-_REBUILD: str = (
-    "A run never changes a listing, so the database has to be rebuilt: set the file aside, "
-    "run `pyvalue db migrate`, then `pyvalue universe load`, `pyvalue symbols load` and "
-    "`pyvalue listings fill`"
-)
+_REBUILD: str = f"A run never changes a listing, so the database has to be rebuilt: {REBUILD_STEPS}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +137,16 @@ class Plan:
     waiting: tuple[Security, ...]
     missing_lists: tuple[str, ...]
     unknown_decisions: tuple[str, ...]
+
+    @property
+    def filled_by_rule(self) -> tuple[Fill, ...]:
+        """The listings the rule found, in ISIN order."""
+        return tuple(each.fill for each in self.fills if not each.decided)
+
+    @property
+    def filled_by_decision(self) -> tuple[Fill, ...]:
+        """The listings a decision named, in ISIN order."""
+        return tuple(each.fill for each in self.fills if each.decided)
 
 
 def by_country(securities: Iterable[Security]) -> dict[str, int]:

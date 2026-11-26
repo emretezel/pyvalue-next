@@ -1,0 +1,20 @@
+[
+ {
+  "Code": "DLT",
+  "Name": "Delta PLC",
+  "Country": "UK",
+  "Exchange": "LSE",
+  "Currency": "GBX",
+  "Type": "Common Stock",
+  "Isin": "GB00000D0016"
+ },
+ {
+  "Code": "0DLT",
+  "Name": "Delta Lloyd Foreign SA",
+  "Country": "UK",
+  "Exchange": "LSE",
+  "Currency": "EUR",
+  "Type": "Common Stock",
+  "Isin": null
+ }
+]

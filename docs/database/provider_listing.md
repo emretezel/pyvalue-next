@@ -1,6 +1,6 @@
 # `provider_listing`
 
-One row says: this provider uses this symbol for this listing of ours. Decided in ADR 0002. Created by migration `0001_reference_schema`.
+One row says: this provider uses this symbol for this listing of ours. Decided in ADR 0002. Created by migration `0001_reference_schema`. Filled by `pyvalue listings fill`, together with the listing (ADR 0019, ADR 0026).
 
 ## Columns
 
@@ -23,6 +23,7 @@ One row says: this provider uses this symbol for this listing of ours. Decided i
 - **The key is the pair `listing_id` plus `provider_code`**: a provider has at most one symbol for a listing.
 - **`provider_symbol` is stored exactly as the provider gives it.** It is never derived from `listing.ticker`, because the two can differ, as for Berkshire above.
 - **No row means the listing is not mapped at that provider.**
+- **The row is the line the listing was written from.** With the provider's exchange code for the listing's exchange, it names a row of [`provider_symbol`](provider_symbol.md) as it stood when the listing was filled. Nothing ties the two afterwards: a stored list is replaced as a whole and can lose the line (ADR 0018).
 
 ## Relationships
 

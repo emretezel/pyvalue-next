@@ -33,6 +33,7 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from pyvalue.db import Company, Database, Fund, Holding, UnitOfWork
+from pyvalue.errors import REBUILD_STEPS
 from pyvalue.identifiers import is_valid_isin, is_valid_lei
 from pyvalue.universe.errors import UniverseError
 from pyvalue.universe.exclusions import Exclusion
@@ -63,10 +64,7 @@ _SEDOL_SHAPE: re.Pattern[str] = re.compile(r"[A-Z0-9]{7}")
 # What the load says when the database holds a security it is no longer to
 # hold. Taking a row out would be the load's first delete, with rules of its
 # own for a company left without securities; a rebuild does it in seconds.
-_REBUILD: str = (
-    "The load does not delete rows, so the database has to be rebuilt: set the file aside, "
-    "run `pyvalue db migrate`, then `pyvalue universe load`"
-)
+_REBUILD: str = f"The load does not delete rows, so the database has to be rebuilt: {REBUILD_STEPS}"
 
 
 class NotLoadedReason(StrEnum):

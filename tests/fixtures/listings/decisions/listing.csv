@@ -1,0 +1,3 @@
+isin,outcome,provider_code,provider_exchange_code,provider_symbol,company,decided_on,decided_by,evidence
+MYL0000L0012,listing,eodhd,KLSE,5555,Lambda Bhd,2026-11-26,agent,Made up: the exchange lists Lambda under the number 5555
+FR00000E0021,none,,,,Epsilon SA,2026-11-26,author,Made up: the B share is not to be analysed

@@ -138,6 +138,16 @@ def sample_codes(eodhd_samples: Path) -> ExchangeCodes:
 
 
 @pytest.fixture
+def listings_samples() -> Path:
+    """Return the folder of the sample lists for the listing fill, ``tests/fixtures/listings``.
+
+    The lists go with the sample holdings filings and are described in the
+    folder's README.
+    """
+    return _FIXTURES / "listings"
+
+
+@pytest.fixture
 def vanguard_samples() -> Path:
     """Return the folder of the sample Vanguard holdings files, ``tests/fixtures/vanguard``.
 

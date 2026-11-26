@@ -2,7 +2,7 @@
 
 A value-investing toolkit with a curated global stock universe, data-quality checks on fundamentals, and quality-at-a-reasonable-price screening.
 
-> **Status: under construction.** This repository (`pyvalue-next`) is the ground-up successor to the original pyvalue (0.1.0). So far it can create its database, load the companies and securities of its stock universe, and keep a data provider's exchange and symbol lists; exchange listings come next. It takes over the `pyvalue` name once its first phase is complete.
+> **Status: under construction.** This repository (`pyvalue-next`) is the ground-up successor to the original pyvalue (0.1.0). So far it can create its database, load the companies and securities of its stock universe, keep a data provider's exchange and symbol lists, and give each security its exchange listing from those lists; prices and fundamentals come next. It takes over the `pyvalue` name once its first phase is complete.
 
 ## Disclaimer
 

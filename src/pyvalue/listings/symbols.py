@@ -30,6 +30,7 @@ from pyvalue.db import (
     ProviderSymbol,
     UnitOfWork,
 )
+from pyvalue.errors import REBUILD_STEPS
 from pyvalue.identifiers import is_valid_isin
 from pyvalue.listings.errors import ListingsError
 from pyvalue.listings.exchanges import packaged_exchanges, require_our_exchanges
@@ -59,10 +60,7 @@ _NO_LABEL: str = "(no label)"
 _NAMED_AT_MOST: int = 10
 
 # What to do about a database that holds a row the files no longer have.
-_REBUILD: str = (
-    "The load does not delete rows, so the database has to be rebuilt: set the file aside, "
-    "run `pyvalue db migrate`, then `pyvalue universe load` and `pyvalue symbols load`"
-)
+_REBUILD: str = f"The load does not delete rows, so the database has to be rebuilt: {REBUILD_STEPS}"
 
 
 class NotStoredReason(Enum):

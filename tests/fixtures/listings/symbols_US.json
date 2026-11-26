@@ -1,0 +1,74 @@
+[
+ {
+  "Code": "ALPH",
+  "Name": "Alpha Corp",
+  "Country": "USA",
+  "Exchange": "NYSE",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": "US00000A0014"
+ },
+ {
+  "Code": "ALPH-PA",
+  "Name": "Alpha Corp Pref A",
+  "Country": "USA",
+  "Exchange": "NYSE",
+  "Currency": "USD",
+  "Type": "Preferred Stock",
+  "Isin": "US00000A0022"
+ },
+ {
+  "Code": "BETA",
+  "Name": "Beta Inc",
+  "Country": "USA",
+  "Exchange": "NASDAQ",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": "US00000B0013"
+ },
+ {
+  "Code": "BETB",
+  "Name": "Beta Inc Class B",
+  "Country": "USA",
+  "Exchange": "NASDAQ",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": "US00000B0021"
+ },
+ {
+  "Code": "BETB-WT",
+  "Name": "Beta Inc Class B When Issued",
+  "Country": "USA",
+  "Exchange": "NASDAQ",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": "US00000B0021"
+ },
+ {
+  "Code": "ETA",
+  "Name": "Eta Holdings Ltd ADR",
+  "Country": "USA",
+  "Exchange": "NYSE",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": "US00000H0017"
+ },
+ {
+  "Code": "OMC",
+  "Name": "Omicron Ltd ADR",
+  "Country": "USA",
+  "Exchange": "NASDAQ",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": "US00000O0018"
+ },
+ {
+  "Code": "OTHR",
+  "Name": "Another Corp",
+  "Country": "USA",
+  "Exchange": "NYSE",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": null
+ }
+]

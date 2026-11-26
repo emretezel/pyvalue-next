@@ -1,0 +1,20 @@
+[
+ {
+  "Code": "EPS",
+  "Name": "Epsilon SA",
+  "Country": "France",
+  "Exchange": "PA",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": "FR00000E0013"
+ },
+ {
+  "Code": "EPS-B",
+  "Name": "Epsilon SA B",
+  "Country": "France",
+  "Exchange": "PA",
+  "Currency": "EUR",
+  "Type": "Common Stock",
+  "Isin": "FR00000E0039"
+ }
+]

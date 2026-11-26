@@ -6,6 +6,15 @@ derive its errors from it without depending on another component.
 Author: Emre Tezel
 """
 
+# How a database is rebuilt, for the messages that ask for it. No load deletes
+# a row and no run changes a listing, so a database that no longer agrees with
+# the committed files is built again from them (ADR 0013, ADR 0024, ADR 0026).
+# Every such message gives the same steps, in the order they have to be run.
+REBUILD_STEPS: str = (
+    "set the file aside, run `pyvalue db migrate`, then `pyvalue universe load`, "
+    "`pyvalue symbols load` and `pyvalue listings fill`"
+)
+
 
 class PyvalueError(Exception):
     """A condition a person can act on, as opposed to a fault in pyvalue.

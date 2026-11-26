@@ -135,7 +135,7 @@ Measured on 2026-11-26 on a copy of the database that held the legacy EODHD cata
 | Outcome | Securities |
 |---|---|
 | Filled automatically | 7,898 (7,490 with ISIN and ticker agreeing, 408 by ISIN with no fund ticker) |
-| Market not served | 3,110: Japan 1,306, India 645, Hong Kong 530, Turkey 175, Saudi Arabia 103, Israel 87, Italy 84, Singapore 47, United Arab Emirates 42, New Zealand 26, Kuwait 24, Qatar 21, Iceland 15, Colombia 6 |
+| Market not served | 3,110: Japan 1,306, India 645, Hong Kong 530, Turkey 175, Saudi Arabia 103, Israel 87, Italy 84, Singapore 47, United Arab Emirates 42, New Zealand 26, Kuwait 24, Qatar 21, Iceland 15, Colombia 6. The countries add up to 3,111: one security is held in two of them and is counted under both |
 | Waiting for a symbol list | 0 |
 | Not held | 0 |
 | On the report | 696 |

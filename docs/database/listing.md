@@ -1,6 +1,6 @@
 # `listing`
 
-One row per instrument that has a known primary exchange line. Decided in ADR 0003. Created by migration `0001_reference_schema`.
+One row per instrument that has a known primary exchange line. Decided in ADR 0003. Created by migration `0001_reference_schema`. Filled by `pyvalue listings fill` (ADR 0019, ADR 0026).
 
 ## Columns
 
@@ -9,7 +9,7 @@ One row per instrument that has a known primary exchange line. Decided in ADR 00
 | `listing_id` | INTEGER | PK | yes | Assigned by the database, never reused | pyvalue's own id for the listing |
 | `instrument_id` | INTEGER | UNIQUE, FK → `instrument.instrument_id` | yes | The instrument must exist; no two listings share an instrument | The security that trades on this line |
 | `mic` | TEXT | FK → `exchange.mic` | yes | The exchange must exist | The exchange the security trades on |
-| `ticker` | TEXT | UNIQUE together with `mic` | yes | Not empty, no leading or trailing spaces, upper case | The exchange's own ticker for the security |
+| `ticker` | TEXT | UNIQUE together with `mic` | yes | Not empty, no leading or trailing spaces, upper case | The ticker of the security on that exchange |
 | `currency` | TEXT | | yes | Exactly three upper-case letters | The ISO 4217 currency the security trades in |
 
 ## Example rows
@@ -26,9 +26,10 @@ One row per instrument that has a known primary exchange line. Decided in ADR 00
 - **Primary listing only.** A row is the line on the market where the instrument has its primary listing. Because `instrument_id` is unique here, an instrument has at most one listing, so there is no primary/secondary status column.
 - **No listing is a missing row.** An instrument whose exchange and ticker are unknown has no row here. No column is left empty to say so.
 - **The company of a listing is reached through its instrument.** This table has no `company_id`.
-- **`ticker` is the exchange's ticker**, written as the exchange writes it. It is not a provider's symbol; that is in [`provider_listing`](provider_listing.md).
-- **`currency` is not a quote unit.** A London line is `GBP` even though its prices are quoted in pence.
-- **How a listing is filled** is set out in ADR 0005.
+- **`ticker` is the fund's ticker where there is one**, in upper case: `BRK.B`, where the provider writes `BRK-B`. It is taken when every ticker the holding lines give equals the provider's symbol and they are spelled alike. In every other case it is the provider's symbol in upper case (ADR 0019, ADR 0026). The provider's symbol itself, exactly as given, is in [`provider_listing`](provider_listing.md).
+- **`currency` is not a quote unit.** A London line is `GBP` even though its prices are quoted in pence. The fill turns the provider's sub-unit code into the currency.
+- **How a listing is filled** is set out in ADR 0019 and ADR 0026: the provider's one line in the security's home market that carries its ISIN, when the fund's ticker and currency do not contradict it, or the line a decision names.
+- **A run never changes a row.** A security that has a listing is skipped. A wrong listing is corrected by a decision and a rebuild of the database.
 
 ## Relationships
 

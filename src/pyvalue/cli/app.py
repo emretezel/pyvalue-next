@@ -9,8 +9,9 @@ Author: Emre Tezel
 import argparse
 import sys
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from types import MappingProxyType
 
 from pyvalue import __version__
 from pyvalue.config import eodhd_api_key, sec_user_agent
@@ -18,10 +19,14 @@ from pyvalue.db import DEFAULT_DATABASE_PATH, Database, migrate
 from pyvalue.errors import PyvalueError
 from pyvalue.listings import (
     DEFAULT_LISTS_DIR,
+    DEFAULT_REPORT_DIR,
     DownloadStatus,
     ListDownload,
     NotStoredReason,
+    Reason,
+    by_country,
     download_symbols,
+    fill_listings,
     load_symbols,
 )
 from pyvalue.providers.eodhd import PROVIDER_NAME
@@ -34,6 +39,31 @@ from pyvalue.universe import (
     Sponsor,
     VanguardAdapter,
     load_universe,
+)
+
+# What each reason of the listing report is called on the screen. The report
+# file itself carries the reason's code, which is what an agent reads.
+_REASON_WORDS: Mapping[Reason, str] = MappingProxyType(
+    {
+        Reason.RECEIPT_READ_AS_ORDINARY_SHARE: "a receipt read as its ordinary share",
+        Reason.US_ISIN_IN_NON_US_FUND: "a US-coded ISIN held by the non-US fund",
+        Reason.SEVERAL_HOME_MARKETS: "held in several markets",
+        Reason.SEVERAL_LINES_WITH_ISIN: "several lines carry the ISIN",
+        Reason.TICKER_FINDS_ONE_LINE: "no line has the ISIN, but the ticker finds exactly one",
+        Reason.TICKER_FINDS_SEVERAL_LINES: "no line has the ISIN, and the ticker finds several",
+        Reason.NOTHING_FOUND: "nothing found in the home market",
+        Reason.OTHER_CURRENCY: "one line has the ISIN, but in another currency",
+        Reason.SYMBOL_ON_ANOTHER_LINE: (
+            "one line has the ISIN, but its symbol is also on another line"
+        ),
+        Reason.TICKER_DIFFERS: "one line has the ISIN, but the ticker differs",
+        Reason.DECISION_LINE_NOT_STORED: "its decision names a line that is not stored",
+        Reason.DECISION_LINE_NOT_ALLOWED: "its decision names a line outside the home market",
+        Reason.DECISION_CURRENCY_UNREADABLE: (
+            "its decision names a line whose currency cannot be read"
+        ),
+        Reason.EXCHANGE_AND_TICKER_TAKEN: "another security has the exchange and ticker",
+    }
 )
 
 
@@ -224,6 +254,54 @@ def _symbols_load(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def _counted(counts: Mapping[str, int]) -> str:
+    """Name some counts in brackets, or nothing when there are none."""
+    return (
+        f" ({', '.join(f'{name} {count:,}' for name, count in counts.items())})" if counts else ""
+    )
+
+
+def _listings_fill(arguments: argparse.Namespace) -> int:
+    """Fill the listings of the securities that have none, and say what was done."""
+    database = Database(arguments.db)
+    outcome = fill_listings(database)
+    plan = outcome.plan
+    by_rule = plan.filled_by_rule
+    confirmed = sum(1 for fill in by_rule if fill.security.tickers)
+
+    print(f"Database: {database.path}")
+    print(f"Securities: {outcome.securities:,}")
+    print(f"Already had a listing: {plan.already_listed:,}")
+    print(
+        f"Filled by the rule: {len(by_rule):,} ({confirmed:,} with ISIN and ticker agreeing, "
+        f"{len(by_rule) - confirmed:,} by ISIN with no fund ticker)"
+    )
+    print(f"Filled by a decision: {len(plan.filled_by_decision):,}")
+    print(f"Decided to have no listing: {len(plan.decided_none):,}")
+    print(f"Not held by a fund: {len(plan.not_held):,}")
+    print(f"Market not served: {len(plan.not_served):,}{_counted(by_country(plan.not_served))}")
+    print(f"Waiting for a symbol list: {len(plan.waiting):,}{_counted(by_country(plan.waiting))}")
+    if plan.missing_lists:
+        # A whole country waits when one of its lists is missing (ADR 0026),
+        # so the codes are what a person acts on.
+        print(f"  Exchange codes without a stored list: {', '.join(plan.missing_lists)}")
+    print(f"For the agent: {len(plan.cases):,}, listed in {outcome.report}")
+    reasons = Counter(case.reason for case in plan.cases)
+    # In the order the reasons are tested, so two runs can be read side by side.
+    for reason in Reason:
+        if reasons[reason]:
+            print(f"  {reasons[reason]:,} {_REASON_WORDS[reason]}")
+    print(
+        f"Stored lines whose currency code cannot be read: "
+        f"{sum(outcome.unreadable_currencies.values()):,}{_counted(outcome.unreadable_currencies)}"
+    )
+    print(
+        f"Decisions for a security that is not in the universe: {len(plan.unknown_decisions):,}"
+        + (f" ({', '.join(plan.unknown_decisions)})" if plan.unknown_decisions else "")
+    )
+    return 0
+
+
 def _add_database_option(command: argparse.ArgumentParser) -> None:
     """Give a command the ``--db`` option every database command shares."""
     command.add_argument(
@@ -298,6 +376,24 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     symbols_download.set_defaults(run=_symbols_download)
+
+    listings = groups.add_parser("listings", help="say where each security trades")
+    listings_commands = listings.add_subparsers(dest="command", required=True, metavar="ACTION")
+    listings_fill = listings_commands.add_parser(
+        "fill",
+        help="give each security its listing from the stored symbol lists",
+        description=(
+            f"Give every security that has no listing the line of {PROVIDER_NAME}'s stored symbol "
+            "lists in its home market: the one line that carries its ISIN, when the fund's "
+            "ticker and currency do not contradict it, or the line the decisions file names. "
+            f"The securities that could not be filled are written to {DEFAULT_REPORT_DIR} for "
+            "an agent. A security whose market is not served, or whose symbol list is not "
+            "stored yet, is counted and left alone. This command never reaches the network and "
+            "never changes a listing. Running it again changes nothing."
+        ),
+    )
+    _add_database_option(listings_fill)
+    listings_fill.set_defaults(run=_listings_fill)
     return parser
 
 

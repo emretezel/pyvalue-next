@@ -1,0 +1,10 @@
+isin,company,reason,detail,trading_countries,fund_tickers,fund_currencies,matched_by,provider_code,provider_exchange_code,provider_symbol,mic,provider_name,provider_currency,provider_isin
+FR00000E0013,EPSILON SA,other_currency,,FR,,EUR,isin,eodhd,PA,EPS,XPAR,Epsilon SA,USD,FR00000E0013
+FR00000E0021,Epsilon SA,ticker_finds_one_line,,FR,EPS B,EUR,ticker,eodhd,PA,EPS-B,XPAR,Epsilon SA B,EUR,FR00000E0039
+KR70000K0000,Kappa Co Ltd,symbol_on_another_line,,KR,000990,KRW,isin and ticker,eodhd,KO,000990,XKRX,Kappa Co Ltd,KRW,KR70000K0000
+KR70000K0000,Kappa Co Ltd,symbol_on_another_line,,KR,000990,KRW,ticker,eodhd,KQ,000990,XKOS,Kappa Co Ltd,KRW,
+MYL0000L0012,LAMBDA BHD,ticker_differs,,MY,LAMBDA,MYR,isin,eodhd,KLSE,5555,XKLS,Lambda Bhd,MYR,MYL0000L0012
+US00000B0021,BETA INC,several_lines_with_isin,,US,,USD,isin,eodhd,US,BETB,XNAS,Beta Inc Class B,USD,US00000B0021
+US00000B0021,BETA INC,several_lines_with_isin,,US,,USD,isin,eodhd,US,BETB-WT,XNAS,Beta Inc Class B When Issued,USD,US00000B0021
+US00000H0017,ETA HOLDINGS LTD,us_isin_in_non_us_fund,,US,ETA,USD,isin and ticker,eodhd,US,ETA,XNYS,Eta Holdings Ltd ADR,USD,US00000H0017
+US00000O0018,Omicron Ltd,us_isin_in_non_us_fund,,US,OMC,USD,isin and ticker,eodhd,US,OMC,XNAS,Omicron Ltd ADR,USD,US00000O0018
