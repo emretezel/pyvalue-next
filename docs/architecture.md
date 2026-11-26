@@ -10,7 +10,7 @@ Only what has been agreed is described as designed. Everything else is listed as
 |---|---|---|---|
 | Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections, migrations, the unit of work, and the repositories for `company`, `instrument`, `fund` and `holding`. A repository is added when a component first needs its table |
 | Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load` |
-| Universe load | `pyvalue.universe` | Downloads the SEC holdings filings of VTI and VXUS and reads them into `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0016, ADR 0006, ADR 0009 to ADR 0015) | Built: the two funds of ADR 0016, each read through its sponsor's adapter (the SEC filing plus Vanguard's own file for ticker and SEDOL). Designed, not built: writing `fund` and `holding` (ADR 0017) |
+| Universe load | `pyvalue.universe` | Downloads the SEC holdings filings of VTI and VXUS and Vanguard's own holdings files, reads each fund through its sponsor's adapter, records the funds and their share lines in `fund` and `holding`, and fills `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0016, ADR 0017, ADR 0006, ADR 0009 to ADR 0015) | Built |
 | Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line |
 | Listings | `pyvalue.listings` | Stores the provider's symbol lists, applies the automatic rule and the decisions file (ADR 0018, ADR 0019) | Designed, not built |
 | Providers | `pyvalue.providers` | The EODHD client | Planned |
@@ -60,7 +60,7 @@ The pattern for database access is Repository with Unit of Work (ADR 0008). The 
 
 ## The universe, as designed
 
-The data model and the steps are fixed by the records. Step 1 is built in part: the two funds are read through the Vanguard adapter and loaded into `company` and `instrument`. The table below shows the design of 2026-11-26. The `fund` and `holding` rows of step 1, and the code for steps 2 to 4, are not written yet.
+The data model and the steps are fixed by the records. Step 1 is built. The code for steps 2 to 4 is not written yet.
 
 | Step | What happens | Record |
 |---|---|---|

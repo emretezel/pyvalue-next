@@ -1,5 +1,7 @@
 # The stock universe
 
+> **These figures are for three funds.** They record the universe as it stood on 2026-11-22, loaded from VTI, VXUS and DFAX. Since ADR 0016 (2026-11-26) the universe comes from VTI and VXUS only, which is about 12,200 securities of about 11,900 companies. A new record of the two-fund universe follows after the rebuilt database has been reviewed.
+
 What the universe holds at the end of the universe phase, on 2026-11-22. The universe is every company and security in `company` and `instrument`. How it is built is in `docs/architecture.md` and in ADR 0004, ADR 0006 and ADR 0009 to ADR 0015.
 
 ## In short

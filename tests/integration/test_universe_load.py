@@ -9,11 +9,12 @@ Author: Emre Tezel
 """
 
 from collections.abc import Mapping
+from datetime import date
 from pathlib import Path
 
 import pytest
 
-from pyvalue.db import Company, Database, Instrument, migrate
+from pyvalue.db import Company, Database, Fund, Holding, Instrument, migrate
 from pyvalue.universe import Sponsor, SponsorAdapter, UniverseError, load_universe
 from pyvalue.universe.exclusions import read_exclusions
 from pyvalue.universe.lei_decisions import read_lei_decisions
@@ -637,3 +638,175 @@ def test_a_swap_added_later_is_refused_until_the_database_is_rebuilt(
         )
 
     assert _tables(database) == (_EXPECTED_COMPANIES, _EXPECTED_INSTRUMENTS)
+
+
+# --- The funds and their holding lines (ADR 0017) -------------------------------------------
+
+
+def _recorded(database: Database) -> tuple[tuple[Fund, ...], tuple[Holding, ...]]:
+    """Read the two tables that record the funds' documents, in one unit of work."""
+    with database.unit_of_work() as work:
+        return work.funds.all(), work.holdings.all()
+
+
+def test_the_sample_documents_are_recorded_line_by_line(
+    database: Database,
+    filings_dir: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
+) -> None:
+    """Every share line with a valid ISIN, pointing at the instrument it was loaded as."""
+    outcome = load_universe(
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        adapters=adapters,
+    )
+
+    funds, holdings = _recorded(database)
+    assert funds == (
+        Fund(
+            fund_code="VTI",
+            name="Vanguard Total Stock Market Index Fund",
+            scope="US",
+            sec_series_id="S000002848",
+            sec_filing_number="0000036405-26-000480",
+            holdings_date=date(2026, 6, 30),
+            sponsor_file_date=date(2026, 10, 31),
+        ),
+        Fund(
+            fund_code="VXUS",
+            name="Vanguard Total International Stock Index Fund",
+            scope="NON_US",
+            sec_series_id="S000002932",
+            sec_filing_number="0000736054-26-000275",
+            holdings_date=date(2026, 7, 31),
+            sponsor_file_date=date(2026, 10, 31),
+        ),
+    )
+    # 31 lines, less the 7 that are debt, derivatives or without a valid ISIN.
+    assert [(row.fund_code, row.line_number) for row in holdings] == [
+        *[("VTI", number) for number in (1, 2, 3, 4)],
+        *[("VXUS", number) for number in (1, 2, 3, 4, 5, 8, 9, 10)],
+        *[("VXUS", number) for number in (11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 24)],
+    ]
+    # A loaded line points at the instrument with its own ISIN.
+    instrument_of = {
+        instrument.isin: instrument.instrument_id for instrument in _EXPECTED_INSTRUMENTS
+    }
+    not_loaded = {
+        (row.fund_code, row.line_number): row.not_loaded_reason
+        for row in holdings
+        if row.instrument_id is None
+    }
+    assert not_loaded == {
+        ("VXUS", 3): "receipt_company_already_loaded",
+        ("VXUS", 16): "receipt_company_already_loaded",
+        ("VXUS", 18): "receipt_company_already_loaded",
+        ("VXUS", 22): "receipt_company_already_loaded",
+    }
+    assert all(
+        row.instrument_id == instrument_of[row.isin]
+        for row in holdings
+        if row.instrument_id is not None
+    )
+    # The sample Vanguard files give a ticker where one line meets one row.
+    assert {(row.fund_code, row.line_number): row.ticker for row in holdings if row.ticker} == {
+        ("VTI", 1): "ALPH",
+        ("VTI", 2): "ALPH.PA",
+        ("VXUS", 4): "700",
+        ("VXUS", 5): "ETA",
+        ("VXUS", 10): "LAMBDA",
+        ("VXUS", 13): "EPS B",
+        ("VXUS", 16): "KAPPA",
+        ("VXUS", 17): "000990",
+        ("VXUS", 19): "MUP",
+        ("VXUS", 24): "OMC",
+    }
+    assert [(row.trading_country, row.currency) for row in holdings[4:9]] == [
+        ("GB", "GBP"),
+        ("FR", "EUR"),
+        ("US", "USD"),
+        ("HK", "HKD"),
+        ("US", "USD"),
+    ]
+    result = outcome.result
+    assert (result.holdings_stored, result.holdings_with_ticker, result.holdings_with_sedol) == (
+        24,
+        10,
+        10,
+    )
+    assert result.instruments_not_held == 0
+
+
+def test_a_second_run_records_the_same_rows(
+    database: Database,
+    filings_dir: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
+) -> None:
+    """A fund's lines are replaced as a whole, and the same documents give the same lines."""
+    load_universe(
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        adapters=adapters,
+    )
+    before = _recorded(database)
+
+    load_universe(
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        adapters=adapters,
+    )
+
+    assert _recorded(database) == before
+
+
+def test_the_sample_exclusion_and_swap_show_in_the_recorded_lines(
+    database: Database,
+    filings_dir: Path,
+    nport_samples: Path,
+    tmp_path: Path,
+    adapters: Mapping[Sponsor, SponsorAdapter],
+) -> None:
+    """A line kept out says why; a receipt read as its share keeps the ISIN the fund filed."""
+    exclusions = read_exclusions(nport_samples / "decisions" / "excluded.csv")
+    swaps = read_ordinary_shares(nport_samples / "decisions" / "ordinary_share.csv")
+
+    load_universe(
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        (),
+        (),
+        exclusions,
+        swaps,
+        adapters=adapters,
+    )
+
+    _, holdings = _recorded(database)
+    by_line = {(row.fund_code, row.line_number): row for row in holdings}
+    with database.unit_of_work() as work:
+        instrument_of = {
+            instrument.isin: instrument.instrument_id for instrument in work.instruments.all()
+        }
+    excluded = by_line[("VXUS", 5)]
+    assert (excluded.isin, excluded.instrument_id, excluded.not_loaded_reason) == (
+        "US00000H0017",
+        None,
+        "excluded_by_decision",
+    )
+    swapped = by_line[("VXUS", 24)]
+    assert (swapped.isin, swapped.not_loaded_reason) == ("US00000O0018", None)
+    assert swapped.instrument_id == instrument_of["SG00000O0017"]
+    assert "US00000O0018" not in instrument_of

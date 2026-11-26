@@ -74,6 +74,10 @@ def _result(
         ordinary_shares_used=0,
         companies=0,
         instruments=0,
+        holdings_stored=0,
+        holdings_with_ticker=0,
+        holdings_with_sedol=0,
+        instruments_not_held=0,
         not_loaded=not_loaded,
         agent_cases=agent_cases,
     )

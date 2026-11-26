@@ -54,7 +54,7 @@ Every line gives the country its currency is traded in, as Vanguard's filings do
 | 23 | Xi Corp | An ISIN with a wrong check digit | Not loaded: no valid ISIN |
 | 24 | Omicron Ltd | A receipt by label only; the company has no other line | Company 14 |
 
-In total: 31 lines (7 and 24), 14 companies, 16 instruments, 11 lines not loaded, 2 cases for the agent. The expected output files are in `expected/`.
+In total: 31 lines (7 and 24), 14 companies, 16 instruments, 11 lines not loaded, 2 cases for the agent. 24 lines are recorded in `holding`: the 31 less the 7 that are debt, derivatives or without a valid ISIN. Four of the 24 are receipts that were not loaded (VXUS lines 3, 16, 18 and 22). The expected output files are in `expected/`.
 
 ## Sample decisions
 

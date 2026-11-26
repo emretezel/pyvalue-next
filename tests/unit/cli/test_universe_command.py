@@ -71,6 +71,9 @@ def test_load_fills_the_database_and_says_what_it_did(
         "Securities kept out of the universe by decision: 0",
         "Receipts read as their ordinary share by decision: 0",
         "The database now holds 14 companies and 16 instruments",
+        "Holding lines stored: 24 (20 loaded, 0 kept out by decision, "
+        "4 receipt of a company already loaded); 10 with a ticker, 10 with a SEDOL",
+        "Instruments no fund holds: 0",
         f"Lines not loaded are listed in {Path('data') / 'universe' / 'lines_not_loaded.csv'}",
         f"Cases for the agent: 2, listed in {Path('data') / 'universe' / 'cases_for_agent.csv'}",
     ]

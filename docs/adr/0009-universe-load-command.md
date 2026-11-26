@@ -1,6 +1,6 @@
 # ADR 0009: The universe load is a command that reads pinned filings
 
-- Status: Accepted. The open point on how an agent's answer reaches the database is settled by ADR 0010. ADR 0013 adds a fourth reason to `lines_not_loaded.csv`: `excluded_by_decision`. ADR 0014 widens what "a company loaded in step 4" is recognised by in the receipt rule. ADR 0015 adds a fourth decisions file, which reads a receipt as its ordinary share.
+- Status: Accepted. The open point on how an agent's answer reaches the database is settled by ADR 0010. ADR 0013 adds a fourth reason to `lines_not_loaded.csv`: `excluded_by_decision`. ADR 0014 widens what "a company loaded in step 4" is recognised by in the receipt rule. ADR 0015 adds a fourth decisions file, which reads a receipt as its ordinary share. ADR 0016 changes the funds to VTI and VXUS and adds the sponsor's own holdings file to what is downloaded; ADR 0017 adds the `fund` and `holding` rows to what the load writes.
 - Date: 2026-11-20
 
 ## Decision

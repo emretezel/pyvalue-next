@@ -1,10 +1,12 @@
 """The rules that turn holdings lines into companies and instruments (ADR 0006).
 
-The load has two parts. Sorting is pure: it decides for every line whether it
-is left out, is an ordinary security or is a depositary receipt, and needs no
-database. Placing writes: it finds or adds the company of each line and adds
-the instrument, all inside one unit of work, so a load is saved whole or not
-at all (ADR 0009).
+The load has three parts. Sorting is pure: it decides for every line whether
+it is left out, is an ordinary security or is a depositary receipt, and needs
+no database. Placing writes: it finds or adds the company of each line and
+adds the instrument. Recording writes what the funds' documents say: one
+``fund`` row per fund and one ``holding`` row per share line, each pointing at
+the instrument its line was loaded as (ADR 0017). Placing and recording share
+one unit of work, so a load is saved whole or not at all (ADR 0009).
 
 Two kinds of decision overrule the filings, each for the security it names.
 Where the funds disagree about a company's legal-entity identifier, a decision
@@ -24,11 +26,12 @@ a security of either kind.
 Author: Emre Tezel
 """
 
+import re
 from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from pyvalue.db import Company, Database, UnitOfWork
+from pyvalue.db import Company, Database, Fund, Holding, UnitOfWork
 from pyvalue.universe.errors import UniverseError
 from pyvalue.universe.exclusions import Exclusion
 from pyvalue.universe.holdings import FundHoldings, HoldingLine
@@ -48,6 +51,13 @@ _DEBT_OR_DERIVATIVE: frozenset[str] = frozenset({"DBT", "DCO", "DCR", "DE", "DFE
 # practice has no ISIN), and whatever a filer puts in the conditional category.
 _LOADABLE: frozenset[str] = frozenset({"EC", "EP", "STIV", CONDITIONAL_CATEGORY})
 
+
+# A CUSIP is nine characters: letters, digits and three special signs. A SEDOL
+# is seven letters or digits. The ``holding`` table accepts nothing else, so a
+# value of another shape is stored as no value: it is a typing error or a
+# placeholder, not an identifier.
+_CUSIP_SHAPE: re.Pattern[str] = re.compile(r"[A-Z0-9*@#]{9}")
+_SEDOL_SHAPE: re.Pattern[str] = re.compile(r"[A-Z0-9]{7}")
 
 # What the load says when the database holds a security it is no longer to
 # hold. Taking a row out would be the load's first delete, with rules of its
@@ -143,6 +153,13 @@ class LoadResult:
             decision reads as lines of their ordinary share.
         companies: Companies in the database after the load.
         instruments: Instruments in the database after the load.
+        holdings_stored: Holding lines the load wrote: every share line with
+            a valid ISIN, loaded or not.
+        holdings_with_ticker: Of those, the lines that carry a ticker.
+        holdings_with_sedol: Of those, the lines that carry a SEDOL.
+        instruments_not_held: Instruments in the database that no holding
+            line points at. None after a rebuild; a database loaded from more
+            funds than today keeps the securities only the other funds held.
         not_loaded: Every line that was not loaded, in the order of the
             filings.
         agent_cases: Every case for the agent, in the order of the filings.
@@ -166,6 +183,10 @@ class LoadResult:
     ordinary_shares_used: int
     companies: int
     instruments: int
+    holdings_stored: int
+    holdings_with_ticker: int
+    holdings_with_sedol: int
+    instruments_not_held: int
     not_loaded: tuple[NotLoadedLine, ...]
     agent_cases: tuple[AgentCase, ...]
 
@@ -266,7 +287,8 @@ def _sort_lines(
             share, the ISIN of that share.
 
     Raises:
-        UniverseError: If a line is in a category the load has no rule for.
+        UniverseError: If a line is in a category the load has no rule for,
+            or a line with a valid ISIN does not say where it trades.
     """
     lines_read = 0
     candidates: list[_Candidate] = []
@@ -288,6 +310,14 @@ def _sort_lines(
                 )
             elif line.isin is None or not is_valid_isin(line.isin):
                 left_out.append(NotLoadedLine(fund, line, NotLoadedReason.NO_VALID_ISIN))
+            elif line.trading_country is None:
+                # Such a line would get a holding row, and the row says where
+                # the line trades (ADR 0017). No share line of a filing lacks
+                # the country; guessing one would mislead the listing rule.
+                raise UniverseError(
+                    f"{fund} line {line.number} ({line.issuer_name}) carries a valid ISIN and "
+                    "no country, so the load cannot say where it trades"
+                )
             elif line.isin in excluded:
                 # Asked last, so a line that is left out anyway keeps the
                 # reason the filing itself gives. Taken out here, before the
@@ -370,9 +400,12 @@ class _Placer:
         self._company_by_name: dict[str, int] = {}
         for company in work.companies.all():
             self._remember(company)
-        self._company_of_isin: dict[str, int] = {
-            instrument.isin: instrument.company_id for instrument in work.instruments.all()
-        }
+        self._company_of_isin: dict[str, int] = {}
+        # The id of each instrument, which is what a holding line points at.
+        self._instrument_of_isin: dict[str, int] = {}
+        for instrument in work.instruments.all():
+            self._company_of_isin[instrument.isin] = instrument.company_id
+            self._instrument_of_isin[instrument.isin] = instrument.instrument_id
         self.companies_added = 0
         self.instruments_added = 0
         self.joined_by_lei = 0
@@ -399,6 +432,10 @@ class _Placer:
     def company(self, company_id: int) -> Company:
         """Return a company as it stands now."""
         return self._companies[company_id]
+
+    def instrument_id(self, isin: str) -> int:
+        """Return the id of the instrument with this ISIN, which must be there."""
+        return self._instrument_of_isin[isin]
 
     def held(self, isins: frozenset[str]) -> list[str]:
         """Return which of the given ISINs are instruments already, in order."""
@@ -481,8 +518,9 @@ class _Placer:
             # security, whichever line brought the company in.
             self._name(company_id, candidate.name, candidate.isin)
 
-        self._work.instruments.add(company_id, candidate.isin)
+        instrument = self._work.instruments.add(company_id, candidate.isin)
         self._company_of_isin[candidate.isin] = company_id
+        self._instrument_of_isin[candidate.isin] = instrument.instrument_id
         self.instruments_added += 1
         return company_id
 
@@ -591,6 +629,67 @@ class _Placer:
             self._company_by_name.setdefault(name_key(company.name), company.company_id)
 
 
+def _fitting(value: str | None, shape: re.Pattern[str]) -> str | None:
+    """Return a value that has the given shape, and ``None`` for any other."""
+    return value if value is not None and shape.fullmatch(value) else None
+
+
+def _holding(
+    fund: str, line: HoldingLine, instrument_id: int | None, reason: NotLoadedReason | None
+) -> Holding:
+    """Build the ``holding`` row of one line (ADR 0017).
+
+    The row records what the fund's documents say, so the ISIN, the name and
+    the identifier are the filed ones, not the decided ones: a receipt read as
+    its ordinary share keeps the receipt's ISIN, and that difference is how
+    the listing rule recognises it (ADR 0019).
+
+    Args:
+        fund: The code of the fund whose filing holds the line.
+        line: A line with a valid ISIN and a trading country: one that
+            ``_sort_lines`` made a candidate or left out for one of the two
+            reasons below.
+        instrument_id: The instrument the line was loaded as, or ``None``
+            when it was not loaded.
+        reason: Why it was not loaded; ``None`` when it was.
+    """
+    # Both are guaranteed by the sorting; the assertions say so to the reader
+    # and to the type checker.
+    assert line.isin is not None
+    assert line.trading_country is not None
+    return Holding(
+        fund_code=fund,
+        line_number=line.number,
+        instrument_id=instrument_id,
+        not_loaded_reason=None if reason is None else reason.value,
+        isin=line.isin,
+        issuer_name=line.issuer_name.strip(),
+        title=line.title.strip() or None,
+        # A filed identifier that fails its check digits is a typing error
+        # (ADR 0009); the row then says that the line gave none.
+        lei=line.lei if line.lei is not None and is_valid_lei(line.lei) else None,
+        cusip=_fitting(line.cusip, _CUSIP_SHAPE),
+        sedol=_fitting(line.sedol, _SEDOL_SHAPE),
+        ticker=None if line.ticker is None else line.ticker.strip() or None,
+        asset_category=line.category,
+        # Only the conditional category has a label of the filer's own.
+        asset_category_label=(
+            line.category_label if line.category == CONDITIONAL_CATEGORY else None
+        ),
+        issuer_type=line.issuer_type,
+        trading_country=line.trading_country,
+        currency=line.currency,
+    )
+
+
+# The two reasons for which a line that was not loaded still gets a holding
+# row: it is a share line the fund really holds. A line without a valid ISIN,
+# and a debt or derivative line, gets none and stays in the output file.
+_RECORDED_REASONS: frozenset[NotLoadedReason] = frozenset(
+    {NotLoadedReason.EXCLUDED_BY_DECISION, NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED}
+)
+
+
 def _refuse_contradictions(
     decided_on: Set[str], excluded: frozenset[str], ordinary_of: Mapping[str, str]
 ) -> None:
@@ -646,13 +745,13 @@ def load_holdings(
     exclusions: Sequence[Exclusion] = (),
     ordinary_shares: Sequence[OrdinaryShare] = (),
 ) -> LoadResult:
-    """Load the holdings of the funds into ``company`` and ``instrument``.
+    """Load the holdings of the funds into the database.
 
-    The steps are those of ADR 0006: lines that are debt, derivatives or
-    without a valid ISIN are left out; ordinary securities are loaded in the
-    order of the funds; a depositary receipt is loaded only when no ordinary
-    line of this run belongs to a company with its identifier or its name, or
-    carries its name itself (ADR 0014).
+    Companies and instruments are added by the steps of ADR 0006: lines that
+    are debt, derivatives or without a valid ISIN are left out; ordinary
+    securities are loaded in the order of the funds; a depositary receipt is
+    loaded only when no ordinary line of this run belongs to a company with
+    its identifier or its name, or carries its name itself (ADR 0014).
 
     Decisions overrule the filings, on legal-entity identifiers (ADR 0010)
     and on company names (ADR 0012): first the company of every decided
@@ -665,8 +764,14 @@ def load_holdings(
     loaded as that share (ADR 0015). The load never deletes: a database that
     already holds a security of either kind is refused and has to be rebuilt.
 
+    The funds and their lines are recorded as well (ADR 0017): one ``fund``
+    row per fund, and one ``holding`` row per share line with a valid ISIN,
+    whether the line was loaded or not. A fund's rows are a copy of its
+    filing, so each load replaces them as a whole.
+
     Everything is written in one unit of work. Loading the same holdings
-    with the same decisions again changes nothing.
+    with the same decisions again changes nothing: no company or instrument
+    is added, and the rows of ``fund`` and ``holding`` come out the same.
 
     Args:
         database: The database to load into.
@@ -687,7 +792,8 @@ def load_holdings(
 
     Raises:
         UniverseError: If a line is in a category the load has no rule for,
-            two decisions of one kind are about the same ISIN, two name
+            a line with a valid ISIN does not say where it trades, two
+            decisions of one kind are about the same ISIN, two name
             decisions call one company by different names, the decisions
             files contradict each other about a security, or the database
             already holds a security that is kept out or read as its ordinary
@@ -714,6 +820,9 @@ def load_holdings(
     not_loaded = list(lines.left_out)
     receipts_kept = 0
     receipts_not_loaded = 0
+    # Report and record in the order of the filings, whatever order the steps
+    # reach the lines in.
+    fund_order = {holdings.fund.code: position for position, holdings in enumerate(funds)}
 
     with database.unit_of_work() as work:
         placer = _Placer(work)
@@ -738,8 +847,10 @@ def load_holdings(
         # Step 4 of ADR 0006: ordinary lines. The companies they belong to are
         # what "already in the universe through its own shares" means below.
         own_share_companies: set[int] = set()
+        placed: list[_Candidate] = []
         for candidate in lines.ordinary:
             own_share_companies.add(placer.place(candidate))
+            placed.append(candidate)
         own_share_leis = {
             company.lei
             for company in map(placer.company, own_share_companies)
@@ -775,9 +886,46 @@ def load_holdings(
                 receipts_kept += 1
                 for candidate in group:
                     placer.place(candidate)
+                    placed.append(candidate)
 
-    # Report in the order of the filings, whatever order the steps found them in.
-    fund_order = {holdings.fund.code: position for position, holdings in enumerate(funds)}
+        # Recording (ADR 0017). Every instrument exists by now, so each line
+        # can point at the one it was loaded as: for a receipt read as its
+        # ordinary share that is the share, found by the candidate's ISIN,
+        # while the row keeps the ISIN the fund filed.
+        rows = [
+            _holding(candidate.fund, candidate.line, placer.instrument_id(candidate.isin), None)
+            for candidate in placed
+        ]
+        rows.extend(
+            _holding(entry.fund, entry.line, None, entry.reason)
+            for entry in not_loaded
+            if entry.reason in _RECORDED_REASONS
+        )
+        for holdings in funds:
+            definition = holdings.fund
+            work.funds.save(
+                Fund(
+                    fund_code=definition.code,
+                    name=definition.name,
+                    scope=definition.scope.value,
+                    sec_series_id=definition.series_id,
+                    sec_filing_number=definition.filing_number,
+                    holdings_date=definition.holdings_date,
+                    sponsor_file_date=holdings.sponsor_file_date,
+                )
+            )
+            # The rows of a fund are a copy of its filing: replaced as a
+            # whole, so a line the filing no longer has does not linger.
+            work.holdings.remove_of_fund(definition.code)
+        for row in sorted(rows, key=lambda row: (fund_order[row.fund_code], row.line_number)):
+            work.holdings.add(row)
+        # Read back, not counted from this run's rows: the table may hold the
+        # lines of a fund that an earlier version of the load knew.
+        held_instruments = {
+            row.instrument_id for row in work.holdings.all() if row.instrument_id is not None
+        }
+        instruments_not_held = placer.instrument_count - len(held_instruments)
+
     return LoadResult(
         lines_read=lines.lines_read,
         securities=len({candidate.isin for candidate in lines.ordinary}) + len(lines.receipts),
@@ -797,6 +945,10 @@ def load_holdings(
         ordinary_shares_used=lines.ordinary_shares_used,
         companies=placer.company_count,
         instruments=placer.instrument_count,
+        holdings_stored=len(rows),
+        holdings_with_ticker=sum(1 for row in rows if row.ticker is not None),
+        holdings_with_sedol=sum(1 for row in rows if row.sedol is not None),
+        instruments_not_held=instruments_not_held,
         not_loaded=tuple(
             sorted(not_loaded, key=lambda entry: (fund_order[entry.fund], entry.line.number))
         ),

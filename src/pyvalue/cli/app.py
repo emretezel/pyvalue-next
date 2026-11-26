@@ -100,6 +100,19 @@ def _universe_load(arguments: argparse.Namespace) -> int:
         f"The database now holds {result.companies:,} companies and "
         f"{result.instruments:,} instruments"
     )
+    excluded = result.not_loaded_for(NotLoadedReason.EXCLUDED_BY_DECISION)
+    receipts = result.not_loaded_for(NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED)
+    print(
+        f"Holding lines stored: {result.holdings_stored:,} "
+        f"({result.holdings_stored - excluded - receipts:,} loaded, "
+        f"{excluded:,} kept out by decision, "
+        f"{receipts:,} receipt of a company already loaded); "
+        f"{result.holdings_with_ticker:,} with a ticker, "
+        f"{result.holdings_with_sedol:,} with a SEDOL"
+    )
+    # Not zero on a database that was loaded from more funds than today: the
+    # load never deletes, so the securities only the other funds held remain.
+    print(f"Instruments no fund holds: {result.instruments_not_held:,}")
     print(f"Lines not loaded are listed in {outcome.output.lines_not_loaded}")
     print(
         f"Cases for the agent: {len(result.agent_cases):,}, "
@@ -146,8 +159,9 @@ def build_parser() -> argparse.ArgumentParser:
             "Download the pinned SEC holdings filings of VTI and VXUS if they are not in "
             f"{DEFAULT_FILINGS_DIR} yet, and Vanguard's own holdings files if they are not in "
             f"{DEFAULT_VANGUARD_DIR} yet, and load their companies and securities into the "
-            f"database. The lines that were not loaded and the cases left for an agent are "
-            f"written to {DEFAULT_OUTPUT_DIR}. Running it again adds nothing."
+            f"database, together with the funds and their holding lines. The lines that were "
+            f"not loaded and the cases left for an agent are written to {DEFAULT_OUTPUT_DIR}. "
+            "Running it again adds nothing."
         ),
     )
     _add_database_option(universe_load)
