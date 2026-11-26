@@ -35,6 +35,7 @@ An instrument exists as soon as a holdings source names it. Where it trades is r
 |---|---|---|---|
 | References | [`company`](company.md) | `instrument.company_id` | A company with instruments cannot be deleted |
 | Referenced by | [`listing`](listing.md) | `listing.instrument_id` | Refused while the instrument has a listing |
+| Referenced by | [`holding`](holding.md) | `holding.instrument_id` | Refused while a holding line points at the instrument |
 
 ## Indexes
 

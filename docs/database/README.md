@@ -10,6 +10,8 @@ The pyvalue database is one SQLite file, `data/pyvalue.db` by default. Its schem
 | [`company`](company.md) | A legal entity that issues securities | ADR 0001 |
 | [`instrument`](instrument.md) | One security of a company, identified by its ISIN | ADR 0003 |
 | [`listing`](listing.md) | The primary exchange line of an instrument | ADR 0003 |
+| [`fund`](fund.md) | A fund whose holdings are loaded | ADR 0017 |
+| [`holding`](holding.md) | One share line of a fund's loaded filing | ADR 0017 |
 | [`provider`](provider.md) | A data provider, such as EODHD | ADR 0002 |
 | [`provider_exchange`](provider_exchange.md) | The code one provider uses for one of our exchanges | ADR 0002 |
 | [`provider_listing`](provider_listing.md) | The symbol one provider uses for one of our listings | ADR 0002 |
@@ -27,6 +29,8 @@ The pyvalue database is one SQLite file, `data/pyvalue.db` by default. Its schem
 erDiagram
     company ||--o{ instrument : "issues"
     instrument ||--o| listing : "has at most one"
+    fund ||--o{ holding : "reports"
+    instrument |o--o{ holding : "was loaded from"
     exchange ||--o{ listing : "lists"
     provider ||--o{ provider_exchange : "has a code for"
     exchange ||--o{ provider_exchange : "is coded by"
@@ -55,6 +59,26 @@ erDiagram
         TEXT ticker "required, unique together with mic"
         TEXT currency "required, ISO 4217"
     }
+    fund {
+        TEXT fund_code PK "our code for the fund"
+        TEXT name "required"
+        TEXT scope "required, US or NON_US"
+        TEXT sec_series_id UK "required"
+        TEXT sec_filing_number UK "required, the filing loaded now"
+        TEXT holdings_date "required"
+        TEXT sponsor_file_date "optional"
+    }
+    holding {
+        TEXT fund_code PK, FK "the fund"
+        INTEGER line_number PK "position in the filing"
+        INTEGER instrument_id FK "optional, the security it was loaded as"
+        TEXT not_loaded_reason "only when not loaded"
+        TEXT isin "required, as filed"
+        TEXT issuer_name "required, as filed"
+        TEXT ticker "optional, from the sponsor's file"
+        TEXT trading_country "required"
+        TEXT currency "required"
+    }
     provider {
         TEXT provider_code PK "our code for the provider"
         TEXT name "required"
@@ -77,12 +101,12 @@ erDiagram
     }
 ```
 
-`PK` is a primary key, `FK` a foreign key, `UK` a unique column. `schema_migration` stands alone: it describes the database itself, not the data in it.
+`PK` is a primary key, `FK` a foreign key, `UK` a unique column. `schema_migration` stands alone: it describes the database itself, not the data in it. `holding` is shown with its main columns only; the rest are in its own file.
 
 ## How to read the table files
 
 - **Key**: `PK` is the primary key; where two columns are marked `PK`, the pair is the key. `FK → table.column` is a foreign key to that column. `UNIQUE` means no two rows share the value.
-- **Required**: `yes` means the column can never be empty.
+- **Required**: `yes` means the column can never be empty. `no` means an empty value is a valid state, and the Meaning column says what it stands for.
 - **Constraint**: the rule the database enforces, in plain words. The exact SQL is in the migration file.
 
 ## Rules that hold for every table
@@ -92,7 +116,7 @@ erDiagram
 | Foreign keys are enforced | Every connection is opened with `PRAGMA foreign_keys = ON`. |
 | Nothing is deleted implicitly | A row that another row points at cannot be deleted. |
 | Ids are never reused | A deleted row's id is never given to a new row. |
-| A corrected code follows through | Changing an exchange's `mic` or a provider's `provider_code` updates every row that points at it. |
+| A corrected code follows through | Changing an exchange's `mic`, a provider's `provider_code` or a fund's `fund_code` updates every row that points at it. |
 | Check digits are validated in code | The database enforces the shape of an ISIN and a legal-entity identifier. Their check digits are validated by the code that writes the row. |
 
 ## Changing the schema

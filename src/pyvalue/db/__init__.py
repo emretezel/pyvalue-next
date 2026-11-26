@@ -12,6 +12,8 @@ Author: Emre Tezel
 from pyvalue.db.company import Company, CompanyRepository
 from pyvalue.db.connection import DEFAULT_DATABASE_PATH
 from pyvalue.db.errors import ConstraintError, DatabaseError
+from pyvalue.db.fund import Fund, FundRepository
+from pyvalue.db.holding import Holding, HoldingRepository
 from pyvalue.db.instrument import Instrument, InstrumentRepository
 from pyvalue.db.migrate import (
     Migration,
@@ -30,6 +32,10 @@ __all__ = [
     "ConstraintError",
     "Database",
     "DatabaseError",
+    "Fund",
+    "FundRepository",
+    "Holding",
+    "HoldingRepository",
     "Instrument",
     "InstrumentRepository",
     "Migration",

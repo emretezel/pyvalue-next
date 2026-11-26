@@ -8,7 +8,7 @@ Only what has been agreed is described as designed. Everything else is listed as
 
 | Component | Package | What it does | Status |
 |---|---|---|---|
-| Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections, migrations, the unit of work, and the repositories for `company` and `instrument`. A repository is added when a component first needs its table |
+| Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections, migrations, the unit of work, and the repositories for `company`, `instrument`, `fund` and `holding`. A repository is added when a component first needs its table |
 | Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load` |
 | Universe load | `pyvalue.universe` | Downloads the three SEC holdings filings and reads them into `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0004, ADR 0006, ADR 0009 to ADR 0015) | Built for the three funds of ADR 0004. Designed, not built: two Vanguard funds read through a sponsor adapter, with `fund` and `holding` tables (ADR 0016, ADR 0017) |
 | Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line |

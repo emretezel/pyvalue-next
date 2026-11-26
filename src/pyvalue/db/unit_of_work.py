@@ -17,6 +17,8 @@ from typing import Final
 from pyvalue.db.company import CompanyRepository
 from pyvalue.db.connection import connect
 from pyvalue.db.errors import DatabaseError
+from pyvalue.db.fund import FundRepository
+from pyvalue.db.holding import HoldingRepository
 from pyvalue.db.instrument import InstrumentRepository
 from pyvalue.db.migrate import require_current_schema
 
@@ -31,12 +33,16 @@ class UnitOfWork:
     Attributes:
         companies: The repository of the ``company`` table.
         instruments: The repository of the ``instrument`` table.
+        funds: The repository of the ``fund`` table.
+        holdings: The repository of the ``holding`` table.
     """
 
     def __init__(self, connection: sqlite3.Connection) -> None:
         """Create the repositories on the connection of this unit of work."""
         self.companies: Final[CompanyRepository] = CompanyRepository(connection)
         self.instruments: Final[InstrumentRepository] = InstrumentRepository(connection)
+        self.funds: Final[FundRepository] = FundRepository(connection)
+        self.holdings: Final[HoldingRepository] = HoldingRepository(connection)
 
 
 class Database:

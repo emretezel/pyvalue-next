@@ -50,15 +50,22 @@ def seeded(migrated_db: sqlite3.Connection) -> Iterator[sqlite3.Connection]:
 
 
 def test_schema_has_exactly_the_agreed_tables_and_view(migrated_db: sqlite3.Connection) -> None:
-    """Migration 0001 creates what the ADRs define and nothing else."""
+    """The migrations create what the ADRs define and nothing else.
+
+    ``fund``, ``holding`` and its index come from migration 0002 (ADR 0017);
+    their constraints are tested in ``test_fund_holding_schema.py``.
+    """
     rows = migrated_db.execute(
         "SELECT type, name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name"
     ).fetchall()
 
     assert rows == [
+        ("index", "holding_instrument_id"),
         ("index", "instrument_company_id"),
         ("table", "company"),
         ("table", "exchange"),
+        ("table", "fund"),
+        ("table", "holding"),
         ("table", "instrument"),
         ("table", "listing"),
         ("table", "provider"),
