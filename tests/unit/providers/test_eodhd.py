@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from pyvalue.providers import ProviderError
 from pyvalue.providers.eodhd import (
@@ -18,6 +20,7 @@ from pyvalue.providers.eodhd import (
     PROVIDER_CODE,
     PROVIDER_NAME,
     SymbolLine,
+    currency_of,
     parse_exchange_list,
     parse_symbol_list,
 )
@@ -191,3 +194,46 @@ def test_the_message_names_the_source_it_was_given() -> None:
     """A saved file is named by its path, an answer by its address without the key."""
     with pytest.raises(ProviderError, match="data/eodhd/symbols_KO.json is not an EODHD"):
         parse_symbol_list(b"{}", "data/eodhd/symbols_KO.json")
+
+
+@pytest.mark.parametrize(
+    ("code", "currency"),
+    [
+        pytest.param("GBX", "GBP", id="pence"),
+        pytest.param("ZAC", "ZAR", id="South African cents"),
+        pytest.param("ILA", "ILS", id="Israeli agorot"),
+    ],
+)
+def test_a_sub_unit_is_turned_into_its_currency(code: str, currency: str) -> None:
+    """A listing's currency is never a quote unit (ADR 0019)."""
+    assert currency_of(code) == currency
+
+
+@pytest.mark.parametrize("code", ["USD", "GBP", "KRW", "ZAR", "ILS"])
+def test_a_currency_code_is_taken_as_it_is(code: str) -> None:
+    """Most lines carry the currency itself."""
+    assert currency_of(code) == code
+
+
+@pytest.mark.parametrize("code", ["Unknown", "", "usd", "GBp", "US", "USDX", " USD", "U$D", "123"])
+def test_a_code_that_cannot_be_a_currency_is_not_read(code: str) -> None:
+    """Such a line can never become a listing (ADR 0026)."""
+    assert currency_of(code) is None
+
+
+@given(st.text(max_size=8))
+def test_what_is_read_always_has_the_shape_the_listing_table_takes(code: str) -> None:
+    """Three capital letters, or nothing: the schema would refuse anything else."""
+    currency = currency_of(code)
+
+    assert currency is None or (
+        len(currency) == 3 and currency.isascii() and currency.isalpha() and currency.isupper()
+    )
+
+
+@given(st.text(max_size=8))
+def test_reading_a_currency_that_was_read_changes_nothing(code: str) -> None:
+    """No sub-unit maps to another sub-unit."""
+    currency = currency_of(code)
+
+    assert currency is None or currency_of(currency) == currency

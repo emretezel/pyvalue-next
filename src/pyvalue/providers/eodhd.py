@@ -9,6 +9,10 @@ through ``pyvalue.http``, which sends it to ``eodhd.com`` only, never along a
 redirect, and keeps it out of every message. This module is handed the key;
 it never reads the settings file.
 
+EODHD also has its own codes for currencies: a market quoted in a sub-unit
+carries the sub-unit's code. ``currency_of`` turns such a code into the
+currency (ADR 0019).
+
 Nothing has been seen live yet (ADR 0024): the shape below is EODHD's
 documentation and what the legacy client read. The readers are strict on
 purpose, so that a difference shows at the first live download as a message
@@ -18,9 +22,11 @@ Author: Emre Tezel
 """
 
 import json
+import re
 import urllib.parse
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from pyvalue.http import fetch_https
 from pyvalue.providers.errors import ProviderError
@@ -43,6 +49,14 @@ _CLIENT_NAME: str = "pyvalue"
 # line, even if empty: a field that is missing means the provider's shape is
 # not the one this reader was written for.
 _SYMBOL_FIELDS: tuple[str, ...] = ("Code", "Name", "Exchange", "Currency", "Type", "Isin")
+
+# EODHD quotes some markets in a sub-unit of their currency and gives the
+# sub-unit a code of its own (ADR 0019): pence, South African cents, Israeli
+# agorot. A listing's currency is the currency itself, never the quote unit.
+_SUB_UNITS: Mapping[str, str] = MappingProxyType({"GBX": "GBP", "ZAC": "ZAR", "ILA": "ILS"})
+
+# The shape of an ISO 4217 code, which is what a listing's currency has to be.
+_CURRENCY: re.Pattern[str] = re.compile(r"[A-Z]{3}")
 
 # What fetches a list: (address without the key, the key) -> the bytes of the
 # answer. A parameter of this type lets tests stand in for the network.
@@ -81,6 +95,27 @@ class SymbolLine:
     currency: str | None
     kind: str | None
     isin: str | None
+
+
+def currency_of(provider_currency: str) -> str | None:
+    """Return the currency a symbol line trades in, from EODHD's code for it.
+
+    A sub-unit becomes its currency: a London line in ``GBX`` trades in
+    ``GBP``. Any other code is taken as it is when it has the shape of a
+    currency code. That shape is all that is checked: a code EODHD made up
+    passes if it is three capital letters, and it is the listing rule that
+    keeps such a line from being filled without review, because the code
+    never equals the currency a fund holds the security in (ADR 0026).
+
+    Args:
+        provider_currency: The line's ``Currency`` as EODHD gives it.
+
+    Returns:
+        The ISO 4217 code, or ``None`` when the code cannot be read as a
+        currency, such as ``Unknown``.
+    """
+    currency = _SUB_UNITS.get(provider_currency, provider_currency)
+    return currency if _CURRENCY.fullmatch(currency) is not None else None
 
 
 def exchange_list_url() -> str:
