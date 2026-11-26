@@ -1,6 +1,6 @@
 # `exchange`
 
-One row per market on which companies list. Decided in ADR 0001. Created by migration `0001_reference_schema`.
+One row per market on which companies list. Decided in ADR 0001. Created by migration `0001_reference_schema`. The rows come from the committed file `src/pyvalue/listings/reference/exchange.csv` (ADR 0018), which lists the markets a provider serves.
 
 ## Columns
 
@@ -17,12 +17,15 @@ One row per market on which companies list. Decided in ADR 0001. Created by migr
 | `XNYS` | New York Stock Exchange | `US` |
 | `XNAS` | Nasdaq | `US` |
 | `XETR` | Xetra | `DE` |
-| `XJPX` | Japan Exchange Group | `JP` |
+| `XKRX` | Korea Exchange | `KR` |
 | `XKOS` | KOSDAQ | `KR` |
+
+There is no row for Tokyo (`XJPX`): no provider serves it, and a market no provider serves needs no row.
 
 ## Notes
 
 - **`mic` is the primary key** because it is an international standard and stable.
+- **Germany has one exchange, Xetra.** The regional exchanges get no row (ADR 0018). US over-the-counter trading gets none either (ADR 0024).
 - **Which code a market gets.** A row uses the ISO operating code by default: AIM is stored as London (`XLON`). A segment code gets its own row only where two separate listing markets share one operating code, as KOSDAQ (`XKOS`) does under Korea Exchange.
 
 ## Relationships

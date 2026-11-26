@@ -12,13 +12,13 @@ A file has no constraints of its own, so every row is checked here.
 Author: Emre Tezel
 """
 
-import csv
 from collections.abc import Callable
 from datetime import date
 from importlib import resources
 from pathlib import Path
 from typing import Protocol
 
+from pyvalue.csv_file import read_csv
 from pyvalue.identifiers import is_valid_isin
 from pyvalue.universe.errors import UniverseError
 
@@ -84,20 +84,11 @@ def read_decisions[D: Decision](
             is invalid, or two rows are about the same security. The message
             names the row, counting the header as row 1.
     """
-    try:
-        with path.open(encoding="utf-8", newline="") as handle:
-            rows = list(csv.reader(handle))
-    except (OSError, UnicodeDecodeError, csv.Error) as error:
-        raise UniverseError(f"cannot read the decisions file {path}: {error}") from error
-    if not rows or tuple(rows[0]) != header:
-        raise UniverseError(f"{path}: the first row must be {','.join(header)}")
-
     decisions: list[D] = []
     seen: dict[str, int] = {}
-    for number, row in enumerate(rows[1:], start=2):
-        where = f"{path} row {number}"
-        if len(row) != len(header):
-            raise UniverseError(f"{where} has {len(row)} cells where {len(header)} are expected")
+    for number, (where, row) in enumerate(
+        read_csv(path, header, UniverseError, "the decisions file"), start=2
+    ):
         decision = parse(row, where)
         if decision.isin in seen:
             # Two answers for one security: the file must say which one holds.

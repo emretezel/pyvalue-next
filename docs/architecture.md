@@ -12,8 +12,8 @@ Only what has been agreed is described as designed. Everything else is listed as
 | Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load` |
 | Universe load | `pyvalue.universe` | Downloads the SEC holdings filings of VTI and VXUS and Vanguard's own holdings files, reads each fund through its sponsor's adapter, records the funds and the share lines that were loaded in `fund` and `holding`, and fills `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0016, ADR 0017, ADR 0021, ADR 0022, ADR 0006, ADR 0009 to ADR 0015, ADR 0023) | Built |
 | Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line |
-| Listings | `pyvalue.listings` | Stores the provider's symbol lists, applies the automatic rule and the decisions file (ADR 0018, ADR 0019) | Designed, not built |
-| Providers | `pyvalue.providers` | The EODHD client | Planned |
+| Listings | `pyvalue.listings` | Keeps our exchanges, stores the provider's symbol lists, applies the automatic rule and the decisions file (ADR 0018, ADR 0019, ADR 0024) | Built: the reader of our exchanges file. The rest is designed, not built |
+| Providers | `pyvalue.providers` | A provider's exchange codes and its client | Built: the reader of a provider's exchange file. The EODHD client is planned |
 | Prices, fundamentals, metrics, screens, data-quality reports, the agent that decides listings | | | Not designed yet |
 
 ## How the components fit together
@@ -40,7 +40,7 @@ flowchart LR
     db --> file
 ```
 
-An arrow means "calls". Nothing calls back up the arrows. Four small modules are left out of the picture because everything may use them: `pyvalue.errors`, the base of pyvalue's own errors; `pyvalue.config`, the settings; `pyvalue.http`, the one function every download goes through; and `pyvalue.identifiers`, the checks of an ISIN and of a legal-entity identifier.
+An arrow means "calls". Nothing calls back up the arrows. Five small modules are left out of the picture because everything may use them: `pyvalue.errors`, the base of pyvalue's own errors; `pyvalue.config`, the settings; `pyvalue.http`, the one function every download goes through; `pyvalue.identifiers`, the checks of an ISIN and of a legal-entity identifier; and `pyvalue.csv_file`, the reader every committed file starts with.
 
 The pattern for database access is Repository with Unit of Work (ADR 0008). The working rules, with what to flag in review, are in the **Database Access** section of [`CLAUDE.md`](../CLAUDE.md).
 
@@ -83,7 +83,7 @@ The data model and the steps are fixed by the records. Step 1 is built. The code
 | Receipts read as their ordinary share | `src/pyvalue/universe/decisions/ordinary_share.csv`, one row per receipt, shipped inside the package. The load reads the receipt's lines under the ordinary share's ISIN; a database that already holds the receipt has to be rebuilt (ADR 0015) | Yes |
 | The agent's listing decisions | `src/pyvalue/listings/decisions/listing.csv`, one row per security, shipped inside the package (ADR 0019). Not built yet | Yes |
 | Vanguard's own holdings files | `data/vanguard/`, one file per fund, named by fund code (ADR 0016) | No |
-| The exchange reference files | `src/pyvalue/listings/reference/exchange.csv` for our exchanges and `src/pyvalue/providers/eodhd_exchange.csv` for the provider's codes (ADR 0018). Not built yet | Yes |
+| The exchange reference files | `src/pyvalue/listings/reference/exchange.csv` for our exchanges and `src/pyvalue/providers/eodhd_exchange.csv` for the provider's codes, both shipped inside the package (ADR 0018). In the provider's file a row without a market leaves a code, or the lines with one venue label, out on purpose (ADR 0024) | Yes |
 | The provider's downloaded lists | `data/eodhd/`, the exchange list and one symbol list per exchange code (ADR 0018). Not built yet | No |
 | Credentials and the SEC contact line | `private/config.toml` | No |
 | Table documentation | `docs/database/`, one file per table | Yes |
