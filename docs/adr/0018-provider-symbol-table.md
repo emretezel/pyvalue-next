@@ -1,6 +1,6 @@
 # ADR 0018: Exchanges come from committed files, and a provider's symbol list is stored
 
-- Status: Accepted. The venue labels on the provider's US lines, and whether every line carries one, are to be confirmed at the first live download.
+- Status: Accepted. The venue labels on the provider's US lines, and whether every line carries one, are to be confirmed at the first live download. ADR 0024 changes three points: a venue label can be left out by a row without a market, a label the file does not know stops the load of a list and not its download, and a list in which a symbol appears twice is not stored.
 - Date: 2026-11-26
 - Changes: ADR 0002. Its three tables and its view stand. `provider_exchange` gets one more unique key, and the consequence "a provider's exchange catalogue is not modelled" no longer holds for the provider's symbols.
 
