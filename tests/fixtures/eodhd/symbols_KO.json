@@ -1,0 +1,47 @@
+[
+ {
+  "Code": "000100",
+  "Name": "Alpha Electronics Co Ltd",
+  "Country": "Korea",
+  "Exchange": "KO",
+  "Currency": "KRW",
+  "Type": "Common Stock",
+  "Isin": "KR7000100008"
+ },
+ {
+  "Code": "000105",
+  "Name": "Alpha Electronics Co Ltd Pref",
+  "Country": "Korea",
+  "Exchange": "KO",
+  "Currency": "KRW",
+  "Type": "Preferred Stock",
+  "Isin": "KR7000101006"
+ },
+ {
+  "Code": "000200",
+  "Name": "Beta Chemical Co Ltd",
+  "Country": "Korea",
+  "Exchange": "KO",
+  "Currency": "KRW",
+  "Type": "Common Stock",
+  "Isin": null
+ },
+ {
+  "Code": "000300",
+  "Name": "Gamma Index Fund",
+  "Country": "Korea",
+  "Exchange": "KO",
+  "Currency": "KRW",
+  "Type": "ETF",
+  "Isin": "KR7000300004"
+ },
+ {
+  "Code": "000400",
+  "Name": "Delta Holdings Co Ltd",
+  "Country": "Korea",
+  "Exchange": "KO",
+  "Currency": "KRW",
+  "Type": "Common Stock",
+  "Isin": "KR7000400"
+ }
+]

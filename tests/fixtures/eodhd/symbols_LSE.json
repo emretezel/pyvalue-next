@@ -1,0 +1,47 @@
+[
+ {
+  "Code": "ALP",
+  "Name": "Alpha plc",
+  "Country": "UK",
+  "Exchange": "LSE",
+  "Currency": "GBX",
+  "Type": "Common Stock",
+  "Isin": "GB00000A0019"
+ },
+ {
+  "Code": "0A1B",
+  "Name": "Beta Inc",
+  "Country": "UK",
+  "Exchange": "LSE",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": null
+ },
+ {
+  "Code": "GAM",
+  "Name": "Gamma plc",
+  "Country": "UK",
+  "Exchange": "LSE",
+  "Currency": "Unknown",
+  "Type": "Common Stock",
+  "Isin": "GB00000C0033"
+ },
+ {
+  "Code": "DEL",
+  "Name": "Delta plc",
+  "Country": "UK",
+  "Exchange": "LSE",
+  "Currency": "",
+  "Type": "Common Stock",
+  "Isin": "GB00000D0040"
+ },
+ {
+  "Code": "EPS",
+  "Name": "Epsilon plc",
+  "Country": "UK",
+  "Exchange": "LSE",
+  "Currency": "GBP",
+  "Type": "Common Stock",
+  "Isin": "GB00000E0056"
+ }
+]

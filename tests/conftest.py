@@ -100,6 +100,16 @@ def filings_dir(tmp_path: Path, nport_samples: Path) -> Path:
 
 
 @pytest.fixture
+def eodhd_samples() -> Path:
+    """Return the folder of the sample EODHD lists, ``tests/fixtures/eodhd``.
+
+    The files are made up in the provider's shape and described in the
+    folder's README.
+    """
+    return _FIXTURES / "eodhd"
+
+
+@pytest.fixture
 def vanguard_samples() -> Path:
     """Return the folder of the sample Vanguard holdings files, ``tests/fixtures/vanguard``.
 

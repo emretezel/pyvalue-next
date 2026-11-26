@@ -19,6 +19,14 @@ import pytest
 
 from pyvalue.errors import PyvalueError
 from pyvalue.http import _NoRedirect, fetch_https
+from pyvalue.providers import ProviderError
+from pyvalue.providers.eodhd import (
+    EODHD_HOST,
+    ListNotFoundError,
+    exchange_list_url,
+    fetch_from_eodhd,
+    symbol_list_url,
+)
 from pyvalue.universe import FilingError, SponsorFileError, UniverseError
 from pyvalue.universe.sec import SEC_HOST, fetch_from_sec
 from pyvalue.universe.vanguard_file import VANGUARD_HOST, fetch_from_vanguard
@@ -210,8 +218,9 @@ def test_every_request_is_made_with_the_redirect_guard(monkeypatch: pytest.Monke
     fetch_https(_URL, _HOST, {}, UniverseError)
     fetch_from_sec(_SEC_URL, _CONTACT)
     fetch_from_vanguard(_VANGUARD_URL)
+    fetch_from_eodhd(symbol_list_url("KO"), _KEY)
 
-    assert built == [(_NoRedirect,)] * 3
+    assert built == [(_NoRedirect,)] * 4
 
 
 # --- Secret parts of an address --------------------------------------------------------------
@@ -486,3 +495,100 @@ def test_a_failed_vanguard_download_is_a_sponsor_file_error(
 
     with pytest.raises(SponsorFileError, match="cannot download https://investor.vanguard.com/"):
         fetch_from_vanguard(_VANGUARD_URL)
+
+
+# --- EODHD -----------------------------------------------------------------------------------
+
+
+def test_the_two_list_addresses_carry_no_key() -> None:
+    """An address is safe to print: the key is added only when the request is made."""
+    assert exchange_list_url() == "https://eodhd.com/api/exchanges-list/?fmt=json"
+    assert symbol_list_url("US") == "https://eodhd.com/api/exchange-symbol-list/US?fmt=json"
+
+
+def test_an_exchange_code_cannot_change_the_address() -> None:
+    """A code comes from a committed file, and is escaped all the same."""
+    assert (
+        symbol_list_url("US/../x?y=1")
+        == "https://eodhd.com/api/exchange-symbol-list/US%2F..%2Fx%3Fy%3D1?fmt=json"
+    )
+
+
+def test_the_key_is_sent_to_eodhd_in_the_address_with_a_plain_client_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """EODHD takes the key as a part of the address, and nothing personal goes with it."""
+    opener = _install(monkeypatch, _Response(b"[]", None))
+
+    body = fetch_from_eodhd(symbol_list_url("KO"), _KEY)
+
+    (request,) = opener.requests
+    assert body == b"[]"
+    assert request.full_url == (
+        f"https://eodhd.com/api/exchange-symbol-list/KO?fmt=json&api_token={_KEY_SENT}"
+    )
+    assert dict(request.header_items()) == {
+        "User-agent": "pyvalue",
+        "Accept": "application/json",
+        "Accept-encoding": "gzip",
+    }
+
+
+def test_the_only_host_of_the_key_is_eodhds() -> None:
+    """A change of this constant is a change of where a credential may go."""
+    assert EODHD_HOST == "eodhd.com"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        pytest.param(_SEC_URL, id="the SEC"),
+        pytest.param(_VANGUARD_URL, id="the sponsor's host"),
+        pytest.param("http://eodhd.com/api/exchanges-list/?fmt=json", id="no https"),
+        pytest.param("https://eodhd.com.example.org/api/exchanges-list/", id="look-alike host"),
+        pytest.param(
+            "https://eodhd.com@example.org/api/exchanges-list/", id="host hidden as a user"
+        ),
+        pytest.param(
+            "https://api.eodhd.com/api/exchanges-list/", id="another host of the provider"
+        ),
+    ],
+)
+def test_the_key_goes_nowhere_but_eodhd(monkeypatch: pytest.MonkeyPatch, url: str) -> None:
+    """Whatever address is passed, a request with the key is made to one host only."""
+    opener = _install(monkeypatch, _Response(b"", None))
+
+    with pytest.raises(ProviderError, match="refusing to fetch") as raised:
+        fetch_from_eodhd(url, _KEY)
+
+    assert opener.requests == []
+    assert _KEY not in str(raised.value)
+
+
+def test_a_list_that_is_not_there_has_an_error_of_its_own(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """EODHD answers "not found" for an exchange that is not in the subscription."""
+    _install(monkeypatch, _answered(404))
+
+    with pytest.raises(ListNotFoundError, match="cannot download https://eodhd.com/") as raised:
+        fetch_from_eodhd(symbol_list_url("KO"), _KEY)
+
+    assert _KEY not in str(raised.value)
+    assert _KEY_SENT not in str(raised.value)
+
+
+@pytest.mark.parametrize("status", [401, 402, 403, 429, 500])
+def test_a_refused_request_is_a_provider_error_without_the_key(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    """A key that is not accepted, or a limit that is reached, is not "not found"."""
+    _install(monkeypatch, _answered(status))
+
+    with pytest.raises(ProviderError, match="cannot download https://eodhd.com/") as raised:
+        fetch_from_eodhd(symbol_list_url("KO"), _KEY)
+
+    assert not isinstance(raised.value, ListNotFoundError)
+    assert _KEY not in str(raised.value)
+    assert _KEY_SENT not in str(raised.value)
+    assert raised.value.__cause__ is None

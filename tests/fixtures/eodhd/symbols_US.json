@@ -1,0 +1,74 @@
+[
+ {
+  "Code": "ALFA",
+  "Name": "Alpha Corp",
+  "Country": "USA",
+  "Exchange": "NYSE",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": "US00000A0014"
+ },
+ {
+  "Code": "BETA-B",
+  "Name": "Beta Inc Class B",
+  "Country": "USA",
+  "Exchange": "NASDAQ",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": "US00000B0021"
+ },
+ {
+  "Code": "GAMA",
+  "Name": "Gamma Index Trust",
+  "Country": "USA",
+  "Exchange": "NYSE ARCA",
+  "Currency": "USD",
+  "Type": "ETF",
+  "Isin": "US00000C0038"
+ },
+ {
+  "Code": "DLTA",
+  "Name": "Delta Ltd",
+  "Country": "USA",
+  "Exchange": "AMEX",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": ""
+ },
+ {
+  "Code": "EPSL",
+  "Name": "Epsilon Corp",
+  "Country": "USA",
+  "Exchange": "PINK",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": "US00000E0051"
+ },
+ {
+  "Code": "ZETA-P",
+  "Name": "Zeta Corp Pref",
+  "Country": "USA",
+  "Exchange": "NYSE",
+  "Currency": "USD",
+  "Type": "Preferred Stock",
+  "Isin": "US00000F0068"
+ },
+ {
+  "Code": "",
+  "Name": "Nameless Corp",
+  "Country": "USA",
+  "Exchange": "NYSE",
+  "Currency": "USD",
+  "Type": "Common Stock",
+  "Isin": null
+ },
+ {
+  "Code": "THTA",
+  "Name": "Theta Growth Fund",
+  "Country": "USA",
+  "Exchange": "NASDAQ",
+  "Currency": "USD",
+  "Type": "FUND",
+  "Isin": null
+ }
+]

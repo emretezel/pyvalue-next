@@ -11,9 +11,9 @@ Only what has been agreed is described as designed. Everything else is listed as
 | Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections, migrations, the unit of work, and the repositories for `company`, `instrument`, `fund`, `holding`, `exchange`, `provider`, `provider_exchange` and `provider_symbol`. A repository is added when a component first needs its table |
 | Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load` |
 | Universe load | `pyvalue.universe` | Downloads the SEC holdings filings of VTI and VXUS and Vanguard's own holdings files, reads each fund through its sponsor's adapter, records the funds and the share lines that were loaded in `fund` and `holding`, and fills `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0016, ADR 0017, ADR 0021, ADR 0022, ADR 0006, ADR 0009 to ADR 0015, ADR 0023) | Built |
-| Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line |
+| Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line and the EODHD key |
 | Listings | `pyvalue.listings` | Keeps our exchanges, stores the provider's symbol lists, applies the automatic rule and the decisions file (ADR 0018, ADR 0019, ADR 0024) | Built: the reader of our exchanges file. The rest is designed, not built |
-| Providers | `pyvalue.providers` | A provider's exchange codes and its client | Built: the reader of a provider's exchange file. The EODHD client is planned |
+| Providers | `pyvalue.providers` | A provider's exchange codes and its client | Built: the reader of a provider's exchange file, and the EODHD client for its exchange list and its symbol lists. Nothing has been requested from EODHD yet (ADR 0024) |
 | Prices, fundamentals, metrics, screens, data-quality reports, the agent that decides listings | | | Not designed yet |
 
 ## How the components fit together

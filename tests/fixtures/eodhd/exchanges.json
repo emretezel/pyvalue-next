@@ -1,0 +1,56 @@
+[
+ {
+  "Name": "Korea Stock Exchange",
+  "Code": "KO",
+  "OperatingMIC": "XKRX",
+  "Country": "Korea",
+  "Currency": "KRW",
+  "CountryISO2": "KR",
+  "CountryISO3": "KOR"
+ },
+ {
+  "Name": "USA Stocks",
+  "Code": "US",
+  "OperatingMIC": "XNAS, XNYS, OTCM, XCBO",
+  "Country": "USA",
+  "Currency": "USD",
+  "CountryISO2": "US",
+  "CountryISO3": "USA"
+ },
+ {
+  "Name": "London Exchange",
+  "Code": "LSE",
+  "OperatingMIC": "XLON",
+  "Country": "UK",
+  "Currency": "GBP",
+  "CountryISO2": "GB",
+  "CountryISO3": "GBR"
+ },
+ {
+  "Name": "Frankfurt Exchange",
+  "Code": "F",
+  "OperatingMIC": "XFRA",
+  "Country": "Germany",
+  "Currency": "EUR",
+  "CountryISO2": "DE",
+  "CountryISO3": "DEU"
+ },
+ {
+  "Name": "Cryptocurrencies",
+  "Code": "CC",
+  "OperatingMIC": "CRYP",
+  "Country": "Unknown",
+  "Currency": "USD",
+  "CountryISO2": "",
+  "CountryISO3": ""
+ },
+ {
+  "Name": "Hong Kong Exchange",
+  "Code": "HK",
+  "OperatingMIC": "XHKG",
+  "Country": "Hong Kong",
+  "Currency": "HKD",
+  "CountryISO2": "HK",
+  "CountryISO3": "HKG"
+ }
+]
