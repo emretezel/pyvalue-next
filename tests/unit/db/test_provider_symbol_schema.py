@@ -1,11 +1,11 @@
 """Tests for the ``provider_symbol`` table and the key it points at.
 
-Migration 0005 creates them (ADR 0018), and migration 0006 takes the venue
-label and the type out of the table (ADR 0025). The tests pin which rows the
+Migration 0005 creates them (ADR 0018), migration 0006 takes the venue label
+and the type out of the table (ADR 0025), and migration 0007 drops the index
+on the ISIN, which nothing reads (ADR 0026). The tests pin which rows the
 database accepts, which it refuses and by which constraint, what happens to
-symbol rows when a mapping changes, which index each lookup of the listing
-rule uses, and what the two migrations do to a database that already has
-rows.
+symbol rows when a mapping changes, which index a lookup uses, and what the
+three migrations do to a database that already has rows.
 
 Author: Emre Tezel
 """
@@ -241,19 +241,18 @@ def _plan(connection: sqlite3.Connection, query: str) -> str:
     return " | ".join(str(row[3]) for row in connection.execute(f"EXPLAIN QUERY PLAN {query}"))
 
 
-def test_the_lines_that_carry_an_isin_are_found_through_the_index(
-    seeded: sqlite3.Connection,
-) -> None:
-    """The first lookup of the listing rule (ADR 0019)."""
-    plan = _plan(seeded, "SELECT provider_symbol FROM provider_symbol WHERE isin = 'KR7000660001'")
+def test_the_table_has_no_index_on_the_isin(seeded: sqlite3.Connection) -> None:
+    """Nothing looks a line up by its ISIN: the listing rule reads the table once (ADR 0026)."""
+    indexes = {str(row[1]) for row in seeded.execute("PRAGMA index_list(provider_symbol)")}
 
-    assert "USING INDEX provider_symbol_isin" in plan
+    assert "provider_symbol_isin" not in indexes
+    assert "provider_symbol_exchange" in indexes
 
 
 def test_the_lines_on_one_of_our_exchanges_are_found_through_the_index(
     seeded: sqlite3.Connection,
 ) -> None:
-    """How the listing rule collects the lines of a country."""
+    """What the foreign-key check asks when a mapping is deleted or corrected."""
     plan = _plan(seeded, "SELECT provider_symbol FROM provider_symbol WHERE mic = 'XNYS'")
 
     assert "provider_symbol_exchange" in plan
@@ -336,6 +335,49 @@ def test_migration_0006_keeps_every_row_and_drops_the_two_columns(tmp_path: Path
             connection.execute(_symbol(symbol="'BRK-B'"))
         with pytest.raises(sqlite3.IntegrityError, match=_FOREIGN_KEY):
             connection.execute(_symbol(mic="'XKRX'"))
+        with pytest.raises(sqlite3.IntegrityError, match=_FOREIGN_KEY):
+            connection.execute("DELETE FROM provider_exchange WHERE mic = 'XKRX'")
+        connection.execute(_symbol())
+    finally:
+        connection.close()
+
+
+def test_migration_0007_drops_the_isin_index_and_nothing_else(tmp_path: Path) -> None:
+    """Every row stays as it was, and so do the keys and the other index."""
+    path = tmp_path / "pyvalue.db"
+    migrate(path, packaged_migrations()[:6])
+    connection = connect(path)
+    try:
+        for statement in (*_REFERENCE, _SYMBOLS):
+            connection.execute(statement)
+        before = connection.execute(
+            f"SELECT {', '.join(_COLUMNS)} FROM provider_symbol ORDER BY provider_symbol"
+        ).fetchall()
+        assert len(before) == 4
+        indexes = {str(row[1]) for row in connection.execute("PRAGMA index_list(provider_symbol)")}
+        assert "provider_symbol_isin" in indexes
+    finally:
+        connection.close()
+
+    report = migrate(path, packaged_migrations()[:7])
+
+    assert [migration.label for migration in report.applied] == [
+        "0007_provider_symbol_drop_isin_index"
+    ]
+    connection = connect(path)
+    try:
+        after = connection.execute(
+            f"SELECT {', '.join(_COLUMNS)} FROM provider_symbol ORDER BY provider_symbol"
+        ).fetchall()
+        assert after == before
+        assert _columns(connection) == _COLUMNS
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+        indexes = {str(row[1]) for row in connection.execute("PRAGMA index_list(provider_symbol)")}
+        assert "provider_symbol_isin" not in indexes
+        assert "provider_symbol_exchange" in indexes
+        # The rules of the table still hold.
+        with pytest.raises(sqlite3.IntegrityError, match=_UNIQUE):
+            connection.execute(_symbol(symbol="'BRK-B'"))
         with pytest.raises(sqlite3.IntegrityError, match=_FOREIGN_KEY):
             connection.execute("DELETE FROM provider_exchange WHERE mic = 'XKRX'")
         connection.execute(_symbol())

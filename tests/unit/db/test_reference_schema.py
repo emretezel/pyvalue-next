@@ -54,9 +54,10 @@ def test_schema_has_exactly_the_agreed_tables_and_view(migrated_db: sqlite3.Conn
 
     ``fund``, ``holding`` and its index come from migration 0002 (ADR 0017);
     their constraints are tested in ``test_fund_holding_schema.py``.
-    ``provider_symbol``, its two indexes and the extra key on
-    ``provider_exchange`` come from migration 0005 (ADR 0018); they are tested
-    in ``test_provider_symbol_schema.py``.
+    ``provider_symbol``, its index and the extra key on ``provider_exchange``
+    come from migration 0005 (ADR 0018); they are tested in
+    ``test_provider_symbol_schema.py``. Its second index, on the ISIN, was
+    dropped by migration 0007 (ADR 0026).
     """
     rows = migrated_db.execute(
         "SELECT type, name FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name"
@@ -67,7 +68,6 @@ def test_schema_has_exactly_the_agreed_tables_and_view(migrated_db: sqlite3.Conn
         ("index", "instrument_company_id"),
         ("index", "provider_exchange_code_key"),
         ("index", "provider_symbol_exchange"),
-        ("index", "provider_symbol_isin"),
         ("table", "company"),
         ("table", "exchange"),
         ("table", "fund"),

@@ -1,6 +1,6 @@
 # `provider_symbol`
 
-One row per line of a provider's symbol list that is a common or preferred share on one of our exchanges. Decided in ADR 0018 and ADR 0025. Created by migration `0005_provider_symbol`; migration `0006_provider_symbol_drop_venue_and_type` removed two columns that nothing read. Filled by `pyvalue symbols load` from the saved lists (ADR 0024).
+One row per line of a provider's symbol list that is a common or preferred share on one of our exchanges. Decided in ADR 0018 and ADR 0025. Created by migration `0005_provider_symbol`; migration `0006_provider_symbol_drop_venue_and_type` removed two columns that nothing read, and migration `0007_provider_symbol_drop_isin_index` an index that nothing used (ADR 0026). Filled by `pyvalue symbols load` from the saved lists (ADR 0024).
 
 ## Columns
 
@@ -56,8 +56,9 @@ There is no direct reference to [`exchange`](exchange.md) or [`provider`](provid
 | Index | Created by | Query it serves |
 |---|---|---|
 | `provider_symbol (provider_code, provider_exchange_code, provider_symbol)` | The primary key | Find one line; read or replace the list of one provider exchange code |
-| `provider_symbol (mic, provider_code, provider_exchange_code)` | `CREATE INDEX provider_symbol_exchange` | The lines on one of our exchanges, which is how the listing rule collects the lines of a country; the foreign-key check when a `provider_exchange` row is deleted or corrected |
-| `provider_symbol (isin)`, rows with an ISIN only | `CREATE INDEX provider_symbol_isin` | The lines that carry a given ISIN, the first lookup of the listing rule |
+| `provider_symbol (mic, provider_code, provider_exchange_code)` | `CREATE INDEX provider_symbol_exchange` | The foreign-key check when a `provider_exchange` row is deleted or corrected; the lines on one of our exchanges |
+
+No index on `isin`: the listing rule reads the provider's lines once and looks them up in memory (ADR 0026). ADR 0018 created one, and migration 0007 dropped it.
 
 ## Normalisation
 
@@ -66,7 +67,7 @@ The table is in Boyce-Codd normal form with one deliberate deviation.
 | Point | Reasoning |
 |---|---|
 | Every other column depends on the whole key | The name, currency and ISIN are what the provider says about that one line |
-| The deviation: `mic` | It follows from the code and the venue label through the committed file, so it could be worked out again. It is stored because the foreign key needs it, and because the listing rule reads the lines of a country through it for every security |
+| The deviation: `mic` | It follows from the code and the venue label through the committed file, so it could be worked out again. It is stored because the foreign key needs it, and because the listing rule takes a line's country from it |
 | Kept consistent by | The foreign key (the exchange must be one the code is mapped to) and by replacing a list as a whole |
 
 ## Views
