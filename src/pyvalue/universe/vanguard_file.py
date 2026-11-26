@@ -1,9 +1,11 @@
 """Vanguard's own holdings file: download it once, read it afterwards.
 
 Vanguard's fund pages are fed by a holdings list that gives a ticker and a
-SEDOL for every holding, which the SEC filing does not (ADR 0016). The list
-is served 500 rows at a time. All pages of one fund are saved as one file in
-Vanguard's own shape, and the load reads that file from then on.
+SEDOL for every holding, which the SEC filing does not (ADR 0016), and the
+full name of the security, which says "ADR" where the filing's shortened
+title does not (ADR 0020). The list is served 500 rows at a time. All pages
+of one fund are saved as one file in Vanguard's own shape, and the load reads
+that file from then on.
 
 The address is not documented by Vanguard and shows only the latest month, so
 the saved file is the only copy of a past month there will ever be.
@@ -58,11 +60,14 @@ class VanguardRow:
         ticker: The ticker as Vanguard writes it, or ``None``.
         sedol: The SEDOL, or ``None`` when the row gives none or one of the
             wrong shape.
+        name: Vanguard's own name for the security, such as "Latam Airlines
+            Group SA ADR", or ``None`` when the row gives none.
     """
 
     isin: str | None
     ticker: str | None
     sedol: str | None
+    name: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,6 +265,7 @@ def read_vanguard_file(path: Path) -> VanguardFile:
                 isin=_value(row, "isin"),
                 ticker=_value(row, "ticker"),
                 sedol=sedol if sedol is not None and _SEDOL.fullmatch(sedol) else None,
+                name=_value(row, "longName"),
             )
         )
     return VanguardFile(as_of=as_of, rows=tuple(rows))

@@ -47,6 +47,10 @@ class HoldingLine:
             ``None`` when the adapter could attach none.
         sedol: The SEDOL the sponsor's own file gives for the line; ``None``
             likewise.
+        sponsor_name: The name the sponsor's own file gives the security;
+            ``None`` when the file does not have the security, or the sponsor
+            has no such file. The receipt check reads it (ADR 0020); it is
+            not stored.
     """
 
     number: int
@@ -62,6 +66,7 @@ class HoldingLine:
     currency: str
     ticker: str | None
     sedol: str | None
+    sponsor_name: str | None
 
 
 @dataclass(frozen=True, slots=True)

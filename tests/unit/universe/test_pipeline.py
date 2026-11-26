@@ -464,3 +464,38 @@ def test_a_fund_whose_sponsor_has_no_adapter_stops_the_run_before_any_download(
         )
 
     assert not (tmp_path / "sec").exists()
+
+
+def test_a_receipt_only_the_sponsors_file_names_is_recognised_from_file_to_database(
+    database: Database, filings_dir: Path, vanguard_dir: Path, tmp_path: Path
+) -> None:
+    """ADR 0020, end to end: the name in Vanguard's file keeps a second security out."""
+    # In the sample, VTI line 2 is another security of Alpha Corp, whose own
+    # share is line 1. Calling it an ADR in Vanguard's file makes it a receipt.
+    path = vanguard_dir / "VTI.json"
+    text = path.read_text(encoding="utf-8")
+    assert text.count("Alpha Corp. Preferred Series A") == 1
+    path.write_text(
+        text.replace("Alpha Corp. Preferred Series A", "Alpha Corp. ADR"), encoding="utf-8"
+    )
+
+    def never_fetched(url: str) -> bytes:
+        pytest.fail(f"{url} was fetched")
+
+    outcome = load_universe(
+        database,
+        filings_dir,
+        tmp_path / "universe",
+        _never_asked,
+        _never_fetched,
+        adapters={Sponsor.VANGUARD: VanguardAdapter(vanguard_dir, never_fetched)},
+    )
+
+    result = outcome.result
+    # One instrument fewer than the 16 of the unchanged sample, and one receipt more.
+    assert (result.companies, result.instruments) == (14, 15)
+    assert (result.receipts_recognised, result.receipts_not_loaded) == (6, 4)
+    with database.unit_of_work() as work:
+        assert "US00000A0022" not in {instrument.isin for instrument in work.instruments.all()}
+        (row,) = [row for row in work.holdings.all() if row.isin == "US00000A0022"]
+    assert (row.instrument_id, row.not_loaded_reason) == (None, "receipt_company_already_loaded")

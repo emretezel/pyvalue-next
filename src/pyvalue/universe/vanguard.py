@@ -1,7 +1,8 @@
 """The adapter for Vanguard's funds.
 
 It joins the lines of a fund's SEC filing with Vanguard's own holdings file,
-which adds a ticker and a SEDOL, and it carries what is particular to
+which adds a ticker, a SEDOL and Vanguard's own name for the security, and it
+carries what is particular to
 Vanguard's documents: where the file is found, and that the country in a
 Vanguard filing is the country the security trades in (ADR 0016).
 
@@ -45,7 +46,7 @@ _EURO: str = "EUR"
 
 
 def join(filed: Sequence[FiledLine], rows: Sequence[VanguardRow]) -> tuple[HoldingLine, ...]:
-    """Turn the lines of a filing into common lines, with Vanguard's ticker and SEDOL.
+    """Turn the lines of a filing into common lines, with what Vanguard's file adds.
 
     Neither document says which row of the file belongs to which line of the
     filing; the ISIN is all they share. A security held on two markets has
@@ -53,6 +54,10 @@ def join(filed: Sequence[FiledLine], rows: Sequence[VanguardRow]) -> tuple[Holdi
     of one market. So a ticker and a SEDOL are attached only where the pairing
     is certain: the ISIN has exactly one line in the filing and exactly one
     row in the file.
+
+    Vanguard's name for the security is another matter. It belongs to the
+    security, not to one market, so every line of an ISIN gets it, whatever
+    the number of lines and rows (ADR 0020).
 
     Args:
         filed: The lines of the fund's SEC filing, in order.
@@ -63,6 +68,12 @@ def join(filed: Sequence[FiledLine], rows: Sequence[VanguardRow]) -> tuple[Holdi
         country is the country the filing gives: Vanguard files where the
         security trades.
     """
+    # The first row of an ISIN that gives a name names the security; further
+    # rows of the same ISIN are the same security on another market.
+    name_of_isin: dict[str, str] = {}
+    for named in rows:
+        if named.isin is not None and named.name is not None:
+            name_of_isin.setdefault(named.isin, named.name)
     lines_per_isin = Counter(line.isin for line in filed if line.isin is not None)
     rows_per_isin = Counter(row.isin for row in rows if row.isin is not None)
     row_of_isin = {
@@ -90,6 +101,7 @@ def join(filed: Sequence[FiledLine], rows: Sequence[VanguardRow]) -> tuple[Holdi
                 currency=line.currency,
                 ticker=None if row is None else row.ticker,
                 sedol=None if row is None else row.sedol,
+                sponsor_name=None if line.isin is None else name_of_isin.get(line.isin),
             )
         )
     return tuple(lines)
@@ -175,7 +187,8 @@ class VanguardAdapter:
 
         Returns:
             The common lines, with a ticker and a SEDOL where the pairing is
-            certain, and the date of Vanguard's file.
+            certain, with Vanguard's name for every security its file has,
+            and the date of Vanguard's file.
 
         Raises:
             SponsorFileError: If Vanguard's file cannot be read.

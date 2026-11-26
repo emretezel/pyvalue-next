@@ -48,6 +48,7 @@ def _line(
         currency="EUR",
         ticker=None,
         sedol=None,
+        sponsor_name=None,
     )
 
 

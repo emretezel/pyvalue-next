@@ -33,6 +33,7 @@ def _line(
     title: str = "ALPHA CORP",
     category: str = "EC",
     category_label: str | None = None,
+    sponsor_name: str | None = None,
 ) -> HoldingLine:
     """Build a holdings line that differs from a plain common share only as stated."""
     return HoldingLine(
@@ -49,6 +50,7 @@ def _line(
         currency="USD",
         ticker=None,
         sedol=None,
+        sponsor_name=sponsor_name,
     )
 
 
@@ -155,3 +157,44 @@ def test_a_receipt_word_is_found_wherever_it_stands(
     words.insert(min(position, len(words)), marker)
 
     assert is_receipt(_line(title=" ".join(words)))
+
+
+# --- The sponsor's own name for the security (ADR 0020) ----------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("title", "sponsor_name"),
+    [
+        pytest.param("LATAM AIRLINES G", "Latam Airlines Group SA ADR", id="Latam Airlines"),
+        pytest.param("GRUPO CIBEST SA-", "Grupo Cibest SA ADR", id="Grupo Cibest"),
+        pytest.param("DR. REDDY'S LABO", "Dr Reddy's Laboratories Ltd. ADR", id="Dr Reddy's"),
+        pytest.param("POLYUS PJSC-G", "Polyus PJSC GDR", id="a GDR"),
+        pytest.param("PHOSAGRO PJSC-BL", "PHOSAGRO PJSC-BLOCKED GDRS", id="upper case, plural"),
+    ],
+)
+def test_the_sponsors_own_name_marks_a_receipt_the_cut_title_hides(
+    title: str, sponsor_name: str
+) -> None:
+    """Vanguard's filing cuts a title at 16 characters; its own file gives the whole name."""
+    assert not is_receipt(_line(title=title))
+    assert is_receipt(_line(title=title, sponsor_name=sponsor_name))
+
+
+@pytest.mark.parametrize(
+    "sponsor_name",
+    [
+        pytest.param(None, id="no name: the file does not have the security"),
+        pytest.param("Alpha Corp.", id="a plain name"),
+        pytest.param("Adriatic Metals plc", id="a receipt word inside another word"),
+        pytest.param("Spondon Holdings Class A", id="another one"),
+    ],
+)
+def test_a_sponsor_name_without_receipt_wording_marks_nothing(sponsor_name: str | None) -> None:
+    """The same whole-word rule as for the title and the issuer name."""
+    assert not is_receipt(_line(sponsor_name=sponsor_name))
+
+
+def test_a_line_the_filing_already_marks_stays_a_receipt_whatever_the_sponsor_says() -> None:
+    """The four things the check reads add up; none of them takes a receipt back."""
+    assert is_receipt(_line(title="ZETA LTD ADR", sponsor_name="Zeta Ltd."))
+    assert is_receipt(_line(category="OTHER", category_label="GDR", sponsor_name=None))

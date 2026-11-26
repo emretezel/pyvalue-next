@@ -6,6 +6,8 @@ A file is what the load saves after a download: the pages of one fund joined int
 
 The load attaches a ticker and a SEDOL to a line of the filing only when the line's ISIN has exactly one line in the filing and exactly one row here. The rows are chosen to exercise each case.
 
+The long name of a row is attached to every line of its ISIN, and the receipt check reads it (ADR 0020). In these samples the names say "ADR" or "GDR" only for securities that the sample filings already mark as receipts, so they change nothing; the tests of the rule change a name on the fly.
+
 `VTI.json`:
 
 | Row | What it exercises | Outcome for the filing's line |

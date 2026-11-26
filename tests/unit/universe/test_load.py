@@ -58,6 +58,7 @@ def _line(
     title: str | None = None,
     category: str = "EC",
     label: str | None = None,
+    sponsor_name: str | None = None,
 ) -> HoldingLine:
     """Build a holdings line; ``_fund`` numbers it. The title defaults to the name."""
     return HoldingLine(
@@ -74,6 +75,7 @@ def _line(
         currency="USD",
         ticker=None,
         sedol=None,
+        sponsor_name=sponsor_name,
     )
 
 
@@ -642,6 +644,79 @@ def test_a_receipt_whose_name_no_ordinary_line_carries_is_still_loaded(
         Company(2, "Woori Financial Group Inc.", None),
     )
     assert (result.receipts_kept, result.receipts_not_loaded) == (1, 0)
+
+
+def test_a_receipt_only_the_sponsors_name_shows_is_not_loaded_beside_the_home_share(
+    database: Database,
+) -> None:
+    """ADR 0020: Vanguard's title is cut before "ADR"; its own file names the receipt."""
+    result = load_holdings(
+        database,
+        [
+            _fund(
+                "VXUS",
+                _line("Latam Airlines Group SA", _ISIN_3, lei=_DELTA_LEI, title="LATAM AIRLINES"),
+                _line(
+                    "Latam Airlines Group SA",
+                    _RECEIPT_ISIN,
+                    lei=_DELTA_LEI,
+                    title="LATAM AIRLINES G",
+                    sponsor_name="Latam Airlines Group SA ADR",
+                ),
+            )
+        ],
+    )
+
+    assert _instruments(database) == (Instrument(1, 1, _ISIN_3),)
+    assert _not_loaded(result) == [("VXUS", 2, NotLoadedReason.RECEIPT_COMPANY_ALREADY_LOADED)]
+    assert (result.receipts_recognised, result.receipts_not_loaded) == (1, 1)
+
+
+def test_the_same_line_without_the_sponsors_name_is_loaded_as_a_second_security(
+    database: Database,
+) -> None:
+    """What happened before ADR 0020: nothing in the filing says that the line is a receipt."""
+    result = load_holdings(
+        database,
+        [
+            _fund(
+                "VXUS",
+                _line("Latam Airlines Group SA", _ISIN_3, lei=_DELTA_LEI, title="LATAM AIRLINES"),
+                _line(
+                    "Latam Airlines Group SA",
+                    _RECEIPT_ISIN,
+                    lei=_DELTA_LEI,
+                    title="LATAM AIRLINES G",
+                ),
+            )
+        ],
+    )
+
+    assert [instrument.isin for instrument in _instruments(database)] == [_ISIN_3, _RECEIPT_ISIN]
+    assert result.receipts_recognised == 0
+
+
+def test_a_receipt_only_the_sponsors_name_shows_is_kept_when_it_is_the_only_line(
+    database: Database,
+) -> None:
+    """A Chinese company listed only in New York: recognised as a receipt, and loaded."""
+    result = load_holdings(
+        database,
+        [
+            _fund(
+                "VXUS",
+                _line(
+                    "PDD Holdings Inc",
+                    _RECEIPT_ISIN,
+                    title="PDD HOLDINGS INC",
+                    sponsor_name="PDD Holdings Inc. ADR",
+                ),
+            )
+        ],
+    )
+
+    assert _instruments(database) == (Instrument(1, 1, _RECEIPT_ISIN),)
+    assert (result.receipts_recognised, result.receipts_kept) == (1, 1)
 
 
 def test_a_receipt_is_loaded_when_its_company_has_no_other_line(database: Database) -> None:

@@ -255,13 +255,20 @@ def test_the_sample_file_is_read_row_by_row(vanguard_samples: Path) -> None:
 
     assert file.as_of == date(2026, 10, 31)
     assert file.rows == (
-        VanguardRow(isin="US00000A0014", ticker="ALPH", sedol="B000A01"),
-        VanguardRow(isin="US00000A0022", ticker="ALPH.PA", sedol="B000A02"),
-        VanguardRow(isin="US00000B0013", ticker=None, sedol="B000B01"),
-        VanguardRow(isin="US00000B0021", ticker="BETB", sedol="B000B02"),
-        VanguardRow(isin="US00000B0021", ticker="BETB.X", sedol="B000B03"),
-        VanguardRow(isin=None, ticker="ESU6", sedol=None),
-        VanguardRow(isin="US00000R0017", ticker="RHO", sedol="B000R01"),
+        VanguardRow(isin="US00000A0014", ticker="ALPH", sedol="B000A01", name="Alpha Corp."),
+        VanguardRow(
+            isin="US00000A0022",
+            ticker="ALPH.PA",
+            sedol="B000A02",
+            name="Alpha Corp. Preferred Series A",
+        ),
+        VanguardRow(isin="US00000B0013", ticker=None, sedol="B000B01", name="Beta Inc."),
+        VanguardRow(isin="US00000B0021", ticker="BETB", sedol="B000B02", name="Beta Inc. Class B"),
+        VanguardRow(
+            isin="US00000B0021", ticker="BETB.X", sedol="B000B03", name="Beta Inc. Class B"
+        ),
+        VanguardRow(isin=None, ticker="ESU6", sedol=None, name="E-mini S&P 500 Future"),
+        VanguardRow(isin="US00000R0017", ticker="RHO", sedol="B000R01", name="Rho Inc."),
     )
 
 
@@ -277,33 +284,33 @@ def test_the_date_is_read_without_its_time_and_zone(tmp_path: Path) -> None:
     [
         pytest.param(
             {"isin": "", "ticker": "", "sedol": ""},
-            VanguardRow(None, None, None),
+            VanguardRow(None, None, None, None),
             id="empty texts",
         ),
-        pytest.param({}, VanguardRow(None, None, None), id="absent values"),
+        pytest.param({}, VanguardRow(None, None, None, None), id="absent values"),
         pytest.param(
             {"isin": None, "ticker": 7, "sedol": ["B000A01"]},
-            VanguardRow(None, None, None),
+            VanguardRow(None, None, None, None),
             id="values that are not text",
         ),
         pytest.param(
             {"isin": " US00000A0014 ", "ticker": " NOVO B ", "sedol": " B000A01 "},
-            VanguardRow("US00000A0014", "NOVO B", "B000A01"),
+            VanguardRow("US00000A0014", "NOVO B", "B000A01", None),
             id="padded values, a space inside a ticker kept",
         ),
         pytest.param(
             {"isin": "US00000A0014", "ticker": "GCC*", "sedol": "N/A"},
-            VanguardRow("US00000A0014", "GCC*", None),
+            VanguardRow("US00000A0014", "GCC*", None, None),
             id="a placeholder for the SEDOL",
         ),
         pytest.param(
             {"isin": "US00000A0014", "ticker": "X", "sedol": "b000a01"},
-            VanguardRow("US00000A0014", "X", None),
+            VanguardRow("US00000A0014", "X", None, None),
             id="a SEDOL in lower case",
         ),
         pytest.param(
             {"isin": "US00000A0014", "ticker": "X", "sedol": "B000A012"},
-            VanguardRow("US00000A0014", "X", None),
+            VanguardRow("US00000A0014", "X", None, None),
             id="a SEDOL one character long",
         ),
     ],
@@ -315,6 +322,25 @@ def test_a_row_is_read_leniently_and_a_sedol_strictly(
     path = _write(tmp_path, _document([values]))
 
     assert read_vanguard_file(path).rows == (expected,)
+
+
+@pytest.mark.parametrize(
+    ("values", "name"),
+    [
+        pytest.param({"longName": "Latam Airlines Group SA ADR"}, "Latam Airlines Group SA ADR"),
+        pytest.param({"longName": "  Grupo Cibest SA ADR "}, "Grupo Cibest SA ADR", id="padded"),
+        pytest.param({"longName": ""}, None, id="empty"),
+        pytest.param({"shortName": "LATAM AIRLINES G"}, None, id="only the short name"),
+        pytest.param({"longName": 7}, None, id="not a text"),
+    ],
+)
+def test_the_name_of_a_row_is_vanguards_long_name(
+    tmp_path: Path, values: dict[str, object], name: str | None
+) -> None:
+    """ADR 0020: the long name says "ADR" where the filing's shortened title does not."""
+    path = _write(tmp_path, _document([values]))
+
+    assert read_vanguard_file(path).rows[0].name == name
 
 
 @pytest.mark.parametrize(

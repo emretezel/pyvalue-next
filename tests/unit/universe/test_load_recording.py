@@ -70,6 +70,7 @@ def _line(
     currency: str = "USD",
     ticker: str | None = None,
     sedol: str | None = None,
+    sponsor_name: str | None = None,
 ) -> HoldingLine:
     """Build a common holding line; ``_fund`` numbers it."""
     return HoldingLine(
@@ -86,6 +87,7 @@ def _line(
         currency=currency,
         ticker=ticker,
         sedol=sedol,
+        sponsor_name=sponsor_name,
     )
 
 

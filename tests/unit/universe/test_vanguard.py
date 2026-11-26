@@ -69,6 +69,7 @@ def _line(country: str | None, currency: str) -> HoldingLine:
         currency=currency,
         ticker=None,
         sedol=None,
+        sponsor_name=None,
     )
 
 
@@ -82,7 +83,7 @@ def _never_fetched(url: str) -> bytes:
 
 def test_one_line_and_one_row_are_paired() -> None:
     """The common line carries everything the filing says, plus the ticker and the SEDOL."""
-    (line,) = join([_filed()], [VanguardRow(isin=_ISIN, ticker="ALPH", sedol="B000A01")])
+    (line,) = join([_filed()], [VanguardRow(isin=_ISIN, ticker="ALPH", sedol="B000A01", name=None)])
 
     assert line == HoldingLine(
         number=1,
@@ -98,6 +99,7 @@ def test_one_line_and_one_row_are_paired() -> None:
         currency="USD",
         ticker="ALPH",
         sedol="B000A01",
+        sponsor_name=None,
     )
 
 
@@ -117,8 +119,8 @@ def test_an_isin_with_two_lines_gets_nothing_attached() -> None:
     """A share held on two markets: which line the one row belongs to is unknown."""
     filed = [_filed(1), _filed(2, _OTHER_ISIN), _filed(3)]
     rows = [
-        VanguardRow(isin=_ISIN, ticker="ALPH", sedol="B000A01"),
-        VanguardRow(isin=_OTHER_ISIN, ticker="DLT", sedol="B000D01"),
+        VanguardRow(isin=_ISIN, ticker="ALPH", sedol="B000A01", name=None),
+        VanguardRow(isin=_OTHER_ISIN, ticker="DLT", sedol="B000D01", name=None),
     ]
 
     lines = join(filed, rows)
@@ -133,8 +135,8 @@ def test_an_isin_with_two_lines_gets_nothing_attached() -> None:
 def test_an_isin_with_two_rows_gets_nothing_attached() -> None:
     """Two rows mean two markets, each with its own SEDOL: neither is known to be this line's."""
     rows = [
-        VanguardRow(isin=_ISIN, ticker="ABX", sedol="B000A01"),
-        VanguardRow(isin=_ISIN, ticker="ABX", sedol="B000A02"),
+        VanguardRow(isin=_ISIN, ticker="ABX", sedol="B000A01", name=None),
+        VanguardRow(isin=_ISIN, ticker="ABX", sedol="B000A02", name=None),
     ]
 
     (line,) = join([_filed()], rows)
@@ -145,7 +147,7 @@ def test_an_isin_with_two_rows_gets_nothing_attached() -> None:
 def test_a_line_without_an_isin_and_a_row_without_one_are_never_paired() -> None:
     """The ISIN is all the two documents share; without it there is no pairing."""
     filed = [_filed(1, None), _filed(2, None)]
-    rows = [VanguardRow(isin=None, ticker="ESU6", sedol=None)]
+    rows = [VanguardRow(isin=None, ticker="ESU6", sedol=None, name=None)]
 
     lines = join(filed, rows)
 
@@ -154,7 +156,9 @@ def test_a_line_without_an_isin_and_a_row_without_one_are_never_paired() -> None
 
 def test_a_row_the_filing_does_not_have_is_ignored() -> None:
     """The documents have different dates; the filing decides what is in the universe."""
-    lines = join([_filed()], [VanguardRow(isin=_OTHER_ISIN, ticker="DLT", sedol="B000D01")])
+    lines = join(
+        [_filed()], [VanguardRow(isin=_OTHER_ISIN, ticker="DLT", sedol="B000D01", name=None)]
+    )
 
     assert [line.isin for line in lines] == [_ISIN]
     assert lines[0].ticker is None
@@ -162,9 +166,58 @@ def test_a_row_the_filing_does_not_have_is_ignored() -> None:
 
 def test_a_row_may_give_a_sedol_without_a_ticker() -> None:
     """Each value is attached for what it is; an empty one stays empty."""
-    (line,) = join([_filed()], [VanguardRow(isin=_ISIN, ticker=None, sedol="B000A01")])
+    (line,) = join([_filed()], [VanguardRow(isin=_ISIN, ticker=None, sedol="B000A01", name=None)])
 
     assert (line.ticker, line.sedol) == (None, "B000A01")
+
+
+def test_the_sponsors_name_is_attached_to_the_line_of_its_security() -> None:
+    """ADR 0020: the receipt check reads it."""
+    rows = [VanguardRow(isin=_ISIN, ticker="LTM", sedol="B000A01", name="Latam Airlines SA ADR")]
+
+    (line,) = join([_filed()], rows)
+
+    assert line.sponsor_name == "Latam Airlines SA ADR"
+
+
+def test_the_name_goes_to_every_line_of_a_security_however_many_lines_and_rows() -> None:
+    """A name belongs to the security, not to one market, so it needs no one-to-one pairing."""
+    filed = [_filed(1), _filed(2), _filed(3, _OTHER_ISIN)]
+    rows = [
+        VanguardRow(isin=_ISIN, ticker="ABX", sedol="B000A01", name="Alpha Corp. ADR"),
+        VanguardRow(isin=_ISIN, ticker="B", sedol="B000A02", name="Alpha Corp. ADR (New York)"),
+        VanguardRow(isin=_OTHER_ISIN, ticker="DLT", sedol="B000D01", name=None),
+    ]
+
+    lines = join(filed, rows)
+
+    # Two lines and two rows: no ticker for either line, and the first row's name for both.
+    assert [(line.ticker, line.sponsor_name) for line in lines] == [
+        (None, "Alpha Corp. ADR"),
+        (None, "Alpha Corp. ADR"),
+        ("DLT", None),
+    ]
+
+
+def test_a_row_without_a_name_does_not_hide_a_later_row_that_has_one() -> None:
+    """The first row that names the security names it."""
+    rows = [
+        VanguardRow(isin=_ISIN, ticker="A", sedol=None, name=None),
+        VanguardRow(isin=_ISIN, ticker="B", sedol=None, name="Alpha Corp. ADR"),
+    ]
+
+    (line,) = join([_filed()], rows)
+
+    assert line.sponsor_name == "Alpha Corp. ADR"
+
+
+def test_a_line_without_an_isin_gets_no_name() -> None:
+    """A row without an ISIN belongs to no line, whatever it is called."""
+    rows = [VanguardRow(isin=None, ticker="ESU6", sedol=None, name="E-mini S&P 500 Future")]
+
+    (line,) = join([_filed(1, None)], rows)
+
+    assert line.sponsor_name is None
 
 
 @given(
@@ -177,7 +230,7 @@ def test_the_join_keeps_every_line_in_order_and_pairs_only_one_to_one(
     """Whatever the two documents hold, no line is lost and no ambiguous pairing is made."""
     filed = [_filed(number, isin) for number, isin in enumerate(isins, start=1)]
     rows = [
-        VanguardRow(isin=isin, ticker=f"T{position}", sedol=None)
+        VanguardRow(isin=isin, ticker=f"T{position}", sedol=None, name=None)
         for position, isin in enumerate(row_isins)
     ]
 
@@ -354,6 +407,14 @@ def test_the_international_sample_pairs_only_the_lines_that_are_alone(
         24: ("OMC", None),
     }
     assert [line.trading_country for line in holdings.lines[:5]] == ["GB", "FR", "US", "HK", "US"]
+    # Vanguard's own names, for every security its file has, two lines or one.
+    assert [line.sponsor_name for line in holdings.lines[:5]] == [
+        "Delta plc",
+        "Epsilon SA",
+        "Zeta Ltd. ADR",
+        "Zeta Ltd.",
+        "Eta Holdings Ltd. ADR",
+    ]
 
 
 def test_a_filing_whose_countries_are_not_trading_places_stops_the_fund(
