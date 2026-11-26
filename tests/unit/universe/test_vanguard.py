@@ -47,7 +47,6 @@ def _filed(
         cusip="00000A001",
         category=category,
         category_label=None,
-        issuer_type="CORP",
         country=country,
         currency=currency,
     )
@@ -64,7 +63,6 @@ def _line(country: str | None, currency: str) -> HoldingLine:
         cusip=None,
         category="EC",
         category_label=None,
-        issuer_type="CORP",
         trading_country=country,
         currency=currency,
         ticker=None,
@@ -94,7 +92,6 @@ def test_one_line_and_one_row_are_paired() -> None:
         cusip="00000A001",
         category="EC",
         category_label=None,
-        issuer_type="CORP",
         trading_country="US",
         currency="USD",
         ticker="ALPH",

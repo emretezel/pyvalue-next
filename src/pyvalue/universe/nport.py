@@ -57,9 +57,6 @@ class FiledLine:
             category.
         category_label: The filer's own label for a line in the conditional
             category, such as ``ADR``; ``None`` for every other line.
-        issuer_type: The form's issuer type code, such as ``CORP`` (a
-            company) or ``RF`` (a registered fund), or ``OTHER`` for the
-            conditional type.
         country: The ISO 3166 country code the filing gives for the line;
             ``None`` when it gives the form's ``N/A``, as derivative lines
             do. Whether it is where the security trades or where the issuer
@@ -76,7 +73,6 @@ class FiledLine:
     cusip: str | None
     category: str
     category_label: str | None
-    issuer_type: str
     country: str | None
     currency: str
 
@@ -123,22 +119,15 @@ def _isin(holding: ET.Element) -> str | None:
     return element.get("value", "").strip() or None
 
 
-def _coded(
-    holding: ET.Element, plain: str, conditional: str, what: str, number: int, path: Path
-) -> tuple[str, str | None]:
-    """Read a fact the form states in one of two ways.
+def _category(holding: ET.Element, number: int, path: Path) -> tuple[str, str | None]:
+    """Read a line's asset category.
 
-    The asset category and the issuer type are each stated either by a plain
-    element holding one of the form's codes, or by a conditional element whose
-    attribute holds the code (``OTHER``) and whose ``desc`` holds the filer's
-    own label.
+    The form states it in one of two ways: by a plain element holding one of
+    the form's codes, or by a conditional element whose attribute holds the
+    code (``OTHER``) and whose ``desc`` holds the filer's own label.
 
     Args:
         holding: The line.
-        plain: The name of the plain element, which is also the name of the
-            attribute that holds the code on the conditional element.
-        conditional: The name of the conditional element.
-        what: What the fact is called in an error message.
         number: The line's position, for the error message.
         path: The filing, for the error message.
 
@@ -146,15 +135,15 @@ def _coded(
         The code, and the label when the conditional element gave one.
 
     Raises:
-        FilingError: If the line states the fact in neither way.
+        FilingError: If the line states its category in neither way.
     """
-    code = _text(holding, plain)
+    code = _text(holding, "assetCat")
     if code is not None:
         return code, None
-    element = holding.find(_NS + conditional)
-    code = "" if element is None else element.get(plain, "").strip()
+    element = holding.find(_NS + "assetConditional")
+    code = "" if element is None else element.get("assetCat", "").strip()
     if element is None or not code:
-        raise FilingError(f"{path}: line {number} has no {what}")
+        raise FilingError(f"{path}: line {number} has no asset category")
     return code, element.get("desc", "").strip() or None
 
 
@@ -179,12 +168,9 @@ def _line(holding: ET.Element, number: int, path: Path) -> FiledLine:
     if issuer_name is None:
         raise FilingError(f"{path}: line {number} has no issuer name")
 
-    category, category_label = _coded(
-        holding, "assetCat", "assetConditional", "asset category", number, path
-    )
-    # The label of the conditional issuer type says nothing the load uses:
-    # the filings give "N/A" there.
-    issuer_type, _ = _coded(holding, "issuerCat", "issuerConditional", "issuer type", number, path)
+    # The form also states an issuer type (a company, a registered fund). It
+    # is not read: nothing uses it (ADR 0022).
+    category, category_label = _category(holding, number, path)
     cusip = _applicable(holding, "cusip")
 
     return FiledLine(
@@ -196,7 +182,6 @@ def _line(holding: ET.Element, number: int, path: Path) -> FiledLine:
         cusip=None if cusip == _NO_CUSIP else cusip,
         category=category,
         category_label=category_label,
-        issuer_type=issuer_type,
         country=_applicable(holding, "invCountry"),
         currency=_currency(holding, number, path),
     )

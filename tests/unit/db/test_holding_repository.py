@@ -47,8 +47,6 @@ _FULL: Holding = Holding(
     sedol="B000001",
     ticker="ALPH",
     asset_category="EC",
-    asset_category_label=None,
-    issuer_type="CORP",
     trading_country="US",
     currency="USD",
 )
@@ -65,13 +63,11 @@ _BARE: Holding = Holding(
     sedol=None,
     ticker=None,
     asset_category="EP",
-    asset_category_label=None,
-    issuer_type="CORP",
     trading_country="GB",
     currency="GBP",
 )
 # A receipt read as its ordinary share: it points at the share's instrument and
-# keeps the ISIN and the label its fund filed.
+# keeps the ISIN its fund filed.
 _RECEIPT: Holding = Holding(
     fund_code="VXUS",
     line_number=1,
@@ -84,8 +80,6 @@ _RECEIPT: Holding = Holding(
     sedol=None,
     ticker=None,
     asset_category="OTHER",
-    asset_category_label="ADR",
-    issuer_type="CORP",
     trading_country="US",
     currency="USD",
 )
@@ -127,7 +121,7 @@ def test_an_empty_value_reads_back_as_none(database: Database) -> None:
         assert work.holdings.all() == (_BARE,)
 
 
-def test_a_line_keeps_the_isin_and_the_label_its_fund_filed(database: Database) -> None:
+def test_a_line_keeps_the_isin_its_fund_filed(database: Database) -> None:
     """The filed ISIN may differ from the instrument's: a receipt read as its ordinary share."""
     with database.unit_of_work() as work:
         _seed(work)
@@ -248,8 +242,6 @@ def test_add_refuses_a_second_line_with_the_same_number(database: Database) -> N
         pytest.param(replace(_FULL, ticker=""), id="empty ticker"),
         pytest.param(replace(_FULL, title=""), id="empty title"),
         pytest.param(replace(_FULL, asset_category="DBT"), id="debt category"),
-        pytest.param(replace(_FULL, asset_category_label="ADR"), id="label without OTHER"),
-        pytest.param(replace(_FULL, issuer_type="corp"), id="lower-case issuer type"),
         pytest.param(replace(_FULL, trading_country="USA"), id="three-letter country"),
         pytest.param(replace(_FULL, currency="US"), id="two-letter currency"),
         pytest.param(replace(_FULL, line_number=0), id="line zero"),

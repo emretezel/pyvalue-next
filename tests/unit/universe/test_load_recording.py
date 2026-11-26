@@ -2,8 +2,9 @@
 
 The rules that decide which lines become companies and instruments are tested
 in ``test_load.py``. These tests pin ADR 0017 and ADR 0021: which lines get a
-holding row (the loaded ones), what the row says, which instrument it points
-at, and that a fund's rows are replaced as a whole.
+holding row (the loaded ones), what the row says (ADR 0022 took the filer's
+label and the issuer type out of it), which instrument it points at, and that
+a fund's rows are replaced as a whole.
 
 Author: Emre Tezel
 """
@@ -65,7 +66,6 @@ def _line(
     cusip: str | None = None,
     category: str = "EC",
     label: str | None = None,
-    issuer_type: str = "CORP",
     country: str | None = "US",
     currency: str = "USD",
     ticker: str | None = None,
@@ -82,7 +82,6 @@ def _line(
         cusip=cusip,
         category=category,
         category_label=label,
-        issuer_type=issuer_type,
         trading_country=country,
         currency=currency,
         ticker=ticker,
@@ -115,8 +114,6 @@ def _row(
     sedol: str | None = None,
     ticker: str | None = None,
     category: str = "EC",
-    label: str | None = None,
-    issuer_type: str = "CORP",
     country: str = "US",
     currency: str = "USD",
 ) -> Holding:
@@ -133,8 +130,6 @@ def _row(
         sedol=sedol,
         ticker=ticker,
         asset_category=category,
-        asset_category_label=label,
-        issuer_type=issuer_type,
         trading_country=country,
         currency=currency,
     )
@@ -226,7 +221,7 @@ def test_a_fund_whose_lines_are_all_left_out_still_gets_its_row(database: Databa
 
 
 def test_a_loaded_line_is_recorded_with_everything_its_documents_say(database: Database) -> None:
-    """Identifiers, names, category, issuer type, country, currency, ticker and SEDOL."""
+    """Identifiers, names, category, country, currency, ticker and SEDOL."""
     line = _line(
         lei=_ALPHA_LEI,
         cusip="00000A001",
@@ -314,11 +309,6 @@ def test_the_row_keeps_what_was_filed_not_what_was_decided(database: Database) -
         pytest.param(_line(sedol="B0001"), _row(), id="SEDOL too short"),
         pytest.param(_line(ticker="  "), _row(), id="blank ticker"),
         pytest.param(_line(ticker=" NOVO B "), _row(ticker="NOVO B"), id="padded ticker"),
-        pytest.param(
-            _line(category="EP", label="ADR"),
-            _row(category="EP"),
-            id="a label outside the conditional category",
-        ),
     ],
 )
 def test_a_value_that_is_no_value_is_recorded_as_empty(
@@ -330,17 +320,22 @@ def test_a_value_that_is_no_value_is_recorded_as_empty(
     assert _holdings(database) == (expected,)
 
 
-def test_a_line_in_the_conditional_category_keeps_its_label(database: Database) -> None:
-    """Units are loaded like any share, and the row says what the filer called them."""
+def test_a_line_in_the_conditional_category_is_recorded_without_its_label(
+    database: Database,
+) -> None:
+    """Units are loaded like any share; the row keeps the category, not the filer's label."""
     line = _line("MU PROPERTY TRUST", _SECOND_ISIN, title="MU", category="OTHER", label="UNITS")
 
     load_holdings(database, [_fund(_VXUS, line)])
 
-    (row,) = _holdings(database)
-    assert (row.asset_category, row.asset_category_label, row.instrument_id) == (
-        "OTHER",
-        "UNITS",
-        1,
+    assert _holdings(database) == (
+        _row(
+            "VXUS",
+            isin=_SECOND_ISIN,
+            issuer_name="MU PROPERTY TRUST",
+            title="MU",
+            category="OTHER",
+        ),
     )
 
 

@@ -37,7 +37,6 @@ class HoldingLine:
             ``OTHER`` for the conditional category.
         category_label: The filer's own label for a line in the conditional
             category, such as ``ADR``; ``None`` for every other line.
-        issuer_type: The form's issuer type code, such as ``CORP``.
         trading_country: The ISO 3166 code of the country the line trades
             in, as the sponsor's adapter says; ``None`` when the documents do
             not say, as for a derivative.
@@ -61,7 +60,6 @@ class HoldingLine:
     cusip: str | None
     category: str
     category_label: str | None
-    issuer_type: str
     trading_country: str | None
     currency: str
     ticker: str | None

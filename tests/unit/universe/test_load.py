@@ -70,7 +70,6 @@ def _line(
         cusip=None,
         category=category,
         category_label=label,
-        issuer_type="CORP",
         trading_country="US",
         currency="USD",
         ticker=None,

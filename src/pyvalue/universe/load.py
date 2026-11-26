@@ -636,7 +636,7 @@ def _fitting(value: str | None, shape: re.Pattern[str]) -> str | None:
 
 
 def _holding(fund: str, line: HoldingLine, instrument_id: int) -> Holding:
-    """Build the ``holding`` row of one loaded line (ADR 0017, ADR 0021).
+    """Build the ``holding`` row of one loaded line (ADR 0017, ADR 0021, ADR 0022).
 
     The row records what the fund's documents say, so the ISIN, the name and
     the identifier are the filed ones, not the decided ones: a receipt read as
@@ -667,11 +667,6 @@ def _holding(fund: str, line: HoldingLine, instrument_id: int) -> Holding:
         sedol=_fitting(line.sedol, _SEDOL_SHAPE),
         ticker=None if line.ticker is None else line.ticker.strip() or None,
         asset_category=line.category,
-        # Only the conditional category has a label of the filer's own.
-        asset_category_label=(
-            line.category_label if line.category == CONDITIONAL_CATEGORY else None
-        ),
-        issuer_type=line.issuer_type,
         trading_country=line.trading_country,
         currency=line.currency,
     )

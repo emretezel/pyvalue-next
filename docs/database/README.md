@@ -11,7 +11,7 @@ The pyvalue database is one SQLite file, `data/pyvalue.db` by default. Its schem
 | [`instrument`](instrument.md) | One security of a company, identified by its ISIN | ADR 0003 |
 | [`listing`](listing.md) | The primary exchange line of an instrument | ADR 0003 |
 | [`fund`](fund.md) | A fund whose holdings are loaded | ADR 0017 |
-| [`holding`](holding.md) | One loaded share line of a fund's filing | ADR 0017, ADR 0021 |
+| [`holding`](holding.md) | One loaded share line of a fund's filing | ADR 0017, ADR 0021, ADR 0022 |
 | [`provider`](provider.md) | A data provider, such as EODHD | ADR 0002 |
 | [`provider_exchange`](provider_exchange.md) | The code one provider uses for one of our exchanges | ADR 0002 |
 | [`provider_listing`](provider_listing.md) | The symbol one provider uses for one of our listings | ADR 0002 |
@@ -79,9 +79,7 @@ erDiagram
         TEXT cusip "optional"
         TEXT sedol "optional, from the sponsor's file"
         TEXT ticker "optional, from the sponsor's file"
-        TEXT asset_category "required"
-        TEXT asset_category_label "optional, only with OTHER"
-        TEXT issuer_type "required"
+        TEXT asset_category "required, common or preferred share"
         TEXT trading_country "required"
         TEXT currency "required"
     }

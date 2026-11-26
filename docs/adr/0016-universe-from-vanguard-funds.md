@@ -1,6 +1,6 @@
 # ADR 0016: The universe comes from Vanguard's two funds, read through a sponsor adapter
 
-- Status: Accepted. ADR 0020 adds the sponsor's own name for the security to the common holding line.
+- Status: Accepted. ADR 0020 adds the sponsor's own name for the security to the common holding line. ADR 0022 takes the issuer type off it: the load no longer reads that field of the filing.
 - Date: 2026-11-26
 - Supersedes: ADR 0004. It also changes two points of other records: the funds read in step 1 of ADR 0006, and the documents that ADR 0009 pins and downloads. The loading rules of ADR 0006 and the decision files of ADR 0010 to ADR 0015 stand.
 

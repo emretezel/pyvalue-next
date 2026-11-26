@@ -1,11 +1,12 @@
 """Tests for the ``fund`` and ``holding`` tables.
 
-Migration 0002 creates them (ADR 0017) and migration 0003 rebuilds ``holding``
-so that it keeps only the lines that were loaded (ADR 0021). The tests pin
-which rows the database accepts, which it refuses and by which constraint,
+Migration 0002 creates them (ADR 0017). Migration 0003 rebuilds ``holding`` so
+that it keeps only the lines that were loaded (ADR 0021), and migration 0004
+takes the filer's label and the issuer type out of it (ADR 0022). The tests
+pin which rows the database accepts, which it refuses and by which constraint,
 what happens to holding lines when a fund or an instrument changes, which
-index the listing rule's lookup uses, and what migration 0003 does to rows
-that are already there.
+index the listing rule's lookup uses, and what the two later migrations do to
+rows that are already there.
 
 Author: Emre Tezel
 """
@@ -29,7 +30,7 @@ _NOT_NULL = "NOT NULL constraint failed"
 #   instrument 1 SK Hynix, 2 Qfin's ordinary share
 #   holding    VXUS 4 a line with every sponsor value,
 #              VXUS 5 a receipt read as the ordinary share (another ISIN than the instrument's),
-#              VXUS 6 a line in the filer's own category, with its label,
+#              VXUS 6 a line in the filer's own category,
 #              VTI 4  a line of the other fund
 _SEED: tuple[str, ...] = (
     "INSERT INTO company (name, lei) VALUES "
@@ -42,16 +43,15 @@ _SEED: tuple[str, ...] = (
     "('VTI', 'Vanguard Total Stock Market Index Fund', 'US', 'S000002848', "
     "'0000036405-26-000480', '2026-06-30', NULL)",
     "INSERT INTO holding (fund_code, line_number, instrument_id, isin, issuer_name, title, lei, "
-    "cusip, sedol, ticker, asset_category, asset_category_label, issuer_type, trading_country, "
-    "currency) VALUES "
+    "cusip, sedol, ticker, asset_category, trading_country, currency) VALUES "
     "('VXUS', 4, 1, 'KR7000660001', 'SK hynix Inc', 'SK HYNIX INC', '988400XAIK6XISWQV045', "
-    "NULL, '6450267', '000660', 'EC', NULL, 'CORP', 'KR', 'KRW'), "
+    "NULL, '6450267', '000660', 'EC', 'KR', 'KRW'), "
     "('VXUS', 5, 2, 'US88557W1018', 'Qfin Holdings Inc', NULL, NULL, '88557W101', NULL, NULL, "
-    "'EC', NULL, 'CORP', 'US', 'USD'), "
+    "'EC', 'US', 'USD'), "
     "('VXUS', 6, 2, 'KYG8851G1001', 'Qfin Holdings Inc', NULL, NULL, NULL, NULL, NULL, "
-    "'OTHER', 'UNITS', 'RF', 'HK', 'HKD'), "
+    "'OTHER', 'HK', 'HKD'), "
     "('VTI', 4, 1, 'KR7000660001', 'SK hynix Inc', NULL, NULL, NULL, NULL, 'BRK.B', "
-    "'EP', NULL, 'CORP', 'US', 'USD')",
+    "'EP', 'US', 'USD')",
 )
 
 
@@ -95,18 +95,15 @@ def _holding(
     sedol: str = "NULL",
     ticker: str = "NULL",
     category: str = "'EC'",
-    label: str = "NULL",
-    issuer_type: str = "'CORP'",
     country: str = "'KR'",
     currency: str = "'KRW'",
 ) -> str:
     """Return an insert of one holding line, valid unless an argument makes it otherwise."""
     return (
         "INSERT INTO holding (fund_code, line_number, instrument_id, isin, issuer_name, title, "
-        "lei, cusip, sedol, ticker, asset_category, asset_category_label, issuer_type, "
-        f"trading_country, currency) VALUES ({fund}, {line}, {instrument}, {isin}, {name}, "
-        f"{title}, {lei}, {cusip}, {sedol}, {ticker}, {category}, {label}, {issuer_type}, "
-        f"{country}, {currency})"
+        "lei, cusip, sedol, ticker, asset_category, trading_country, currency) "
+        f"VALUES ({fund}, {line}, {instrument}, {isin}, {name}, {title}, {lei}, {cusip}, {sedol}, "
+        f"{ticker}, {category}, {country}, {currency})"
     )
 
 
@@ -179,11 +176,7 @@ def test_fund_refuses_a_row_that_breaks_a_rule(
         pytest.param(_holding(ticker="' 000660'"), _CHECK, id="padded ticker"),
         pytest.param(_holding(category="'DBT'"), _CHECK, id="a debt line"),
         pytest.param(_holding(category="'DE'"), _CHECK, id="a derivative line"),
-        pytest.param(_holding(label="'ADR'"), _CHECK, id="a label without the OTHER category"),
-        pytest.param(_holding(category="'OTHER'", label="''"), _CHECK, id="an empty label"),
-        pytest.param(_holding(issuer_type="'corp'"), _CHECK, id="lower-case issuer type"),
-        pytest.param(_holding(issuer_type="''"), _CHECK, id="empty issuer type"),
-        pytest.param(_holding(issuer_type="NULL"), _NOT_NULL, id="no issuer type"),
+        pytest.param(_holding(category="NULL"), _NOT_NULL, id="no category"),
         pytest.param(_holding(country="'Korea'"), _CHECK, id="country as a word"),
         pytest.param(_holding(country="NULL"), _NOT_NULL, id="no country"),
         pytest.param(_holding(currency="'won'"), _CHECK, id="currency as a word"),
@@ -206,9 +199,9 @@ def test_holding_refuses_a_row_that_breaks_a_rule(
         pytest.param(_holding(cusip="'38259P508'"), id="a CUSIP with letters"),
         pytest.param(_holding(cusip="'1234567*@'"), id="a CUSIP with its special characters"),
         pytest.param(_holding(sedol="'BP6MXD8'"), id="a SEDOL with letters"),
-        pytest.param(_holding(category="'OTHER'"), id="the OTHER category without a label"),
+        pytest.param(_holding(category="'OTHER'"), id="the filer's own category"),
+        pytest.param(_holding(category="'EP'"), id="a preferred share"),
         pytest.param(_holding(category="'STIV'"), id="a short-term investment vehicle"),
-        pytest.param(_holding(issuer_type="'OTHER'"), id="the form's OTHER issuer type"),
     ],
 )
 def test_holding_accepts_what_the_documents_really_carry(
@@ -273,7 +266,7 @@ def test_the_lines_of_a_fund_are_found_through_the_primary_key(seeded: sqlite3.C
     assert "(fund_code=?)" in plan[0][3]
 
 
-# --- Migration 0003: only the lines that were loaded (ADR 0021) ---------------------------------
+# --- The table after migrations 0003 and 0004 (ADR 0021, ADR 0022) ------------------------------
 
 _HOLDING_COLUMNS: list[str] = [
     "fund_code",
@@ -287,17 +280,50 @@ _HOLDING_COLUMNS: list[str] = [
     "sedol",
     "ticker",
     "asset_category",
-    "asset_category_label",
-    "issuer_type",
     "trading_country",
     "currency",
 ]
+# The columns migration 0003 left, before migration 0004 took two away.
+_HOLDING_COLUMNS_AT_3: list[str] = [
+    *_HOLDING_COLUMNS[:11],
+    "asset_category_label",
+    "issuer_type",
+    *_HOLDING_COLUMNS[11:],
+]
 
 
-def test_holding_has_no_column_for_a_line_that_was_not_loaded(
+def _rebuilt(path: Path, columns: list[str]) -> tuple[list[tuple[str | int | None, ...]], bool]:
+    """Read ``holding`` after a migration that rebuilt it.
+
+    Returns:
+        Its rows in the given columns, and whether the rebuild left the table
+        sound: its index is there again, no reference is broken, and the two
+        funds are untouched.
+    """
+    connection = connect(path)
+    try:
+        rows = connection.execute(
+            f"SELECT {', '.join(columns)} FROM holding ORDER BY fund_code, line_number"
+        ).fetchall()
+        objects = connection.execute(
+            "SELECT type, name FROM sqlite_schema WHERE name LIKE 'holding%' ORDER BY type, name"
+        ).fetchall()
+        broken = connection.execute("PRAGMA foreign_key_check").fetchall()
+        funds = connection.execute("SELECT COUNT(*) FROM fund").fetchone()
+    finally:
+        connection.close()
+    sound = (
+        objects == [("index", "holding_instrument_id"), ("table", "holding")]
+        and broken == []
+        and funds == (2,)
+    )
+    return rows, sound
+
+
+def test_holding_has_the_columns_of_its_record_and_requires_the_instrument(
     migrated_db: sqlite3.Connection,
 ) -> None:
-    """Every row is a line of a security: no reason column, and the instrument is required."""
+    """Thirteen columns: no reason, no label, no issuer type; the instrument is required."""
     columns = migrated_db.execute("PRAGMA table_info(holding)").fetchall()
 
     assert [column[1] for column in columns] == _HOLDING_COLUMNS
@@ -330,21 +356,10 @@ def test_migration_0003_keeps_loaded_lines_and_drops_the_others(tmp_path: Path) 
     finally:
         connection.close()
 
-    report = migrate(path)
+    report = migrate(path, packaged_migrations()[:3])
 
     assert [migration.label for migration in report.applied] == ["0003_holding_loaded_lines_only"]
-    connection = connect(path)
-    try:
-        rows = connection.execute(
-            f"SELECT {', '.join(_HOLDING_COLUMNS)} FROM holding ORDER BY fund_code, line_number"
-        ).fetchall()
-        objects = connection.execute(
-            "SELECT type, name FROM sqlite_schema WHERE name LIKE 'holding%' ORDER BY type, name"
-        ).fetchall()
-        broken = connection.execute("PRAGMA foreign_key_check").fetchall()
-        funds = connection.execute("SELECT COUNT(*) FROM fund").fetchone()
-    finally:
-        connection.close()
+    rows, sound = _rebuilt(path, _HOLDING_COLUMNS_AT_3)
     assert rows == [
         (
             "VXUS",
@@ -381,7 +396,74 @@ def test_migration_0003_keeps_loaded_lines_and_drops_the_others(tmp_path: Path) 
             "USD",
         ),
     ]
-    # The rebuilt table has its index again, and nothing else was touched.
-    assert objects == [("index", "holding_instrument_id"), ("table", "holding")]
-    assert broken == []
-    assert funds == (2,)
+    assert sound
+
+
+def test_migration_0004_keeps_every_row_and_drops_the_two_columns(tmp_path: Path) -> None:
+    """A database at version 3 keeps all its holding lines; only the two columns go."""
+    path = tmp_path / "pyvalue.db"
+    migrate(path, packaged_migrations()[:3])
+    connection = connect(path)
+    try:
+        for statement in _SEED[:3]:
+            connection.execute(statement)
+        # Rows as migration 0003 left them. The second carries a label and an
+        # issuer type of its own, which no row of the real filings does: the
+        # row must be kept all the same.
+        connection.execute(
+            "INSERT INTO holding (fund_code, line_number, instrument_id, isin, issuer_name, "
+            "title, lei, cusip, sedol, ticker, asset_category, asset_category_label, issuer_type, "
+            "trading_country, currency) VALUES "
+            "('VXUS', 4, 1, 'KR7000660001', 'SK hynix Inc', 'SK HYNIX INC', "
+            "'988400XAIK6XISWQV045', NULL, '6450267', '000660', 'EC', NULL, 'CORP', 'KR', 'KRW'), "
+            "('VXUS', 5, 2, 'US88557W1018', 'Qfin Holdings Inc', NULL, NULL, '88557W101', NULL, "
+            "NULL, 'OTHER', 'ADR', 'RF', 'US', 'USD')"
+        )
+    finally:
+        connection.close()
+
+    report = migrate(path, packaged_migrations()[:4])
+
+    assert [migration.label for migration in report.applied] == [
+        "0004_holding_drop_label_and_issuer_type"
+    ]
+    connection = connect(path)
+    try:
+        columns = [row[1] for row in connection.execute("PRAGMA table_info(holding)")]
+    finally:
+        connection.close()
+    assert columns == _HOLDING_COLUMNS
+    rows, sound = _rebuilt(path, _HOLDING_COLUMNS)
+    assert rows == [
+        (
+            "VXUS",
+            4,
+            1,
+            "KR7000660001",
+            "SK hynix Inc",
+            "SK HYNIX INC",
+            "988400XAIK6XISWQV045",
+            None,
+            "6450267",
+            "000660",
+            "EC",
+            "KR",
+            "KRW",
+        ),
+        (
+            "VXUS",
+            5,
+            2,
+            "US88557W1018",
+            "Qfin Holdings Inc",
+            None,
+            None,
+            "88557W101",
+            None,
+            None,
+            "OTHER",
+            "US",
+            "USD",
+        ),
+    ]
+    assert sound

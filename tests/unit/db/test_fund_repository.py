@@ -97,8 +97,6 @@ def test_save_updates_a_fund_whose_holding_lines_point_at_it(database: Database)
         sedol=None,
         ticker=None,
         asset_category="EC",
-        asset_category_label=None,
-        issuer_type="CORP",
         trading_country="US",
         currency="USD",
     )

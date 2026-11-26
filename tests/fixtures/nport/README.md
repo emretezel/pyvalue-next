@@ -4,7 +4,7 @@ Two small files in the shape of an SEC N-PORT filing, for the tests of the unive
 
 The files are named by ticker. A test copies them into a temporary folder under the names the load expects.
 
-Every line gives the country its currency is traded in, as Vanguard's filings do: a line held in pounds says `GB`, a euro line the country of its ISIN. The one exception is the currency forward (VXUS line 7), which gives `N/A` and no issuer type of the form's list, as a real derivative line does.
+Every line gives the country its currency is traded in, as Vanguard's filings do: a line held in pounds says `GB`, a euro line the country of its ISIN. The one exception is the currency forward (VXUS line 7), which gives `N/A`, as a real derivative line does. The lines also carry the form's issuer type, as real ones do; the reader does not read it (ADR 0022).
 
 ## What each line is there for
 

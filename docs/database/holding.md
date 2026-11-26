@@ -1,6 +1,6 @@
 # `holding`
 
-One row per line of a fund's loaded filing that became a security of the universe, or met one already there. A line that was not loaded has no row. Decided in ADR 0017 and ADR 0021. Created by migration `0002_fund_and_holding` and rebuilt by migration `0003_holding_loaded_lines_only`, which removed the rows of lines that were not loaded.
+One row per line of a fund's loaded filing that became a security of the universe, or met one already there. A line that was not loaded has no row. Decided in ADR 0017, ADR 0021 and ADR 0022. Created by migration `0002_fund_and_holding` and rebuilt twice: by migration `0003_holding_loaded_lines_only`, which removed the rows of lines that were not loaded, and by migration `0004_holding_drop_label_and_issuer_type`, which removed two columns that carried no information.
 
 A row records what the fund's documents say about the line. The only thing in it that pyvalue decided is which instrument the line was loaded as.
 
@@ -20,9 +20,7 @@ A row records what the fund's documents say about the line. The only thing in it
 | `cusip` | TEXT | | no | SEC | Nine characters | The US security number. Empty when the filing gives none or a placeholder |
 | `sedol` | TEXT | | no | Sponsor | Seven letters or digits | The London Stock Exchange's security number. Empty when the join rule of ADR 0016 attaches none |
 | `ticker` | TEXT | | no | Sponsor | Not empty when present, no leading or trailing spaces | The ticker as the sponsor writes it. Empty when the join rule attaches none |
-| `asset_category` | TEXT | | yes | SEC | `EC`, `EP`, `STIV` or `OTHER` | The form's asset category: common share, preferred share, short-term investment vehicle, or the filer's own category |
-| `asset_category_label` | TEXT | | no | SEC | Allowed only when `asset_category` is `OTHER` | The filer's own label for that category, such as `ADR` |
-| `issuer_type` | TEXT | | yes | SEC | Upper-case letters only | The form's issuer type, such as `CORP` for a company or `RF` for a registered fund |
+| `asset_category` | TEXT | | yes | SEC | `EC`, `EP`, `STIV` or `OTHER` | The form's asset category: common share, preferred share, short-term investment vehicle, or the filer's own category. The only place the database says that a security is a preferred share |
 | `trading_country` | TEXT | | yes | Adapter | Two upper-case letters | The ISO 3166 code of the country the line trades in |
 | `currency` | TEXT | | yes | SEC | Three upper-case letters | The ISO 4217 code of the currency the fund holds the line in |
 
@@ -30,10 +28,10 @@ A row records what the fund's documents say about the line. The only thing in it
 
 Columns that are empty in both rows are left out.
 
-| `fund_code` | `line_number` | `instrument_id` | `isin` | `issuer_name` | `lei` | `sedol` | `ticker` | `asset_category` | `issuer_type` | `trading_country` | `currency` |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| `VXUS` | 8803 | 5210 (SK Hynix) | `KR7000660001` | SK hynix Inc | `988400XAIK6XISWQV045` | `6450267` | `000660` | `EC` | `CORP` | `KR` | `KRW` |
-| `VXUS` | 3618 | 6034 (Qfin Holdings, ordinary share `KYG8851G1001`) | `US88557W1018` | Qfin Holdings Inc | `836800R59NKEPDR6I240` | | | `EC` | `CORP` | `US` | `USD` |
+| `fund_code` | `line_number` | `instrument_id` | `isin` | `issuer_name` | `lei` | `sedol` | `ticker` | `asset_category` | `trading_country` | `currency` |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `VXUS` | 8803 | 5210 (SK Hynix) | `KR7000660001` | SK hynix Inc | `988400XAIK6XISWQV045` | `6450267` | `000660` | `EC` | `KR` | `KRW` |
+| `VXUS` | 3618 | 6034 (Qfin Holdings, ordinary share `KYG8851G1001`) | `US88557W1018` | Qfin Holdings Inc | `836800R59NKEPDR6I240` | | | `EC` | `US` | `USD` |
 
 The lines are those of the VXUS filing of 31 July 2026; the instrument ids are made up, and so is which sponsor values are empty. The second row is a depositary receipt read as its ordinary share (ADR 0015): the line keeps the receipt's ISIN, country and currency, and points at the instrument of the ordinary share.
 
@@ -60,7 +58,7 @@ The number of shares, the value and the share of the fund are not stored for any
 - **`lei` and `issuer_name` are what the fund filed.** The company's stored identifier and name can differ, where a decision of ADR 0010 or ADR 0012 applies.
 - **A placeholder is stored as empty,** never as the text `N/A`.
 - **A newer filing replaces the fund's lines.** The rows of a fund are deleted and written again in one transaction. Companies and instruments are never deleted, so an instrument whose fund no longer holds it has no holding line.
-- **`issuer_type` is checked for its shape only.** The list of codes is the SEC's and can grow.
+- **The filer's own label and the issuer type are not stored** (ADR 0022). The form states both, and on the filings loaded so far the label was empty on every row and the issuer type the same on every row. The load still reads the label from the filing for the receipt check.
 - **Not enforced by the schema:** that `isin` belongs to the instrument the row points at, that `ticker` and `sedol` belong to the line, and that `lei` passes its check digits. The load guarantees all three.
 
 ## Relationships

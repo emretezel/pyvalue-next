@@ -31,8 +31,9 @@ def _write(tmp_path: Path, text: str) -> Path:
     return path
 
 
-# What every line states besides its name and category: the currency it is
-# held in and the type of its issuer.
+# What every real line states besides its name and category: the currency it
+# is held in and the type of its issuer. The reader does not read the type
+# (ADR 0022); it is here because the filings carry it.
 _REST: str = "<curCd>USD</curCd><issuerCat>CORP</issuerCat>"
 
 _PLAIN_LINE: str = (
@@ -83,7 +84,6 @@ def test_a_plain_line_is_read_in_full(nport_samples: Path) -> None:
         cusip=None,
         category="EP",
         category_label=None,
-        issuer_type="CORP",
         country="US",
         currency="USD",
     )
@@ -106,7 +106,6 @@ def test_the_conditional_category_is_read_with_its_label(nport_samples: Path) ->
         cusip=None,
         category="OTHER",
         category_label="GDR",
-        issuer_type="CORP",
         country="US",
         currency="USD",
     )
@@ -170,22 +169,26 @@ def test_the_country_is_read_as_filed(nport_samples: Path) -> None:
     assert [line.country for line in filing.lines[:5]] == ["GB", "FR", "US", "HK", "US"]
 
 
-def test_a_derivative_line_has_no_country_and_the_conditional_issuer_type(
-    nport_samples: Path,
-) -> None:
-    """A currency forward gives ``N/A`` as its country and no issuer type of the form's list."""
+def test_a_derivative_line_has_no_country(nport_samples: Path) -> None:
+    """A currency forward gives ``N/A`` as its country, and states its issuer type conditionally."""
     forward = read_filing(nport_samples / "VXUS.xml").lines[6]
 
     assert forward.category == "DFE"
     assert forward.country is None
-    assert forward.issuer_type == "OTHER"
 
 
-def test_the_issuer_type_is_read(nport_samples: Path) -> None:
-    """A company is ``CORP``; the code is kept as the form writes it."""
-    filing = read_filing(nport_samples / "VTI.xml")
+def test_a_line_without_an_issuer_type_is_read(tmp_path: Path) -> None:
+    """The form's issuer type is not read (ADR 0022), so a line that lacks it is not refused."""
+    path = _write(
+        tmp_path,
+        _filing_text(
+            "<invstOrSec><name>ALPHA CORP</name><assetCat>EC</assetCat><curCd>USD</curCd>"
+            "</invstOrSec>"
+        ),
+    )
 
-    assert {line.issuer_type for line in filing.lines} == {"CORP"}
+    (line,) = read_filing(path).lines
+    assert (line.issuer_name, line.category, line.currency) == ("ALPHA CORP", "EC", "USD")
 
 
 def test_inner_spacing_of_a_name_is_kept(nport_samples: Path) -> None:
@@ -226,7 +229,6 @@ def test_surrounding_whitespace_is_dropped_and_empty_values_are_absent(tmp_path:
             cusip=None,
             category="OTHER",
             category_label=None,
-            issuer_type="OTHER",
             country="GB",
             currency="GBP",
         ),
@@ -234,7 +236,7 @@ def test_surrounding_whitespace_is_dropped_and_empty_values_are_absent(tmp_path:
 
 
 def test_a_line_without_title_identifiers_or_identifier_element_is_read(tmp_path: Path) -> None:
-    """Only the name, the category, the issuer type and the currency are indispensable."""
+    """Only the name, the category and the currency are indispensable."""
     path = _write(
         tmp_path,
         _filing_text(
@@ -252,7 +254,6 @@ def test_a_line_without_title_identifiers_or_identifier_element_is_read(tmp_path
             cusip=None,
             category="EC",
             category_label=None,
-            issuer_type="CORP",
             country=None,
             currency="USD",
         ),
@@ -294,18 +295,6 @@ def test_an_empty_isin_value_is_no_isin(tmp_path: Path) -> None:
             "<invstOrSec><name>BETA INC</name><assetConditional desc='ADR'/></invstOrSec>",
             "line 2 has no asset category",
             id="conditional category without a code",
-        ),
-        pytest.param(
-            "<invstOrSec><name>BETA INC</name><assetCat>EC</assetCat><curCd>USD</curCd>"
-            "</invstOrSec>",
-            "line 2 has no issuer type",
-            id="no issuer type at all",
-        ),
-        pytest.param(
-            "<invstOrSec><name>BETA INC</name><assetCat>EC</assetCat><curCd>USD</curCd>"
-            "<issuerConditional desc='N/A'/></invstOrSec>",
-            "line 2 has no issuer type",
-            id="conditional issuer type without a code",
         ),
         pytest.param(
             "<invstOrSec><name>BETA INC</name><assetCat>EC</assetCat>"

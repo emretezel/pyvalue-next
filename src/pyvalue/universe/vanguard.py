@@ -96,7 +96,6 @@ def join(filed: Sequence[FiledLine], rows: Sequence[VanguardRow]) -> tuple[Holdi
                 cusip=line.cusip,
                 category=line.category,
                 category_label=line.category_label,
-                issuer_type=line.issuer_type,
                 trading_country=line.country,
                 currency=line.currency,
                 ticker=None if row is None else row.ticker,

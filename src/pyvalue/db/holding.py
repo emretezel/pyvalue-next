@@ -11,7 +11,9 @@ from pyvalue.db.repository import Repository
 
 @dataclass(frozen=True, slots=True)
 class Holding:
-    """One row of ``holding``: one loaded share line of a fund's filing (ADR 0017, ADR 0021).
+    """One row of ``holding``: one loaded share line of a fund's filing.
+
+    The table is decided in ADR 0017, ADR 0021 and ADR 0022.
 
     The row records what the fund's documents say about the line. The one
     thing in it that pyvalue decided is ``instrument_id``. A line that was not
@@ -31,11 +33,8 @@ class Holding:
         sedol: The London Stock Exchange's security number from the sponsor's
             own file, or ``None`` when none was attached (ADR 0016).
         ticker: The ticker as the sponsor writes it, or ``None`` likewise.
-        asset_category: The form's asset category: ``EC``, ``EP``, ``STIV``
-            or ``OTHER``.
-        asset_category_label: The filer's own label for the ``OTHER``
-            category, such as ``ADR``; ``None`` otherwise.
-        issuer_type: The form's issuer type, such as ``CORP``.
+        asset_category: The form's asset category: ``EC`` (a common share),
+            ``EP`` (a preferred share), ``STIV`` or ``OTHER``.
         trading_country: The ISO 3166 code of the country the line trades in.
         currency: The ISO 4217 code of the currency the fund holds the line in.
     """
@@ -51,8 +50,6 @@ class Holding:
     sedol: str | None
     ticker: str | None
     asset_category: str
-    asset_category_label: str | None
-    issuer_type: str
     trading_country: str
     currency: str
 
@@ -71,8 +68,8 @@ class HoldingRepository(Repository):
         """Return every holding line, by fund and then in the order of its filing."""
         rows = self._execute(
             "SELECT fund_code, line_number, instrument_id, isin, issuer_name, title, lei, cusip, "
-            "sedol, ticker, asset_category, asset_category_label, issuer_type, trading_country, "
-            "currency FROM holding ORDER BY fund_code, line_number"
+            "sedol, ticker, asset_category, trading_country, currency "
+            "FROM holding ORDER BY fund_code, line_number"
         ).fetchall()
         return tuple(
             Holding(
@@ -87,8 +84,6 @@ class HoldingRepository(Repository):
                 sedol=_text(sedol),
                 ticker=_text(ticker),
                 asset_category=str(asset_category),
-                asset_category_label=_text(asset_category_label),
-                issuer_type=str(issuer_type),
                 trading_country=str(trading_country),
                 currency=str(currency),
             )
@@ -104,8 +99,6 @@ class HoldingRepository(Repository):
                 sedol,
                 ticker,
                 asset_category,
-                asset_category_label,
-                issuer_type,
                 trading_country,
                 currency,
             ) in rows
@@ -124,8 +117,8 @@ class HoldingRepository(Repository):
         """
         self._execute(
             "INSERT INTO holding (fund_code, line_number, instrument_id, isin, issuer_name, title, "
-            "lei, cusip, sedol, ticker, asset_category, asset_category_label, issuer_type, "
-            "trading_country, currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "lei, cusip, sedol, ticker, asset_category, trading_country, currency) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 holding.fund_code,
                 holding.line_number,
@@ -138,8 +131,6 @@ class HoldingRepository(Repository):
                 holding.sedol,
                 holding.ticker,
                 holding.asset_category,
-                holding.asset_category_label,
-                holding.issuer_type,
                 holding.trading_country,
                 holding.currency,
             ),
