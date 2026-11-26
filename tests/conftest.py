@@ -15,7 +15,7 @@ import pytest
 
 from pyvalue.db import Database, migrate
 from pyvalue.db.connection import connect
-from pyvalue.universe import PINNED_FILINGS
+from pyvalue.universe import FUNDS
 
 # The checked-in sample data: tests/fixtures.
 _FIXTURES: Path = Path(__file__).resolve().parent / "fixtures"
@@ -77,6 +77,6 @@ def filings_dir(tmp_path: Path, nport_samples: Path) -> Path:
     """
     folder = tmp_path / "sec"
     folder.mkdir()
-    for pinned in PINNED_FILINGS:
-        shutil.copyfile(nport_samples / f"{pinned.ticker}.xml", folder / pinned.file_name)
+    for fund in FUNDS:
+        shutil.copyfile(nport_samples / f"{fund.code}.xml", folder / fund.filing_file_name)
     return folder

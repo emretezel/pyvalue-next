@@ -20,12 +20,12 @@ from pathlib import Path
 from typing import IO
 
 from pyvalue.universe.errors import FilingError
-from pyvalue.universe.filings import PinnedFiling, read_pinned_filing
+from pyvalue.universe.funds import FundDefinition, read_pinned_filing
 
 # The one host a contact string may be sent to.
 SEC_HOST: str = "www.sec.gov"
 
-# The largest of the three filings is about ten megabytes.
+# A holdings filing of a broad fund is up to about ten megabytes.
 _TIMEOUT_SECONDS: float = 120.0
 
 # What fetches a URL: (url, contact string) -> the bytes of the response. A
@@ -89,9 +89,9 @@ def fetch_from_sec(url: str, user_agent: str) -> bytes:
 
 
 def download_filing(
-    pinned: PinnedFiling, destination: Path, user_agent: str, fetch: Fetch = fetch_from_sec
+    fund: FundDefinition, destination: Path, user_agent: str, fetch: Fetch = fetch_from_sec
 ) -> None:
-    """Download a pinned filing and keep it only if it is that filing.
+    """Download a fund's pinned filing and keep it only if it is that filing.
 
     The document is written under a temporary name, read back and checked
     against the pin, and only then given its final name. So a file with the
@@ -99,7 +99,7 @@ def download_filing(
     interrupted or the SEC answered with an error page.
 
     Args:
-        pinned: The filing to download.
+        fund: The fund whose pinned filing is downloaded.
         destination: Where to keep it.
         user_agent: The contact string the SEC asks for.
         fetch: What performs the request. Tests pass their own.
@@ -108,23 +108,23 @@ def download_filing(
         FilingError: If the download fails, the file cannot be written, or
             what arrived is not the pinned filing.
     """
-    body = fetch(pinned.url, user_agent)
+    body = fetch(fund.filing_url, user_agent)
     partial = destination.with_name(destination.name + ".part")
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
         partial.write_bytes(body)
         try:
-            read_pinned_filing(partial, pinned)
+            read_pinned_filing(partial, fund)
         except FilingError as error:
             # The reader's message names the temporary file, which is about to
             # be removed. Say where the document came from instead.
             raise FilingError(
-                f"{pinned.url} did not return the pinned {pinned.ticker} filing; nothing was kept"
+                f"{fund.filing_url} did not return the pinned {fund.code} filing; nothing was kept"
             ) from error
         partial.replace(destination)
     except OSError as error:
         raise FilingError(
-            f"cannot save the {pinned.ticker} filing to {destination}: {error}"
+            f"cannot save the {fund.code} filing to {destination}: {error}"
         ) from error
     finally:
         # The temporary file must not stay, whatever happened. If it cannot be

@@ -50,8 +50,8 @@ def test_every_line_is_read_whatever_its_category(nport_samples: Path) -> None:
     """Debt, derivatives and cash are returned too, so the load can account for them."""
     filing = read_filing(nport_samples / "VXUS.xml")
 
-    assert [line.number for line in filing.lines] == list(range(1, 11))
-    assert [line.category for line in filing.lines] == [
+    assert [line.number for line in filing.lines] == list(range(1, 25))
+    assert [line.category for line in filing.lines[:10]] == [
         "EC",
         "EC",
         "EC",
@@ -81,11 +81,15 @@ def test_a_plain_line_is_read_in_full(nport_samples: Path) -> None:
 
 
 def test_the_conditional_category_is_read_with_its_label(nport_samples: Path) -> None:
-    """Dimensional files receipts, units and rights there; missing them was a real bug."""
-    filing = read_filing(nport_samples / "DFAX.xml")
+    """Some sponsors file receipts, units and rights there; missing them was a real bug.
 
-    assert filing.lines[5] == HoldingLine(
-        number=6,
+    Vanguard does not use the conditional category, but the form allows it,
+    and lines 11 to 24 of the sample keep the reader's support for it tested.
+    """
+    filing = read_filing(nport_samples / "VXUS.xml")
+
+    assert filing.lines[15] == HoldingLine(
+        number=16,
         issuer_name="Kappa Co Ltd",
         title="Kappa Co Ltd",
         lei="549300KAPPA000000078",

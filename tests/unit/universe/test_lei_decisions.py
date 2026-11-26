@@ -34,8 +34,8 @@ def test_a_file_is_read_row_by_row(nport_samples: Path) -> None:
             company="Theta AG",
             decided_on=date(2026, 11, 20),
             evidence=(
-                "Made up: the identifier VXUS files is retired, and the one DFAX files is "
-                "its successor"
+                "Made up: the identifier VXUS line 8 files is retired, and the one line 14 "
+                "files is its successor"
             ),
         ),
         LeiDecision(
@@ -44,7 +44,8 @@ def test_a_file_is_read_row_by_row(nport_samples: Path) -> None:
             company="Iota KK",
             decided_on=date(2026, 11, 20),
             evidence=(
-                "Made up: DFAX files the identifier of Delta PLC by mistake; this one is Iota's own"
+                "Made up: VXUS line 15 files the identifier of Delta PLC by mistake; this one is "
+                "Iota's own"
             ),
         ),
     )
@@ -165,17 +166,13 @@ def test_a_file_that_is_not_text_is_refused(tmp_path: Path) -> None:
 
 
 def test_the_decisions_shipped_with_the_package_are_valid() -> None:
-    """The real file is read with the same checks on every test run."""
+    """The real file is read with the same checks on every test run.
+
+    Since ADR 0016 it holds its header only: both funds have one sponsor, so
+    they do not disagree. The checks stand for the day a row is added.
+    """
     decisions = packaged_lei_decisions()
 
-    assert decisions, "the shipped decisions file holds no decision"
     assert all(is_valid_isin(decision.isin) for decision in decisions)
     assert all(is_valid_lei(decision.lei) for decision in decisions)
     assert len({decision.isin for decision in decisions}) == len(decisions)
-
-
-def test_the_shipped_file_decides_both_securities_of_a_company_alike() -> None:
-    """ADR 0010: the A and the B share of Guangdong Electric Power have one issuer."""
-    decided = {decision.isin: decision.lei for decision in packaged_lei_decisions()}
-
-    assert decided["CNE0000006J0"] == decided["CNE000000HW5"]

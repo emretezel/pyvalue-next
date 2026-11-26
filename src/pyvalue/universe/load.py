@@ -294,7 +294,7 @@ def _sort_lines(
                 )
             elif line.category not in _LOADABLE:
                 # Loading it would be a guess and so would leaving it out.
-                # None of the three funds files such a line today.
+                # No fund files such a line today.
                 raise UniverseError(
                     f"{fund.ticker} line {line.number} ({line.issuer_name}) is in category "
                     f"'{line.category}', which the load has no rule for"

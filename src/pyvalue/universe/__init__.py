@@ -1,6 +1,6 @@
-"""The universe load: three SEC holdings filings into ``company`` and ``instrument``.
+"""The universe load: the funds' SEC holdings filings into ``company`` and ``instrument``.
 
-Which funds, and why, is ADR 0004. The rules of the load are ADR 0006. How it
+Which funds, and why, is ADR 0016. The rules of the load are ADR 0006. How it
 is run, where its files go and what it leaves for an agent is ADR 0009. How a
 decision on a company's legal-entity identifier is applied is ADR 0010, and
 which identifier it may name is ADR 0011. How a decision on a company's name
@@ -12,7 +12,7 @@ Author: Emre Tezel
 
 from pyvalue.universe.errors import FilingError, UniverseError
 from pyvalue.universe.exclusions import Exclusion
-from pyvalue.universe.filings import PINNED_FILINGS, PinnedFiling
+from pyvalue.universe.funds import FUNDS, FundDefinition, Scope, Sponsor
 from pyvalue.universe.lei_decisions import LeiDecision
 from pyvalue.universe.load import (
     AgentCase,
@@ -37,11 +37,12 @@ from pyvalue.universe.pipeline import (
 __all__ = [
     "DEFAULT_FILINGS_DIR",
     "DEFAULT_OUTPUT_DIR",
-    "PINNED_FILINGS",
+    "FUNDS",
     "AgentCase",
     "AgentCaseReason",
     "Exclusion",
     "FilingError",
+    "FundDefinition",
     "FundHoldings",
     "HoldingLine",
     "LeiDecision",
@@ -51,7 +52,8 @@ __all__ = [
     "NotLoadedReason",
     "OrdinaryShare",
     "OutputFiles",
-    "PinnedFiling",
+    "Scope",
+    "Sponsor",
     "UniverseError",
     "UniverseLoad",
     "load_holdings",

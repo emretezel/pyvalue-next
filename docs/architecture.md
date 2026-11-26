@@ -10,7 +10,7 @@ Only what has been agreed is described as designed. Everything else is listed as
 |---|---|---|---|
 | Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections, migrations, the unit of work, and the repositories for `company`, `instrument`, `fund` and `holding`. A repository is added when a component first needs its table |
 | Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load` |
-| Universe load | `pyvalue.universe` | Downloads the three SEC holdings filings and reads them into `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0004, ADR 0006, ADR 0009 to ADR 0015) | Built for the three funds of ADR 0004. Designed, not built: two Vanguard funds read through a sponsor adapter, with `fund` and `holding` tables (ADR 0016, ADR 0017) |
+| Universe load | `pyvalue.universe` | Downloads the SEC holdings filings of VTI and VXUS and reads them into `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0016, ADR 0006, ADR 0009 to ADR 0015) | Built for the two funds of ADR 0016, from their SEC filings. Designed, not built: the sponsor adapter that adds ticker and SEDOL, and writing `fund` and `holding` (ADR 0016, ADR 0017) |
 | Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line |
 | Listings | `pyvalue.listings` | Stores the provider's symbol lists, applies the automatic rule and the decisions file (ADR 0018, ADR 0019) | Designed, not built |
 | Providers | `pyvalue.providers` | The EODHD client | Planned |
@@ -58,7 +58,7 @@ The pattern for database access is Repository with Unit of Work (ADR 0008). The 
 
 ## The universe, as designed
 
-The data model and the steps are fixed by the records. Step 1 is built as ADR 0004 had it: three funds (VTI, VXUS and DFAX), SEC filings only, no `fund` or `holding` table. The table below shows the design of 2026-11-26. The change to step 1 and the code for steps 2 to 4 are not written yet.
+The data model and the steps are fixed by the records. Step 1 is built in part: the two funds are loaded from their SEC filings into `company` and `instrument`. The table below shows the design of 2026-11-26. The sponsor adapter and the `fund` and `holding` rows of step 1, and the code for steps 2 to 4, are not written yet.
 
 | Step | What happens | Record |
 |---|---|---|
@@ -119,7 +119,7 @@ with database.unit_of_work() as work:
 | `tests/unit/` | Tests of single functions and modules. Its tree mirrors `src/pyvalue/`: `tests/unit/db/` tests `pyvalue.db` |
 | `tests/regression/` | One test per fixed bug, marked `regression` |
 | `tests/integration/` | End-to-end runs on a small checked-in dataset, marked `integration` |
-| `tests/fixtures/` | Checked-in sample data, such as three small made-up holdings filings |
+| `tests/fixtures/` | Checked-in sample data, such as two small made-up holdings filings |
 | `tests/conftest.py` | Shared fixtures, such as a temporary database at the latest schema version |
 
 No test touches `data/pyvalue.db`. Every test that needs a database builds a temporary one.

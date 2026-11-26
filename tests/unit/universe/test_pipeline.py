@@ -14,7 +14,7 @@ import pytest
 
 from pyvalue.db import Database
 from pyvalue.universe import (
-    PINNED_FILINGS,
+    FUNDS,
     Exclusion,
     FilingError,
     NameDecision,
@@ -173,7 +173,7 @@ def test_missing_filings_are_downloaded_once_and_kept(
 ) -> None:
     """Each pinned filing is fetched at its own address, with the contact string."""
     filings_dir = tmp_path / "sec"
-    by_url = {pinned.url: nport_samples / f"{pinned.ticker}.xml" for pinned in PINNED_FILINGS}
+    by_url = {fund.filing_url: nport_samples / f"{fund.code}.xml" for fund in FUNDS}
     calls: list[tuple[str, str]] = []
 
     def fetch(url: str, user_agent: str) -> bytes:
@@ -182,13 +182,13 @@ def test_missing_filings_are_downloaded_once_and_kept(
 
     outcome = load_universe(database, filings_dir, tmp_path / "universe", lambda: _CONTACT, fetch)
 
-    assert outcome.downloaded == PINNED_FILINGS
-    assert calls == [(pinned.url, _CONTACT) for pinned in PINNED_FILINGS]
+    assert outcome.downloaded == FUNDS
+    assert calls == [(fund.filing_url, _CONTACT) for fund in FUNDS]
     assert sorted(path.name for path in filings_dir.iterdir()) == sorted(
-        pinned.file_name for pinned in PINNED_FILINGS
+        fund.filing_file_name for fund in FUNDS
     )
 
-    # The second run finds all three and fetches nothing.
+    # The second run finds both and fetches nothing.
     again = load_universe(
         database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched
     )
@@ -200,9 +200,9 @@ def test_missing_filings_are_downloaded_once_and_kept(
 def test_only_the_missing_filing_is_downloaded(
     database: Database, filings_dir: Path, nport_samples: Path, tmp_path: Path
 ) -> None:
-    """A folder that holds two of the three costs one request."""
-    missing = PINNED_FILINGS[1]
-    (filings_dir / missing.file_name).unlink()
+    """A folder that holds one of the two costs one request."""
+    missing = FUNDS[1]
+    (filings_dir / missing.filing_file_name).unlink()
     calls: list[str] = []
 
     def fetch(url: str, user_agent: str) -> bytes:
@@ -212,7 +212,7 @@ def test_only_the_missing_filing_is_downloaded(
     outcome = load_universe(database, filings_dir, tmp_path / "universe", lambda: _CONTACT, fetch)
 
     assert outcome.downloaded == (missing,)
-    assert calls == [missing.url]
+    assert calls == [missing.filing_url]
 
 
 def test_a_failed_download_stops_the_run_before_the_database_is_touched(
@@ -235,8 +235,10 @@ def test_a_wrong_file_under_a_pinned_name_stops_the_run(
     database: Database, filings_dir: Path, tmp_path: Path
 ) -> None:
     """A file that is there is trusted only as far as its own content confirms the pin."""
-    vti, vxus, _ = PINNED_FILINGS
-    (filings_dir / vti.file_name).write_bytes((filings_dir / vxus.file_name).read_bytes())
+    vti, vxus = FUNDS
+    (filings_dir / vti.filing_file_name).write_bytes(
+        (filings_dir / vxus.filing_file_name).read_bytes()
+    )
 
     with pytest.raises(FilingError, match="is not the pinned VTI filing"):
         load_universe(database, filings_dir, tmp_path / "universe", _never_asked, _never_fetched)

@@ -30,7 +30,7 @@ pyvalue db migrate
 
 The database is `data/pyvalue.db` in the folder you run the command from. `--db PATH` points it elsewhere. Running the command again is harmless: it applies only what is missing.
 
-Fill the stock universe with the companies and securities held by three broad index funds (VTI, VXUS and DFAX):
+Fill the stock universe with the companies and securities held by two broad index funds (VTI and VXUS):
 
 ```bash
 pyvalue universe load

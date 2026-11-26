@@ -37,8 +37,8 @@ def test_a_file_is_read_row_by_row(nport_samples: Path) -> None:
             name="Iota KK",
             decided_on=date(2026, 11, 21),
             evidence=(
-                "Made up: VXUS files the name in capitals; DFAX files this spelling for "
-                "the same ISIN"
+                "Made up: VXUS line 9 files the name in capitals; line 15 files this spelling "
+                "for the same ISIN"
             ),
         ),
     )

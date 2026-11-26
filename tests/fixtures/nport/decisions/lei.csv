@@ -1,3 +1,3 @@
 isin,lei,company,decided_on,evidence
-DE00000T0019,549300THET2000000069,Theta AG,2026-11-20,"Made up: the identifier VXUS files is retired, and the one DFAX files is its successor"
-JP300000I006,549300SIGMA000000049,Iota KK,2026-11-20,"Made up: DFAX files the identifier of Delta PLC by mistake; this one is Iota's own"
+DE00000T0019,549300THET2000000069,Theta AG,2026-11-20,"Made up: the identifier VXUS line 8 files is retired, and the one line 14 files is its successor"
+JP300000I006,549300SIGMA000000049,Iota KK,2026-11-20,"Made up: VXUS line 15 files the identifier of Delta PLC by mistake; this one is Iota's own"

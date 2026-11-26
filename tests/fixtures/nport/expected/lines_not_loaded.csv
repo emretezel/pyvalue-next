@@ -5,8 +5,8 @@ VTI,7,no_valid_isin,SAMPLE CASH MANAGEMENT FUND,SAMPLE CASH MANAGEMENT FUND,,N/A
 VXUS,3,receipt_company_already_loaded,ZETA LTD,ZETA LTD ADR,US00000Z0015,549300ZETA0000000008,EC,
 VXUS,6,debt_or_derivative,SAMPLE TREASURY,TREASURY BILL,US00000T0013,N/A,DBT,
 VXUS,7,debt_or_derivative,SAMPLE BANK NA,FX FORWARD USD/EUR,,N/A,DFE,
-DFAX,6,receipt_company_already_loaded,Kappa Co Ltd,Kappa Co Ltd,US00000K0012,549300KAPPA000000078,OTHER,GDR
-DFAX,8,receipt_company_already_loaded,Lambda Bhd,Lambda Bhd,US00000L0011,N/A,OTHER,DEPOSITORY RECEIPT
-DFAX,11,no_valid_isin,U.S. Dollar,U.S. Dollar,,N/A,OTHER,currency
-DFAX,12,receipt_company_already_loaded,Zeta Ltd,Zeta Ltd,US00000Z0015,549300ZETA0000000008,OTHER,ADR
-DFAX,13,no_valid_isin,Xi Corp,Xi Corp,US00000X0018,N/A,EC,
+VXUS,16,receipt_company_already_loaded,Kappa Co Ltd,Kappa Co Ltd,US00000K0012,549300KAPPA000000078,OTHER,GDR
+VXUS,18,receipt_company_already_loaded,Lambda Bhd,Lambda Bhd,US00000L0011,N/A,OTHER,DEPOSITORY RECEIPT
+VXUS,21,no_valid_isin,U.S. Dollar,U.S. Dollar,,N/A,OTHER,currency
+VXUS,22,receipt_company_already_loaded,Zeta Ltd,Zeta Ltd,US00000Z0015,549300ZETA0000000008,OTHER,ADR
+VXUS,23,no_valid_isin,Xi Corp,Xi Corp,US00000X0018,N/A,EC,

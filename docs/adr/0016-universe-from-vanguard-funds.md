@@ -135,7 +135,7 @@ Estimated from the database of 2026-11-22, which holds 15,955 securities of 15,6
 | File | Rows today | Rows that stay | Why |
 |---|---|---|---|
 | `lei.csv` | 14 | 0 | Every row settled a disagreement between DFAX and VXUS. With one sponsor the funds do not disagree |
-| `name.csv` | 47 | 46 | One security is held only by DFAX |
+| `name.csv` | 47 | 47 | Every row is about a security a Vanguard fund holds. Corrected on 2026-11-26: this record first said 46, counting out Pony AI, whose row is keyed by the ordinary share that VXUS's receipt is read as |
 | `excluded.csv` | 18 | 13 | Six securities are held only by DFAX. One row is added for Tencent Music's receipt (below) |
 | `ordinary_share.csv` | 26 | 15 | Eleven receipts are held only by DFAX |
 

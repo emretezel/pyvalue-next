@@ -18,7 +18,7 @@ from pyvalue.errors import PyvalueError
 from pyvalue.universe import (
     DEFAULT_FILINGS_DIR,
     DEFAULT_OUTPUT_DIR,
-    PINNED_FILINGS,
+    FUNDS,
     NotLoadedReason,
     load_universe,
 )
@@ -52,9 +52,9 @@ def _universe_load(arguments: argparse.Namespace) -> int:
     result = outcome.result
 
     print(f"Database: {database.path}")
-    for pinned in PINNED_FILINGS:
-        action = "downloaded" if pinned in outcome.downloaded else "already there"
-        print(f"Filing {pinned.ticker} {pinned.filing_number}: {action}")
+    for fund in FUNDS:
+        action = "downloaded" if fund in outcome.downloaded else "already there"
+        print(f"Filing {fund.code} {fund.filing_number}: {action}")
     print(f"Lines read: {result.lines_read:,}")
     print(
         f"Lines not loaded: {len(result.not_loaded):,} "
@@ -134,9 +134,9 @@ def build_parser() -> argparse.ArgumentParser:
     universe_commands = universe.add_subparsers(dest="command", required=True, metavar="ACTION")
     universe_load = universe_commands.add_parser(
         "load",
-        help="load the companies and securities of the three fund holdings filings",
+        help="load the companies and securities of the fund holdings filings",
         description=(
-            "Download the three pinned SEC holdings filings if they are not in "
+            "Download the pinned SEC holdings filings of VTI and VXUS if they are not in "
             f"{DEFAULT_FILINGS_DIR} yet, and load their companies and securities into the "
             f"database. The lines that were not loaded and the cases left for an agent are "
             f"written to {DEFAULT_OUTPUT_DIR}. Running it again adds nothing."

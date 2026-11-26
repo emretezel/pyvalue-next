@@ -1,8 +1,10 @@
 # Sample holdings filings
 
-Three small files in the shape of an SEC N-PORT filing, for the tests of the universe load. The series id and the holdings date of each file are those of the pinned filing it stands in for, so the load accepts it. Every company, identifier and amount is made up. The ISINs and legal-entity identifiers carry correct check digits.
+Two small files in the shape of an SEC N-PORT filing, for the tests of the universe load: one for each fund of ADR 0016. The series id and the holdings date of each file are those of the pinned filing it stands in for, so the load accepts it. Every company, identifier and amount is made up. The ISINs and legal-entity identifiers carry correct check digits.
 
 The files are named by ticker. A test copies them into a temporary folder under the names the load expects.
+
+Every line gives the country its currency is traded in, as Vanguard's filings do: a line held in pounds says `GB`, a euro line the country of its ISIN. The one exception is the currency forward (VXUS line 7), which gives `N/A` and no issuer type of the form's list, as a real derivative line does.
 
 ## What each line is there for
 
@@ -18,7 +20,7 @@ The files are named by ticker. A test copies them into a temporary folder under 
 | 6 | CHICAGO MERCANTILE EXCHANGE | A derivative | Not loaded: debt or derivative |
 | 7 | SAMPLE CASH MANAGEMENT FUND | Cash, no ISIN | Not loaded: no valid ISIN |
 
-`VXUS.xml` (files receipts as common shares, the way Vanguard does):
+`VXUS.xml`, lines 1 to 10 (files receipts as common shares, the way Vanguard does):
 
 | Line | Issuer | What it exercises | Outcome |
 |---|---|---|---|
@@ -29,30 +31,30 @@ The files are named by ticker. A test copies them into a temporary folder under 
 | 5 | ETA HOLDINGS LTD | A receipt by its title; the company has no other line | Company 13, loaded after the ordinary lines |
 | 6 | SAMPLE TREASURY | Debt with an ISIN | Not loaded: debt or derivative |
 | 7 | SAMPLE BANK NA | A currency derivative | Not loaded: debt or derivative |
-| 8 | THETA AG | A company whose identifier DFAX contradicts | Company 6 |
-| 9 | IOTA KK | No identifier; DFAX supplies one that is taken | Company 7 |
+| 8 | THETA AG | A company whose identifier line 14 contradicts | Company 6 |
+| 9 | IOTA KK | No identifier; line 15 supplies one that is taken | Company 7 |
 | 10 | LAMBDA BHD | No identifier | Company 8 |
 
-`DFAX.xml` (labels receipts, units and rights in the conditional category, the way Dimensional does):
+`VXUS.xml`, lines 11 to 24 (a second sighting of securities above under other spellings and identifiers, and receipts, units and rights labelled in the form's conditional category). No Vanguard filing looks like this today. The lines are kept so that the rules for a security that is met again, and for a sponsor that labels its receipts, stay tested from the file to the database:
 
 | Line | Issuer | What it exercises | Outcome |
 |---|---|---|---|
-| 1 | Delta plc | A known ISIN with the same identifier and another spelling | Nothing |
-| 2 | Epsilon S.A. | A known ISIN that brings the missing identifier | Identifier filled in on company 4 |
-| 3 | Epsilon SA | A name that now belongs only to a company with an identifier | Company 9, a second "Epsilon" |
-| 4 | Theta AG | A known ISIN with another identifier | Case for the agent: `different_lei` |
-| 5 | Iota KK | A known ISIN with an identifier company 3 already has | Case for the agent: `lei_belongs_to_another_company` |
-| 6 | Kappa Co Ltd | A receipt by label (`GDR`); same identifier as line 7 | Not loaded: company already loaded |
-| 7 | Kappa Co Ltd | The company's own share | Company 10 |
-| 8 | Lambda Bhd | A receipt by label; same name as company 8, no identifier | Not loaded: company already loaded |
-| 9 | Mu Property Trust | Units in the conditional category | Company 11 |
-| 10 | Nu Corp | Rights in the conditional category | Company 12 |
-| 11 | U.S. Dollar | A currency balance, no ISIN | Not loaded: no valid ISIN |
-| 12 | Zeta Ltd | The ISIN of VXUS line 3, here labelled `ADR` | Not loaded: company already loaded |
-| 13 | Xi Corp | An ISIN with a wrong check digit | Not loaded: no valid ISIN |
-| 14 | Omicron Ltd | A receipt by label only; the company has no other line | Company 14 |
+| 11 | Delta plc | A known ISIN with the same identifier and another spelling | Nothing |
+| 12 | Epsilon S.A. | A known ISIN that brings the missing identifier | Identifier filled in on company 4 |
+| 13 | Epsilon SA | A name that now belongs only to a company with an identifier | Company 9, a second "Epsilon" |
+| 14 | Theta AG | A known ISIN with another identifier | Case for the agent: `different_lei` |
+| 15 | Iota KK | A known ISIN with an identifier company 3 already has | Case for the agent: `lei_belongs_to_another_company` |
+| 16 | Kappa Co Ltd | A receipt by label (`GDR`); same identifier as line 17 | Not loaded: company already loaded |
+| 17 | Kappa Co Ltd | The company's own share | Company 10 |
+| 18 | Lambda Bhd | A receipt by label; same name as company 8, no identifier | Not loaded: company already loaded |
+| 19 | Mu Property Trust | Units in the conditional category | Company 11 |
+| 20 | Nu Corp | Rights in the conditional category | Company 12 |
+| 21 | U.S. Dollar | A currency balance, no ISIN | Not loaded: no valid ISIN |
+| 22 | Zeta Ltd | The ISIN of line 3, here labelled `ADR` | Not loaded: company already loaded |
+| 23 | Xi Corp | An ISIN with a wrong check digit | Not loaded: no valid ISIN |
+| 24 | Omicron Ltd | A receipt by label only; the company has no other line | Company 14 |
 
-In total: 31 lines, 14 companies, 16 instruments, 11 lines not loaded, 2 cases for the agent. The expected output files are in `expected/`.
+In total: 31 lines (7 and 24), 14 companies, 16 instruments, 11 lines not loaded, 2 cases for the agent. The expected output files are in `expected/`.
 
 ## Sample decisions
 
@@ -60,16 +62,16 @@ In total: 31 lines, 14 companies, 16 instruments, 11 lines not loaded, 2 cases f
 
 | Security | Decided identifier | Effect |
 |---|---|---|
-| `DE00000T0019` (Theta AG) | The one DFAX files | Company 6 carries it instead of the one VXUS files |
-| `JP300000I006` (Iota KK) | An identifier neither fund files | Company 7, which had none, carries it |
+| `DE00000T0019` (Theta AG) | The one VXUS line 14 files | Company 6 carries it instead of the one line 8 files |
+| `JP300000I006` (Iota KK) | An identifier neither line files | Company 7, which had none, carries it |
 
 With these decisions the load reports no case.
 
-`decisions/name.csv` holds one decision on a company name (ADR 0012). None of the sample filings carries a vendor placeholder, so the sample decision does the next closest thing: it takes the spelling the second fund files.
+`decisions/name.csv` holds one decision on a company name (ADR 0012). None of the sample filings carries a vendor placeholder, so the sample decision does the next closest thing: it takes the spelling the second line files.
 
 | Security | Decided name | Effect |
 |---|---|---|
-| `JP300000I006` (Iota KK) | "Iota KK", as DFAX files it | Company 7 is called "Iota KK" instead of "IOTA KK", the spelling VXUS files |
+| `JP300000I006` (Iota KK) | "Iota KK", as VXUS line 15 files it | Company 7 is called "Iota KK" instead of "IOTA KK", the spelling line 9 files |
 
 The two spellings compare as equal, so the decision changes no join.
 
@@ -85,6 +87,6 @@ A database that was loaded before the exclusion existed is refused; a rebuilt on
 
 | Receipt | Ordinary share | Effect |
 |---|---|---|
-| `US00000O0018` (Omicron Ltd, DFAX line 14) | `SG00000O0017`, made up | The line is loaded as an ordinary line under the ordinary share's ISIN. Still 14 companies and 16 instruments, but Omicron is now company 13 with instrument 15, ahead of Eta Holdings, whose only line is still a receipt. One receipt fewer is recognised |
+| `US00000O0018` (Omicron Ltd, VXUS line 24) | `SG00000O0017`, made up | The line is loaded as an ordinary line under the ordinary share's ISIN. Still 14 companies and 16 instruments, but Omicron is now company 13 with instrument 15, ahead of Eta Holdings, whose only line is still a receipt. One receipt fewer is recognised |
 
 A database that already holds the receipt is refused, as for an exclusion.

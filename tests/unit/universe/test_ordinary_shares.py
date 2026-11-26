@@ -39,8 +39,8 @@ def test_a_file_is_read_row_by_row(nport_samples: Path) -> None:
             company="Omicron Ltd",
             decided_on=date(2026, 11, 21),
             evidence=(
-                "Made up: a depositary receipt, which DFAX labels ADR; the ordinary share "
-                "trades at home, where no sample fund holds it"
+                "Made up: a depositary receipt, which VXUS line 24 labels ADR; the ordinary "
+                "share trades at home, where no sample fund holds it"
             ),
         ),
     )

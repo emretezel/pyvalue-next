@@ -35,12 +35,12 @@ _EXPECTED_COMPANIES: tuple[Company, ...] = (
     Company(1, "ALPHA CORP", _ALPHA),
     Company(2, "BETA INC", None),
     Company(3, "DELTA PLC", _DELTA),
-    # Loaded without an identifier from VXUS; DFAX filled it in.
+    # Loaded without an identifier from VXUS line 2; line 12 filled it in.
     Company(4, "EPSILON SA", _EPSILON),
     Company(5, "ZETA LTD", _ZETA),
-    # DFAX names another identifier for the same ISIN: the first answer stays.
+    # VXUS line 14 names another identifier for the same ISIN: the first answer stays.
     Company(6, "THETA AG", _THETA),
-    # DFAX supplies an identifier company 3 already has: it is not filled in.
+    # VXUS line 15 supplies an identifier company 3 already has: it is not filled in.
     Company(7, "IOTA KK", None),
     Company(8, "LAMBDA BHD", None),
     # The same name as company 4, which by then is found by identifier only.
@@ -140,7 +140,7 @@ def test_every_line_of_the_filings_is_loaded_or_listed(
     )
 
     result = outcome.result
-    # 16 lines added an instrument; 4 met an ISIN that was already one (DFAX lines 1, 2, 4, 5).
+    # 16 lines added an instrument; 4 met an ISIN that was already one (VXUS lines 11, 12, 14, 15).
     assert result.lines_read - len(result.not_loaded) == result.instruments_added + 4
 
 
@@ -171,7 +171,7 @@ def test_a_second_run_changes_nothing_and_writes_the_same_files(
 
 # --- With the sample decisions (ADR 0010) ------------------------------------------------
 
-# What the two sample decisions change: Theta carries the identifier DFAX files,
+# What the two sample decisions change: Theta carries the identifier VXUS line 14 files,
 # and Iota, which had none, carries its own.
 _EXPECTED_COMPANIES_AFTER_DECISIONS: tuple[Company, ...] = tuple(
     {6: Company(6, "THETA AG", _THETA_DECIDED), 7: Company(7, "IOTA KK", _IOTA_DECIDED)}.get(
@@ -248,7 +248,7 @@ def test_decisions_applied_later_give_the_database_a_rebuild_would_give(
 
 # --- With the sample name decision (ADR 0012) --------------------------------------------
 
-# What the sample name decision changes: Iota is called as DFAX spells it.
+# What the sample name decision changes: Iota is called as VXUS line 15 spells it.
 _EXPECTED_COMPANIES_AFTER_NAMING: tuple[Company, ...] = tuple(
     Company(7, "Iota KK", None) if company.company_id == 7 else company
     for company in _EXPECTED_COMPANIES

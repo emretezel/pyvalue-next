@@ -11,7 +11,7 @@ from pathlib import Path
 
 from pyvalue.db import Database
 from pyvalue.universe.exclusions import Exclusion, packaged_exclusions
-from pyvalue.universe.filings import PINNED_FILINGS, PinnedFiling, read_pinned_filing
+from pyvalue.universe.funds import FUNDS, FundDefinition, read_pinned_filing
 from pyvalue.universe.lei_decisions import LeiDecision, packaged_lei_decisions
 from pyvalue.universe.load import FundHoldings, LoadResult, load_holdings
 from pyvalue.universe.name_decisions import NameDecision, packaged_name_decisions
@@ -30,13 +30,13 @@ class UniverseLoad:
     """What one run of the universe load did.
 
     Attributes:
-        downloaded: The filings this run fetched from the SEC. Filings that
-            were already in the folder are not listed.
+        downloaded: The funds whose filing this run fetched from the SEC. A
+            fund whose filing was already in the folder is not listed.
         result: What the load did to the database.
         output: Where the load output was written.
     """
 
-    downloaded: tuple[PinnedFiling, ...]
+    downloaded: tuple[FundDefinition, ...]
     result: LoadResult
     output: OutputFiles
 
@@ -52,7 +52,7 @@ def load_universe(
     exclusions: Sequence[Exclusion] | None = None,
     ordinary_shares: Sequence[OrdinaryShare] | None = None,
 ) -> UniverseLoad:
-    """Load the pinned filings into the database.
+    """Load the pinned filings of the funds into the database.
 
     Args:
         database: The database to load into.
@@ -86,7 +86,7 @@ def load_universe(
         DatabaseError: If the database is not ready or refuses a row.
     """
     # Read before anything is fetched: a broken decisions file should stop the
-    # run at once, not after three downloads.
+    # run at once, not after the downloads.
     if lei_decisions is None:
         lei_decisions = packaged_lei_decisions()
     if name_decisions is None:
@@ -95,14 +95,14 @@ def load_universe(
         exclusions = packaged_exclusions()
     if ordinary_shares is None:
         ordinary_shares = packaged_ordinary_shares()
-    downloaded: list[PinnedFiling] = []
+    downloaded: list[FundDefinition] = []
     funds: list[FundHoldings] = []
-    for pinned in PINNED_FILINGS:
-        path = filings_dir / pinned.file_name
+    for fund in FUNDS:
+        path = filings_dir / fund.filing_file_name
         if not path.is_file():
-            download_filing(pinned, path, user_agent(), fetch)
-            downloaded.append(pinned)
-        funds.append(FundHoldings(ticker=pinned.ticker, lines=read_pinned_filing(path, pinned)))
+            download_filing(fund, path, user_agent(), fetch)
+            downloaded.append(fund)
+        funds.append(FundHoldings(ticker=fund.code, lines=read_pinned_filing(path, fund)))
 
     result = load_holdings(
         database, funds, lei_decisions, name_decisions, exclusions, ordinary_shares

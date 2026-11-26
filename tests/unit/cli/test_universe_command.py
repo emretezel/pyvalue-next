@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from pyvalue.cli import main
-from pyvalue.universe import PINNED_FILINGS, Exclusion
+from pyvalue.universe import FUNDS, Exclusion
 
 
 @pytest.fixture
@@ -28,8 +28,8 @@ def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, nport_samples: Pa
     assert main(["db", "migrate"]) == 0
     folder = tmp_path / "data" / "sec"
     folder.mkdir()
-    for pinned in PINNED_FILINGS:
-        shutil.copyfile(nport_samples / f"{pinned.ticker}.xml", folder / pinned.file_name)
+    for fund in FUNDS:
+        shutil.copyfile(nport_samples / f"{fund.code}.xml", folder / fund.filing_file_name)
     return tmp_path
 
 
@@ -48,7 +48,6 @@ def test_load_fills_the_database_and_says_what_it_did(
         f"Database: {Path('data') / 'pyvalue.db'}",
         "Filing VTI 0000036405-26-000480: already there",
         "Filing VXUS 0000736054-26-000275: already there",
-        "Filing DFAX 0001004726-26-009205: already there",
         "Lines read: 31",
         "Lines not loaded: 11 (3 debt or derivative, 4 without a valid ISIN, "
         "4 receipt of a company already loaded, 0 kept out by decision)",
@@ -149,7 +148,7 @@ def test_a_missing_filing_without_the_contact_line_stops_before_any_download(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """ADR 0009: no contact line, no request; the message names the line to add."""
-    (workspace / "data" / "sec" / PINNED_FILINGS[0].file_name).unlink()
+    (workspace / "data" / "sec" / FUNDS[0].filing_file_name).unlink()
     capsys.readouterr()
 
     status = main(["universe", "load"])
@@ -163,7 +162,7 @@ def test_a_missing_filing_without_the_contact_line_stops_before_any_download(
     )
     assert len(output.err.splitlines()) == 1
     # Nothing was fetched, and nothing was loaded from the two filings that were there.
-    assert not (workspace / "data" / "sec" / PINNED_FILINGS[0].file_name).exists()
+    assert not (workspace / "data" / "sec" / FUNDS[0].filing_file_name).exists()
     assert not (workspace / "data" / "universe").exists()
 
 
@@ -171,7 +170,7 @@ def test_a_damaged_filing_gives_one_line_and_status_one(
     workspace: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A file that is not the pinned filing is named, and the database stays empty."""
-    (workspace / "data" / "sec" / PINNED_FILINGS[2].file_name).write_text("<html></html>")
+    (workspace / "data" / "sec" / FUNDS[1].filing_file_name).write_text("<html></html>")
     capsys.readouterr()
 
     status = main(["universe", "load"])
