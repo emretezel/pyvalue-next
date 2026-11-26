@@ -1,6 +1,6 @@
 # ADR 0020: The receipt check also reads the sponsor's own name for a security
 
-- Status: Accepted
+- Status: Accepted. The point left open below, the receipts that are their company's only line, was settled by the author on 2026-11-26: they stay.
 - Date: 2026-11-26
 - Changes: the receipt check of ADR 0006, which gains a fourth thing to read, and the common holding line of ADR 0016, which gains the sponsor's name. Everything else in both records stands.
 
@@ -84,4 +84,4 @@ Only the three receipts are gone. Their companies stay, each through its home sh
 ## Not decided here
 
 - Whether the load should refuse a database that still holds a receipt it would no longer load (open since ADR 0014).
-- The receipts that are their company's only line: 22 after this change, mostly Chinese companies listed in New York.
+- The receipts that are their company's only line: 22 after this change, mostly Chinese companies listed in New York. Settled on 2026-11-26: they stay in the universe, as ADR 0006 has it. No listed home share was found for them, and the listing rule of ADR 0019 sends each to the agent before a listing is written.
