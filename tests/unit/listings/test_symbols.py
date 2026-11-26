@@ -74,44 +74,15 @@ def test_the_us_sample_list_gives_four_rows_on_two_exchanges(
     path = eodhd_samples / "symbols_US.json"
     prepared = prepare_list("US", parse_symbol_list(path.read_bytes(), str(path)), sample_codes)
 
+    # The label picked the exchange and the type let the line in; neither is
+    # part of the row (ADR 0025).
     assert prepared.symbols == (
-        ProviderSymbol(
-            "eodhd",
-            "US",
-            "ALFA",
-            "XNYS",
-            "NYSE",
-            "Alpha Corp",
-            "Common Stock",
-            "USD",
-            "US00000A0014",
-        ),
-        ProviderSymbol(
-            "eodhd",
-            "US",
-            "BETA-B",
-            "XNAS",
-            "NASDAQ",
-            "Beta Inc Class B",
-            "Common Stock",
-            "USD",
-            "US00000B0021",
-        ),
+        ProviderSymbol("eodhd", "US", "ALFA", "XNYS", "Alpha Corp", "USD", "US00000A0014"),
+        ProviderSymbol("eodhd", "US", "BETA-B", "XNAS", "Beta Inc Class B", "USD", "US00000B0021"),
         # An empty ISIN is no ISIN; AMEX is a second label for New York.
-        ProviderSymbol(
-            "eodhd", "US", "DLTA", "XNYS", "AMEX", "Delta Ltd", "Common Stock", "USD", None
-        ),
-        ProviderSymbol(
-            "eodhd",
-            "US",
-            "ZETA-P",
-            "XNYS",
-            "NYSE",
-            "Zeta Corp Pref",
-            "Preferred Stock",
-            "USD",
-            "US00000F0068",
-        ),
+        ProviderSymbol("eodhd", "US", "DLTA", "XNYS", "Delta Ltd", "USD", None),
+        # A preferred share is stored like a common one.
+        ProviderSymbol("eodhd", "US", "ZETA-P", "XNYS", "Zeta Corp Pref", "USD", "US00000F0068"),
     )
     assert prepared.lines == 8
     assert dict(prepared.not_shares) == {"ETF": 1, "FUND": 1}

@@ -1,9 +1,11 @@
 """Tests for the ``provider_symbol`` table and the key it points at.
 
-Migration 0005 creates them (ADR 0018). The tests pin which rows the database
-accepts, which it refuses and by which constraint, what happens to symbol
-rows when a mapping changes, which index each lookup of the listing rule
-uses, and that the migration leaves an existing database as it was.
+Migration 0005 creates them (ADR 0018), and migration 0006 takes the venue
+label and the type out of the table (ADR 0025). The tests pin which rows the
+database accepts, which it refuses and by which constraint, what happens to
+symbol rows when a mapping changes, which index each lookup of the listing
+rule uses, and what the two migrations do to a database that already has
+rows.
 
 Author: Emre Tezel
 """
@@ -22,6 +24,17 @@ _FOREIGN_KEY = "FOREIGN KEY constraint failed"
 _UNIQUE = "UNIQUE constraint failed"
 _NOT_NULL = "NOT NULL constraint failed"
 
+# The columns of the table today, in order (ADR 0018 without the two of ADR 0025).
+_COLUMNS: list[str] = [
+    "provider_code",
+    "provider_exchange_code",
+    "provider_symbol",
+    "mic",
+    "provider_name",
+    "provider_currency",
+    "isin",
+]
+
 # Valid rows, the examples of ADR 0018. EODHD's ``US`` covers two of our
 # exchanges, ``KO`` one, and ``LSE`` one.
 _REFERENCE: tuple[str, ...] = (
@@ -35,6 +48,17 @@ _REFERENCE: tuple[str, ...] = (
     "('eodhd', 'XLON', 'LSE'), ('eodhd', 'XKLS', 'KLSE')",
 )
 _SYMBOLS: str = (
+    "INSERT INTO provider_symbol (provider_code, provider_exchange_code, provider_symbol, mic, "
+    "provider_name, provider_currency, isin) VALUES "
+    "('eodhd', 'KO', '000660', 'XKRX', 'SK Hynix Inc', 'KRW', 'KR7000660001'), "
+    "('eodhd', 'US', 'BRK-B', 'XNYS', 'Berkshire Hathaway Inc', 'USD', 'US0846707026'), "
+    "('eodhd', 'LSE', 'SHEL', 'XLON', 'Shell plc', 'GBX', 'GB00BP6MXD84'), "
+    "('eodhd', 'KLSE', '1155', 'XKLS', NULL, 'MYR', NULL)"
+)
+
+# The same four lines as the table took them before migration 0006, with the
+# venue label and the type.
+_SYMBOLS_AT_5: str = (
     "INSERT INTO provider_symbol (provider_code, provider_exchange_code, provider_symbol, mic, "
     "provider_venue, provider_name, provider_type, provider_currency, isin) VALUES "
     "('eodhd', 'KO', '000660', 'XKRX', 'KO', 'SK Hynix Inc', 'Common Stock', 'KRW', "
@@ -60,9 +84,7 @@ def _symbol(
     code: str = "'US'",
     symbol: str = "'AAPL'",
     mic: str = "'XNAS'",
-    venue: str = "'NASDAQ'",
     name: str = "'Apple Inc'",
-    kind: str = "'Common Stock'",
     currency: str = "'USD'",
     isin: str = "'US0378331005'",
 ) -> str:
@@ -72,9 +94,14 @@ def _symbol(
     """
     return (
         "INSERT INTO provider_symbol (provider_code, provider_exchange_code, provider_symbol, "
-        "mic, provider_venue, provider_name, provider_type, provider_currency, isin) VALUES "
-        f"('eodhd', {code}, {symbol}, {mic}, {venue}, {name}, {kind}, {currency}, {isin})"
+        "mic, provider_name, provider_currency, isin) VALUES "
+        f"('eodhd', {code}, {symbol}, {mic}, {name}, {currency}, {isin})"
     )
+
+
+def _columns(connection: sqlite3.Connection) -> list[str]:
+    """Return the names of the table's columns, in order."""
+    return [str(row[1]) for row in connection.execute("PRAGMA table_info(provider_symbol)")]
 
 
 def test_the_example_rows_are_accepted(seeded: sqlite3.Connection) -> None:
@@ -85,6 +112,11 @@ def test_the_example_rows_are_accepted(seeded: sqlite3.Connection) -> None:
 def test_the_helper_builds_a_valid_row(seeded: sqlite3.Connection) -> None:
     """Otherwise a refusal below could be for another reason than the one tested."""
     seeded.execute(_symbol())
+
+
+def test_the_table_has_the_seven_columns_of_its_record(migrated_db: sqlite3.Connection) -> None:
+    """The venue label and the type are gone (ADR 0025)."""
+    assert _columns(migrated_db) == _COLUMNS
 
 
 # Each case: what is wrong, the statement the database must refuse, and the
@@ -103,13 +135,8 @@ _REFUSED: list[tuple[str, str, str]] = [
     ("a padded symbol", _symbol(symbol="' AAPL'"), _CHECK),
     ("no symbol", _symbol(symbol="NULL"), _NOT_NULL),
     ("no exchange", _symbol(mic="NULL"), _NOT_NULL),
-    ("an empty venue label", _symbol(venue="''"), _CHECK),
-    ("a padded venue label", _symbol(venue="'NASDAQ '"), _CHECK),
     ("an empty name", _symbol(name="''"), _CHECK),
     ("a padded name", _symbol(name="' Apple Inc'"), _CHECK),
-    ("a fund", _symbol(kind="'ETF'"), _CHECK),
-    ("a type in another spelling", _symbol(kind="'common stock'"), _CHECK),
-    ("no type", _symbol(kind="NULL"), _NOT_NULL),
     ("an empty currency", _symbol(currency="''"), _CHECK),
     ("a padded currency", _symbol(currency="'USD '"), _CHECK),
     ("no currency", _symbol(currency="NULL"), _NOT_NULL),
@@ -127,7 +154,7 @@ _REFUSED: list[tuple[str, str, str]] = [
 def test_provider_symbol_refuses_a_row_that_breaks_a_rule(
     seeded: sqlite3.Connection, statement: str, constraint: str
 ) -> None:
-    """The schema is the last line of defence for every rule of ADR 0018."""
+    """The schema is the last line of defence for the rules it still holds."""
     with pytest.raises(sqlite3.IntegrityError, match=constraint):
         seeded.execute(statement)
 
@@ -135,12 +162,10 @@ def test_provider_symbol_refuses_a_row_that_breaks_a_rule(
 @pytest.mark.parametrize(
     "statement",
     [
-        pytest.param(_symbol(venue="NULL"), id="no venue label"),
         pytest.param(_symbol(name="NULL"), id="no name"),
         pytest.param(_symbol(isin="NULL"), id="no ISIN"),
         pytest.param(_symbol(currency="'GBX'"), id="a sub-unit currency"),
         pytest.param(_symbol(currency="'Unknown'"), id="a currency code we do not know"),
-        pytest.param(_symbol(kind="'Preferred Stock'"), id="a preferred share"),
         pytest.param(
             _symbol(code="'KO'", symbol="'AAPL'", mic="'XKRX'"),
             id="a symbol that another code also has",
@@ -271,6 +296,48 @@ def test_migration_0005_leaves_an_existing_database_as_it_was(tmp_path: Path) ->
         assert connection.execute("SELECT COUNT(*) FROM provider_symbol").fetchone() == (0,)
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
         # The new table is usable at once on the rows that were already there.
-        connection.execute(_SYMBOLS)
+        connection.execute(_SYMBOLS_AT_5)
+    finally:
+        connection.close()
+
+
+def test_migration_0006_keeps_every_row_and_drops_the_two_columns(tmp_path: Path) -> None:
+    """The other seven values of each line stay, and so do the keys and the indexes."""
+    path = tmp_path / "pyvalue.db"
+    migrate(path, packaged_migrations()[:5])
+    connection = connect(path)
+    try:
+        for statement in (*_REFERENCE, _SYMBOLS_AT_5):
+            connection.execute(statement)
+        before = connection.execute(
+            f"SELECT {', '.join(_COLUMNS)} FROM provider_symbol ORDER BY provider_symbol"
+        ).fetchall()
+        assert len(before) == 4
+    finally:
+        connection.close()
+
+    report = migrate(path, packaged_migrations()[:6])
+
+    assert [migration.label for migration in report.applied] == [
+        "0006_provider_symbol_drop_venue_and_type"
+    ]
+    connection = connect(path)
+    try:
+        assert _columns(connection) == _COLUMNS
+        after = connection.execute(
+            f"SELECT {', '.join(_COLUMNS)} FROM provider_symbol ORDER BY provider_symbol"
+        ).fetchall()
+        assert after == before
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+        indexes = {str(row[1]) for row in connection.execute("PRAGMA index_list(provider_symbol)")}
+        assert {"provider_symbol_exchange", "provider_symbol_isin"} <= indexes
+        # The rules that did not depend on the two columns still hold.
+        with pytest.raises(sqlite3.IntegrityError, match=_UNIQUE):
+            connection.execute(_symbol(symbol="'BRK-B'"))
+        with pytest.raises(sqlite3.IntegrityError, match=_FOREIGN_KEY):
+            connection.execute(_symbol(mic="'XKRX'"))
+        with pytest.raises(sqlite3.IntegrityError, match=_FOREIGN_KEY):
+            connection.execute("DELETE FROM provider_exchange WHERE mic = 'XKRX'")
+        connection.execute(_symbol())
     finally:
         connection.close()

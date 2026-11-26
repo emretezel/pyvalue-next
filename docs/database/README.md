@@ -15,7 +15,7 @@ The pyvalue database is one SQLite file, `data/pyvalue.db` by default. Its schem
 | [`provider`](provider.md) | A data provider, such as EODHD | ADR 0002 |
 | [`provider_exchange`](provider_exchange.md) | The code one provider uses for one of our exchanges | ADR 0002 |
 | [`provider_listing`](provider_listing.md) | The symbol one provider uses for one of our listings | ADR 0002 |
-| [`provider_symbol`](provider_symbol.md) | One share line of a provider's symbol list | ADR 0018 |
+| [`provider_symbol`](provider_symbol.md) | One share line of a provider's symbol list | ADR 0018, ADR 0025 |
 | [`schema_migration`](schema_migration.md) | A migration that has been applied to this database | ADR 0007 |
 
 ## Views
@@ -104,9 +104,7 @@ erDiagram
         TEXT provider_exchange_code PK, FK "the provider's exchange code"
         TEXT provider_symbol PK "the provider's own symbol"
         TEXT mic FK "required, our exchange the line is on"
-        TEXT provider_venue "optional, the provider's venue label"
         TEXT provider_name "optional"
-        TEXT provider_type "required, Common Stock or Preferred Stock"
         TEXT provider_currency "required, as the provider gives it"
         TEXT isin "optional, the ISIN the provider gives"
     }

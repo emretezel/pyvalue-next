@@ -11,7 +11,11 @@ from pyvalue.db.repository import Repository
 
 @dataclass(frozen=True, slots=True)
 class ProviderSymbol:
-    """One row of ``provider_symbol``: a share line of a provider's symbol list (ADR 0018).
+    """One row of ``provider_symbol``: a share line of a provider's symbol list.
+
+    Decided in ADR 0018. The provider's venue label and its type for the line
+    are not kept (ADR 0025): the first only says how ``mic`` was worked out,
+    and the load stores nothing but common and preferred shares.
 
     Attributes:
         provider_code: The provider.
@@ -19,10 +23,7 @@ class ProviderSymbol:
             line is in.
         provider_symbol: The symbol the provider uses, exactly as given.
         mic: Our exchange the line is on.
-        provider_venue: The provider's venue label for the line, or ``None``
-            when it gives none.
         provider_name: The provider's name for the security, or ``None``.
-        provider_type: ``Common Stock`` or ``Preferred Stock``.
         provider_currency: The currency code as the provider gives it. It can
             be a sub-unit, such as ``GBX`` for pence.
         isin: The ISIN the provider gives for the line, or ``None`` when it
@@ -33,9 +34,7 @@ class ProviderSymbol:
     provider_exchange_code: str
     provider_symbol: str
     mic: str
-    provider_venue: str | None
     provider_name: str | None
-    provider_type: str
     provider_currency: str
     isin: str | None
 
@@ -72,16 +71,13 @@ class ProviderSymbolRepository(Repository):
         """
         self._execute(
             "INSERT INTO provider_symbol (provider_code, provider_exchange_code, provider_symbol, "
-            "mic, provider_venue, provider_name, provider_type, provider_currency, isin) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "mic, provider_name, provider_currency, isin) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
                 symbol.provider_code,
                 symbol.provider_exchange_code,
                 symbol.provider_symbol,
                 symbol.mic,
-                symbol.provider_venue,
                 symbol.provider_name,
-                symbol.provider_type,
                 symbol.provider_currency,
                 symbol.isin,
             ),

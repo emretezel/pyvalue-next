@@ -22,9 +22,7 @@ _HYNIX: ProviderSymbol = ProviderSymbol(
     provider_exchange_code="KO",
     provider_symbol="000660",
     mic="XKRX",
-    provider_venue="KO",
     provider_name="SK Hynix Inc",
-    provider_type="Common Stock",
     provider_currency="KRW",
     isin="KR7000660001",
 )
@@ -33,21 +31,17 @@ _BERKSHIRE: ProviderSymbol = ProviderSymbol(
     provider_exchange_code="US",
     provider_symbol="BRK-B",
     mic="XNYS",
-    provider_venue="NYSE",
     provider_name="Berkshire Hathaway Inc",
-    provider_type="Common Stock",
     provider_currency="USD",
     isin="US0846707026",
 )
-# A line for which the provider gives no venue, no name and no ISIN.
+# A line for which the provider gives no name and no ISIN.
 _BARE: ProviderSymbol = ProviderSymbol(
     provider_code="eodhd",
     provider_exchange_code="US",
     provider_symbol="XYZ",
     mic="XNAS",
-    provider_venue=None,
     provider_name=None,
-    provider_type="Preferred Stock",
     provider_currency="USD",
     isin=None,
 )
@@ -103,26 +97,15 @@ def test_add_stores_every_column_as_given(mapped: Database) -> None:
     connection = connect(mapped.path)
     try:
         rows = connection.execute(
-            "SELECT provider_code, provider_exchange_code, provider_symbol, mic, provider_venue, "
-            "provider_name, provider_type, provider_currency, isin FROM provider_symbol "
-            "ORDER BY provider_symbol"
+            "SELECT provider_code, provider_exchange_code, provider_symbol, mic, provider_name, "
+            "provider_currency, isin FROM provider_symbol ORDER BY provider_symbol"
         ).fetchall()
     finally:
         connection.close()
 
     assert rows == [
-        (
-            "eodhd",
-            "US",
-            "BRK-B",
-            "XNYS",
-            "NYSE",
-            "Berkshire Hathaway Inc",
-            "Common Stock",
-            "USD",
-            "US0846707026",
-        ),
-        ("eodhd", "US", "XYZ", "XNAS", None, None, "Preferred Stock", "USD", None),
+        ("eodhd", "US", "BRK-B", "XNYS", "Berkshire Hathaway Inc", "USD", "US0846707026"),
+        ("eodhd", "US", "XYZ", "XNAS", None, "USD", None),
     ]
 
 
@@ -175,7 +158,6 @@ def test_a_removed_list_can_be_stored_again_in_the_same_unit_of_work(mapped: Dat
     [
         pytest.param(replace(_BERKSHIRE, mic="XKRX"), id="an exchange the code is not mapped to"),
         pytest.param(replace(_BERKSHIRE, provider_exchange_code="ZZ"), id="an unknown code"),
-        pytest.param(replace(_BERKSHIRE, provider_type="ETF"), id="not a share"),
         pytest.param(replace(_BERKSHIRE, provider_symbol=""), id="no symbol"),
         pytest.param(replace(_BERKSHIRE, provider_currency=""), id="no currency"),
         pytest.param(replace(_BERKSHIRE, isin="US084670702"), id="a malformed ISIN"),
@@ -195,6 +177,6 @@ def test_a_code_has_one_line_per_symbol(mapped: Database) -> None:
     with mapped.unit_of_work() as work:
         work.provider_symbols.add(_BERKSHIRE)
         with pytest.raises(ConstraintError, match="provider_symbol"):
-            work.provider_symbols.add(replace(_BERKSHIRE, mic="XNAS", provider_venue="NASDAQ"))
+            work.provider_symbols.add(replace(_BERKSHIRE, mic="XNAS"))
 
     assert _count(mapped, "US") == 1

@@ -43,9 +43,11 @@ from pyvalue.providers.eodhd import (
     parse_symbol_list,
 )
 
-# The types of a symbol line that are stored: the two the table accepts
+# The types of a symbol line that are stored: common and preferred shares
 # (ADR 0018). Matched exactly; a line of any other type, or of one of these
-# in another spelling, is counted by its type in the report.
+# in another spelling, is counted by its type in the report. The type itself
+# is not stored (ADR 0025), so this is the only place that keeps funds,
+# warrants and bonds out of the table.
 _SHARE_TYPES: frozenset[str] = frozenset({"Common Stock", "Preferred Stock"})
 
 # How a line without a type, and a line without a venue label, are named in
@@ -343,10 +345,10 @@ def prepare_list(
                 provider_code=PROVIDER_CODE,
                 provider_exchange_code=provider_exchange_code,
                 provider_symbol=line.symbol,
+                # The venue label decided the exchange and the type decided
+                # that the line is stored at all; neither is kept (ADR 0025).
                 mic=market,
-                provider_venue=line.venue,
                 provider_name=line.name,
-                provider_type=line.kind,
                 provider_currency=line.currency,
                 isin=isin,
             )
