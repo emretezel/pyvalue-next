@@ -13,8 +13,11 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from pyvalue.universe.decision_file import read_decisions, read_packaged, valid_day, valid_isin
+from pyvalue.decision_file import read_decisions, read_packaged, valid_day, valid_isin
 from pyvalue.universe.errors import UniverseError
+
+# The component whose `decisions` folder holds the file.
+_PACKAGE: str = "pyvalue.universe"
 
 # The columns of the file, in order.
 _HEADER: tuple[str, ...] = ("isin", "name", "decided_on", "evidence")
@@ -41,7 +44,7 @@ class NameDecision:
 def _decision(row: list[str], where: str) -> NameDecision:
     """Turn one row of the file into a decision, or say what is wrong with it."""
     isin, name, decided_on, evidence = row
-    valid_isin(isin, where)
+    valid_isin(isin, where, UniverseError)
     # The load stores a filed name with its runs of spaces reduced to one. A
     # decided name is stored as it stands, so it has to be in that form
     # already; an empty one would be refused by the table.
@@ -53,7 +56,10 @@ def _decision(row: list[str], where: str) -> NameDecision:
     if not evidence.strip():
         raise UniverseError(f"{where}: the evidence must be filled in")
     return NameDecision(
-        isin=isin, name=name, decided_on=valid_day(decided_on, where), evidence=evidence
+        isin=isin,
+        name=name,
+        decided_on=valid_day(decided_on, where, UniverseError),
+        evidence=evidence,
     )
 
 
@@ -72,9 +78,9 @@ def read_name_decisions(path: Path) -> tuple[NameDecision, ...]:
             is invalid, or two rows are about the same security. The message
             names the row, counting the header as row 1.
     """
-    return read_decisions(path, _HEADER, _decision)
+    return read_decisions(path, _HEADER, _decision, UniverseError)
 
 
 def packaged_name_decisions() -> tuple[NameDecision, ...]:
     """Read the decisions shipped inside the installed package."""
-    return read_packaged("name.csv", read_name_decisions)
+    return read_packaged(_PACKAGE, "name.csv", read_name_decisions)

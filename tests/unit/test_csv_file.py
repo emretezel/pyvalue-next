@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from pyvalue.csv_file import read_csv
+from pyvalue.csv_file import read_csv, write_csv
 from pyvalue.errors import PyvalueError
 
 _HEADER: tuple[str, ...] = ("code", "name")
@@ -83,3 +83,52 @@ def test_a_file_that_is_not_text_is_refused(tmp_path: Path) -> None:
 
     with pytest.raises(_FileError, match="cannot read the sample file"):
         read_csv(path, _HEADER, _FileError, "the sample file")
+
+
+def test_a_written_file_is_its_header_and_its_rows(tmp_path: Path) -> None:
+    """Line ends are plain new lines on every platform, and a comma in a cell is quoted."""
+    path = tmp_path / "out.csv"
+
+    write_csv(path, _HEADER, [("A", "Alpha"), ("B", "Beta, the second")], _FileError)
+
+    assert path.read_bytes() == b'code,name\nA,Alpha\nB,"Beta, the second"\n'
+
+
+def test_a_file_written_without_rows_is_its_header(tmp_path: Path) -> None:
+    """A run with nothing to report still leaves a file that says so."""
+    path = tmp_path / "out.csv"
+
+    write_csv(path, _HEADER, [], _FileError)
+
+    assert path.read_text(encoding="utf-8") == "code,name\n"
+
+
+def test_writing_creates_the_folder_and_replaces_what_was_there(tmp_path: Path) -> None:
+    """The file describes the latest run only."""
+    path = tmp_path / "new" / "folder" / "out.csv"
+
+    write_csv(path, _HEADER, [("A", "Alpha")], _FileError)
+    write_csv(path, _HEADER, [("B", "Beta")], _FileError)
+
+    assert path.read_text(encoding="utf-8") == "code,name\nB,Beta\n"
+
+
+def test_what_is_written_can_be_read_back(tmp_path: Path) -> None:
+    """The reader and the writer agree on the shape."""
+    path = tmp_path / "out.csv"
+    rows = [("A", 'He said "no"'), ("B", "two\nlines")]
+
+    write_csv(path, _HEADER, rows, _FileError)
+
+    assert [cells for _, cells in read_csv(path, _HEADER, _FileError, "the sample file")] == [
+        list(row) for row in rows
+    ]
+
+
+def test_a_file_that_cannot_be_written_is_the_components_error(tmp_path: Path) -> None:
+    """A folder in the place of the file: the message names the path."""
+    path = tmp_path / "out.csv"
+    path.mkdir()
+
+    with pytest.raises(_FileError, match="cannot write"):
+        write_csv(path, _HEADER, [], _FileError)

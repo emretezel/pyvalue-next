@@ -7,11 +7,10 @@ writes the same bytes (ADR 0009).
 Author: Emre Tezel
 """
 
-import csv
-from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from pyvalue.csv_file import write_csv
 from pyvalue.universe.errors import UniverseError
 from pyvalue.universe.load import AgentCase, LoadResult, NotLoadedLine
 
@@ -92,20 +91,6 @@ def _agent_case_row(case: AgentCase) -> tuple[str, ...]:
     )
 
 
-def _write(path: Path, header: Sequence[str], rows: Iterable[Sequence[str]]) -> None:
-    """Write one comma-separated file, replacing what was there."""
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # newline="" hands line endings to the csv module, and "\n" keeps the
-        # file byte-identical on every platform.
-        with path.open("w", encoding="utf-8", newline="") as handle:
-            writer = csv.writer(handle, lineterminator="\n")
-            writer.writerow(header)
-            writer.writerows(rows)
-    except OSError as error:
-        raise UniverseError(f"cannot write {path}: {error}") from error
-
-
 def write_output(result: LoadResult, folder: Path) -> OutputFiles:
     """Write the two output files of a load.
 
@@ -123,14 +108,16 @@ def write_output(result: LoadResult, folder: Path) -> OutputFiles:
         lines_not_loaded=folder / LINES_NOT_LOADED_FILE,
         cases_for_agent=folder / CASES_FOR_AGENT_FILE,
     )
-    _write(
+    write_csv(
         files.lines_not_loaded,
         _LINES_NOT_LOADED_HEADER,
         (_not_loaded_row(entry) for entry in result.not_loaded),
+        UniverseError,
     )
-    _write(
+    write_csv(
         files.cases_for_agent,
         _CASES_FOR_AGENT_HEADER,
         (_agent_case_row(case) for case in result.agent_cases),
+        UniverseError,
     )
     return files

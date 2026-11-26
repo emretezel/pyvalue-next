@@ -141,7 +141,8 @@ Update this list in the same commit as any structural change. `docs/architecture
   - `config.py`: reads `private/config.toml`. Never puts a value from that file into a message.
   - `http.py`: the one place a download is made from: one named host, HTTPS only, no redirects. A secret part of an address, such as a provider's API key, is sent and never put into a message.
   - `identifiers.py`: whether a text is a valid ISIN or legal-entity identifier, check digits included.
-  - `csv_file.py`: reads a committed comma-separated file with a fixed header. The decision files and the exchange files start with it.
+  - `csv_file.py`: reads a committed comma-separated file with a fixed header, and writes a generated one. The decision files and the exchange files start with it; the files a run leaves under `data/` for a person or an agent are written with it.
+  - `decision_file.py`: what every decisions file shares: one row per security, keyed by its ISIN, with the day of the decision. The reader of each kind of decision is built on it and names its own error.
   - `errors.py`: `PyvalueError`, the base of every error a person can fix. The command line prints such an error as one line.
 - `tests/`: pytest suite, mirroring the source tree under `tests/unit/`, `tests/regression/`, and `tests/integration/`. Shared fixtures are in `tests/conftest.py`; checked-in sample data is under `tests/fixtures/` (the sample EODHD lists there are made up in the provider's documented shape; none was downloaded).
 - `docs/`: substantive documentation (see the **Documentation** section); `docs/architecture.md` is the design, `docs/adr/` holds the architecture decision records, `docs/database/` has one file per table, and `docs/universe.md` records what the universe held at the end of the universe phase.

@@ -14,8 +14,11 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from pyvalue.universe.decision_file import read_decisions, read_packaged, valid_day, valid_isin
+from pyvalue.decision_file import read_decisions, read_packaged, valid_day, valid_isin
 from pyvalue.universe.errors import UniverseError
+
+# The component whose `decisions` folder holds the file.
+_PACKAGE: str = "pyvalue.universe"
 
 # The columns of the file, in order.
 _HEADER: tuple[str, ...] = ("isin", "company", "decided_on", "evidence")
@@ -42,13 +45,16 @@ class Exclusion:
 def _exclusion(row: list[str], where: str) -> Exclusion:
     """Turn one row of the file into an exclusion, or say what is wrong with it."""
     isin, company, decided_on, evidence = row
-    valid_isin(isin, where)
+    valid_isin(isin, where, UniverseError)
     # Keeping a security out is a decision someone must be able to retrace,
     # so the two columns that only people read are required as well.
     if not company.strip() or not evidence.strip():
         raise UniverseError(f"{where}: the company and the evidence must both be filled in")
     return Exclusion(
-        isin=isin, company=company, decided_on=valid_day(decided_on, where), evidence=evidence
+        isin=isin,
+        company=company,
+        decided_on=valid_day(decided_on, where, UniverseError),
+        evidence=evidence,
     )
 
 
@@ -67,9 +73,9 @@ def read_exclusions(path: Path) -> tuple[Exclusion, ...]:
             is invalid, or two rows are about the same security. The message
             names the row, counting the header as row 1.
     """
-    return read_decisions(path, _HEADER, _exclusion)
+    return read_decisions(path, _HEADER, _exclusion, UniverseError)
 
 
 def packaged_exclusions() -> tuple[Exclusion, ...]:
     """Read the exclusions shipped inside the installed package."""
-    return read_packaged("excluded.csv", read_exclusions)
+    return read_packaged(_PACKAGE, "excluded.csv", read_exclusions)

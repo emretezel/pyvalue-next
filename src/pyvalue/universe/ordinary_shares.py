@@ -15,8 +15,11 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-from pyvalue.universe.decision_file import read_decisions, read_packaged, valid_day, valid_isin
+from pyvalue.decision_file import read_decisions, read_packaged, valid_day, valid_isin
 from pyvalue.universe.errors import UniverseError
+
+# The component whose `decisions` folder holds the file.
+_PACKAGE: str = "pyvalue.universe"
 
 # The columns of the file, in order.
 _HEADER: tuple[str, ...] = ("isin", "ordinary_isin", "company", "decided_on", "evidence")
@@ -46,8 +49,8 @@ class OrdinaryShare:
 def _ordinary_share(row: list[str], where: str) -> OrdinaryShare:
     """Turn one row of the file into a decision, or say what is wrong with it."""
     isin, ordinary_isin, company, decided_on, evidence = row
-    valid_isin(isin, where)
-    valid_isin(ordinary_isin, where)
+    valid_isin(isin, where, UniverseError)
+    valid_isin(ordinary_isin, where, UniverseError)
     if isin == ordinary_isin:
         raise UniverseError(f"{where}: {isin} is given as its own ordinary share")
     # A wrong pair would attach a company to another company's share, and the
@@ -59,7 +62,7 @@ def _ordinary_share(row: list[str], where: str) -> OrdinaryShare:
         isin=isin,
         ordinary_isin=ordinary_isin,
         company=company,
-        decided_on=valid_day(decided_on, where),
+        decided_on=valid_day(decided_on, where, UniverseError),
         evidence=evidence,
     )
 
@@ -79,9 +82,9 @@ def read_ordinary_shares(path: Path) -> tuple[OrdinaryShare, ...]:
             is invalid, or two rows are about the same receipt. The message
             names the row, counting the header as row 1.
     """
-    return read_decisions(path, _HEADER, _ordinary_share)
+    return read_decisions(path, _HEADER, _ordinary_share, UniverseError)
 
 
 def packaged_ordinary_shares() -> tuple[OrdinaryShare, ...]:
     """Read the decisions shipped inside the installed package."""
-    return read_packaged("ordinary_share.csv", read_ordinary_shares)
+    return read_packaged(_PACKAGE, "ordinary_share.csv", read_ordinary_shares)

@@ -13,9 +13,12 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
+from pyvalue.decision_file import read_decisions, read_packaged, valid_day, valid_isin
 from pyvalue.identifiers import is_valid_lei
-from pyvalue.universe.decision_file import read_decisions, read_packaged, valid_day, valid_isin
 from pyvalue.universe.errors import UniverseError
+
+# The component whose `decisions` folder holds the file.
+_PACKAGE: str = "pyvalue.universe"
 
 # The columns of the file, in order.
 _HEADER: tuple[str, ...] = ("isin", "lei", "company", "decided_on", "evidence")
@@ -44,7 +47,7 @@ class LeiDecision:
 def _decision(row: list[str], where: str) -> LeiDecision:
     """Turn one row of the file into a decision, or say what is wrong with it."""
     isin, lei, company, decided_on, evidence = row
-    valid_isin(isin, where)
+    valid_isin(isin, where, UniverseError)
     if not is_valid_lei(lei):
         raise UniverseError(f"{where}: '{lei}' is not a valid legal-entity identifier")
     # A decision nobody can retrace is worth little, so the two columns that
@@ -55,7 +58,7 @@ def _decision(row: list[str], where: str) -> LeiDecision:
         isin=isin,
         lei=lei,
         company=company,
-        decided_on=valid_day(decided_on, where),
+        decided_on=valid_day(decided_on, where, UniverseError),
         evidence=evidence,
     )
 
@@ -75,9 +78,9 @@ def read_lei_decisions(path: Path) -> tuple[LeiDecision, ...]:
             is invalid, or two rows are about the same security. The message
             names the row, counting the header as row 1.
     """
-    return read_decisions(path, _HEADER, _decision)
+    return read_decisions(path, _HEADER, _decision, UniverseError)
 
 
 def packaged_lei_decisions() -> tuple[LeiDecision, ...]:
     """Read the decisions shipped inside the installed package."""
-    return read_packaged("lei.csv", read_lei_decisions)
+    return read_packaged(_PACKAGE, "lei.csv", read_lei_decisions)

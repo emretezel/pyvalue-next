@@ -1,19 +1,24 @@
-"""Read a committed comma-separated file with a fixed header.
+"""Read a committed comma-separated file, and write a generated one.
 
 pyvalue keeps what people decide and maintain in small comma-separated files
-under version control: the decisions that correct the universe load, our list
-of exchanges, a provider's exchange codes. They share one shape, a header row
-and then rows with as many cells as the header has. A file has no constraints
-of its own, so every reader starts with the two checks made here; what a row
-means is for the reader of its kind to check.
+under version control: the decisions that correct what a rule works out, our
+list of exchanges, a provider's exchange codes. They share one shape, a header
+row and then rows with as many cells as the header has. A file has no
+constraints of its own, so every reader starts with the two checks made here;
+what a row means is for the reader of its kind to check.
+
+What a run leaves for a person or an agent to look at is written in the same
+shape, under ``data/``. Such a file is generated, never committed, and the
+same run writes the same bytes.
 
 The module lives outside every component, like ``pyvalue.errors``, so that
-each component can read its files without depending on another.
+each component can read and write its files without depending on another.
 
 Author: Emre Tezel
 """
 
 import csv
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from pyvalue.errors import PyvalueError
@@ -57,3 +62,30 @@ def read_csv(
             raise error(f"{where} has {len(row)} cells where {len(header)} are expected")
         located.append((where, row))
     return tuple(located)
+
+
+def write_csv(
+    path: Path, header: Sequence[str], rows: Iterable[Sequence[str]], error: type[PyvalueError]
+) -> None:
+    """Write one comma-separated file, replacing what was there.
+
+    Args:
+        path: The file. Its folder is created when missing.
+        header: The first row.
+        rows: The rows after it, each with as many cells as the header has.
+        error: The error to raise. Each component has its own.
+
+    Raises:
+        PyvalueError: Of the class given as ``error``, if the file cannot be
+            written.
+    """
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # newline="" hands line endings to the csv module, and "\n" keeps the
+        # file byte-identical on every platform.
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.writer(handle, lineterminator="\n")
+            writer.writerow(header)
+            writer.writerows(rows)
+    except OSError as failure:
+        raise error(f"cannot write {path}: {failure}") from failure
