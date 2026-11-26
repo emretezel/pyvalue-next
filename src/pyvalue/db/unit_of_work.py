@@ -21,9 +21,11 @@ from pyvalue.db.exchange import ExchangeRepository
 from pyvalue.db.fund import FundRepository
 from pyvalue.db.holding import HoldingRepository
 from pyvalue.db.instrument import InstrumentRepository
+from pyvalue.db.listing import ListingRepository
 from pyvalue.db.migrate import require_current_schema
 from pyvalue.db.provider import ProviderRepository
 from pyvalue.db.provider_exchange import ProviderExchangeRepository
+from pyvalue.db.provider_listing import ProviderListingRepository
 from pyvalue.db.provider_symbol import ProviderSymbolRepository
 
 
@@ -43,6 +45,8 @@ class UnitOfWork:
         providers: The repository of the ``provider`` table.
         provider_exchanges: The repository of the ``provider_exchange`` table.
         provider_symbols: The repository of the ``provider_symbol`` table.
+        listings: The repository of the ``listing`` table.
+        provider_listings: The repository of the ``provider_listing`` table.
     """
 
     def __init__(self, connection: sqlite3.Connection) -> None:
@@ -57,6 +61,10 @@ class UnitOfWork:
             connection
         )
         self.provider_symbols: Final[ProviderSymbolRepository] = ProviderSymbolRepository(
+            connection
+        )
+        self.listings: Final[ListingRepository] = ListingRepository(connection)
+        self.provider_listings: Final[ProviderListingRepository] = ProviderListingRepository(
             connection
         )
 

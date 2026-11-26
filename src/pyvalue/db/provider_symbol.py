@@ -44,6 +44,35 @@ class ProviderSymbolRepository(Repository):
 
     table: ClassVar[str] = "provider_symbol"
 
+    def of_provider(self, provider_code: str) -> tuple[ProviderSymbol, ...]:
+        """Return every stored line of one provider, ordered by exchange code and symbol.
+
+        The listing rule reads them once and looks them up in memory
+        (ADR 0026): one of its comparisons, between a fund's ticker and a
+        symbol, cannot be made by the database.
+
+        Args:
+            provider_code: The provider whose lines are wanted.
+        """
+        rows = self._execute(
+            "SELECT provider_code, provider_exchange_code, provider_symbol, mic, provider_name, "
+            "provider_currency, isin FROM provider_symbol WHERE provider_code = ? "
+            "ORDER BY provider_exchange_code, provider_symbol",
+            (provider_code,),
+        ).fetchall()
+        return tuple(
+            ProviderSymbol(
+                provider_code=str(provider),
+                provider_exchange_code=str(code),
+                provider_symbol=str(symbol),
+                mic=str(mic),
+                provider_name=None if name is None else str(name),
+                provider_currency=str(currency),
+                isin=None if isin is None else str(isin),
+            )
+            for provider, code, symbol, mic, name, currency, isin in rows
+        )
+
     def count_of_code(self, provider_code: str, provider_exchange_code: str) -> int:
         """Return how many lines are stored under one exchange code of a provider.
 

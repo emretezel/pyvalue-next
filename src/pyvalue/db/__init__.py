@@ -16,6 +16,7 @@ from pyvalue.db.exchange import Exchange, ExchangeRepository
 from pyvalue.db.fund import Fund, FundRepository
 from pyvalue.db.holding import Holding, HoldingRepository
 from pyvalue.db.instrument import Instrument, InstrumentRepository
+from pyvalue.db.listing import Listing, ListingRepository
 from pyvalue.db.migrate import (
     Migration,
     MigrationError,
@@ -26,6 +27,7 @@ from pyvalue.db.migrate import (
 )
 from pyvalue.db.provider import Provider, ProviderRepository
 from pyvalue.db.provider_exchange import ProviderExchange, ProviderExchangeRepository
+from pyvalue.db.provider_listing import ProviderListing, ProviderListingRepository
 from pyvalue.db.provider_symbol import ProviderSymbol, ProviderSymbolRepository
 from pyvalue.db.unit_of_work import Database, UnitOfWork
 
@@ -44,12 +46,16 @@ __all__ = [
     "HoldingRepository",
     "Instrument",
     "InstrumentRepository",
+    "Listing",
+    "ListingRepository",
     "Migration",
     "MigrationError",
     "MigrationReport",
     "Provider",
     "ProviderExchange",
     "ProviderExchangeRepository",
+    "ProviderListing",
+    "ProviderListingRepository",
     "ProviderRepository",
     "ProviderSymbol",
     "ProviderSymbolRepository",

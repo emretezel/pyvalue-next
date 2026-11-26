@@ -15,7 +15,6 @@ from pyvalue.db import (
     ProviderExchange,
     ProviderSymbol,
 )
-from pyvalue.db.connection import connect
 
 _HYNIX: ProviderSymbol = ProviderSymbol(
     provider_code="eodhd",
@@ -85,28 +84,33 @@ def test_add_stores_lines_and_they_are_counted_under_their_code(mapped: Database
 
 
 def test_add_stores_every_column_as_given(mapped: Database) -> None:
-    """Read back with a plain query: the repository has no reader for a line yet.
-
-    The listing rule will bring one (ADR 0019). Until then this is the test
-    that each value lands in its own column, and an absent one as NULL.
-    """
+    """Each value comes back from its own column, and an absent one as ``None``."""
     with mapped.unit_of_work() as work:
         work.provider_symbols.add(_BERKSHIRE)
         work.provider_symbols.add(_BARE)
 
-    connection = connect(mapped.path)
-    try:
-        rows = connection.execute(
-            "SELECT provider_code, provider_exchange_code, provider_symbol, mic, provider_name, "
-            "provider_currency, isin FROM provider_symbol ORDER BY provider_symbol"
-        ).fetchall()
-    finally:
-        connection.close()
+    with mapped.unit_of_work() as work:
+        assert work.provider_symbols.of_provider("eodhd") == (_BERKSHIRE, _BARE)
 
-    assert rows == [
-        ("eodhd", "US", "BRK-B", "XNYS", "Berkshire Hathaway Inc", "USD", "US0846707026"),
-        ("eodhd", "US", "XYZ", "XNAS", None, "USD", None),
-    ]
+
+def test_of_provider_orders_by_exchange_code_and_then_symbol(mapped: Database) -> None:
+    """The order does not depend on which line was added first."""
+    with mapped.unit_of_work() as work:
+        work.provider_symbols.add(_BARE)
+        work.provider_symbols.add(_BERKSHIRE)
+        work.provider_symbols.add(_HYNIX)
+
+    with mapped.unit_of_work() as work:
+        assert work.provider_symbols.of_provider("eodhd") == (_HYNIX, _BERKSHIRE, _BARE)
+
+
+def test_of_provider_returns_only_that_providers_lines(mapped: Database) -> None:
+    """Another provider has stored nothing."""
+    with mapped.unit_of_work() as work:
+        work.provider_symbols.add(_HYNIX)
+
+    with mapped.unit_of_work() as work:
+        assert work.provider_symbols.of_provider("other") == ()
 
 
 def test_the_count_is_per_provider(mapped: Database) -> None:
