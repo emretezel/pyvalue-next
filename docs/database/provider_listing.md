@@ -42,7 +42,7 @@ The key leads with `listing_id`, so the index serves lookups that start from a l
 
 ## View: `provider_listing_address`
 
-One row gives the two parts a provider needs to address one listing. It stores nothing; it joins this table to `listing` and `provider_exchange`.
+One row gives the two parts a provider needs to address one listing. It stores nothing; it joins this table to `listing` and `provider_exchange`. The fundamentals download reads it to know which lines to ask the provider about (ADR 0028), through `ProviderListingRepository.addresses_of_provider`.
 
 | Column | Comes from | Meaning |
 |---|---|---|

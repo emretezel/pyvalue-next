@@ -1,0 +1,90 @@
+{
+  "General": {
+    "Code": "DLT",
+    "Type": "Common Stock",
+    "Name": "Delta PLC",
+    "Exchange": "LSE",
+    "CurrencyCode": "GBX",
+    "CountryISO": "GB",
+    "ISIN": "GB00000D0016",
+    "PrimaryTicker": "DLT.LSE",
+    "FiscalYearEnd": "December",
+    "UpdatedAt": "2026-11-27"
+  },
+  "Highlights": {
+    "MarketCapitalization": 2620000000
+  },
+  "outstandingShares": {
+    "annual": {
+      "0": {
+        "date": "2025",
+        "dateFormatted": "2025-12-31",
+        "shares": 100000000
+      }
+    },
+    "quarterly": {}
+  },
+  "Financials": {
+    "Balance_Sheet": {
+      "currency_symbol": "GBP",
+      "quarterly": {
+        "2026-09-30": {
+          "date": "2026-09-30",
+          "filing_date": "2026-11-05",
+          "currency_symbol": "GBP",
+          "totalAssets": "1310000000.00",
+          "totalLiab": "524000000.00"
+        }
+      },
+      "yearly": {
+        "2025-12-31": {
+          "date": "2025-12-31",
+          "filing_date": "2026-02-20",
+          "currency_symbol": "GBP",
+          "totalAssets": "1310000000.00",
+          "totalLiab": "524000000.00"
+        }
+      }
+    },
+    "Cash_Flow": {
+      "currency_symbol": "GBP",
+      "quarterly": {
+        "2026-09-30": {
+          "date": "2026-09-30",
+          "filing_date": "2026-11-05",
+          "currency_symbol": "GBP",
+          "totalCashFromOperatingActivities": "131000000.00"
+        }
+      },
+      "yearly": {
+        "2025-12-31": {
+          "date": "2025-12-31",
+          "filing_date": "2026-02-20",
+          "currency_symbol": "GBP",
+          "totalCashFromOperatingActivities": "131000000.00"
+        }
+      }
+    },
+    "Income_Statement": {
+      "currency_symbol": "GBP",
+      "quarterly": {
+        "2026-09-30": {
+          "date": "2026-09-30",
+          "filing_date": "2026-11-05",
+          "currency_symbol": "GBP",
+          "totalRevenue": "655000000.00",
+          "netIncome": "65000000.00"
+        }
+      },
+      "yearly": {
+        "2025-12-31": {
+          "date": "2025-12-31",
+          "filing_date": "2026-02-20",
+          "currency_symbol": "GBP",
+          "totalRevenue": "655000000.00",
+          "netIncome": "65000000.00"
+        }
+      }
+    }
+  }
+}

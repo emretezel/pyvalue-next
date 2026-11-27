@@ -27,7 +27,11 @@ from pyvalue.db.migrate import (
 )
 from pyvalue.db.provider import Provider, ProviderRepository
 from pyvalue.db.provider_exchange import ProviderExchange, ProviderExchangeRepository
-from pyvalue.db.provider_listing import ProviderListing, ProviderListingRepository
+from pyvalue.db.provider_listing import (
+    ProviderListing,
+    ProviderListingAddress,
+    ProviderListingRepository,
+)
 from pyvalue.db.provider_symbol import ProviderSymbol, ProviderSymbolRepository
 from pyvalue.db.unit_of_work import Database, UnitOfWork
 
@@ -55,6 +59,7 @@ __all__ = [
     "ProviderExchange",
     "ProviderExchangeRepository",
     "ProviderListing",
+    "ProviderListingAddress",
     "ProviderListingRepository",
     "ProviderRepository",
     "ProviderSymbol",

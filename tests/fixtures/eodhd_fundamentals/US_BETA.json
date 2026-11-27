@@ -1,0 +1,90 @@
+{
+  "General": {
+    "Code": "BETA",
+    "Type": "Common Stock",
+    "Name": "Beta Inc",
+    "Exchange": "NASDAQ",
+    "CurrencyCode": "USD",
+    "CountryISO": "US",
+    "ISIN": null,
+    "PrimaryTicker": "BETA.US",
+    "FiscalYearEnd": "December",
+    "UpdatedAt": "2026-11-27"
+  },
+  "Highlights": {
+    "MarketCapitalization": 1680000000
+  },
+  "outstandingShares": {
+    "annual": {
+      "0": {
+        "date": "2025",
+        "dateFormatted": "2025-12-31",
+        "shares": 100000000
+      }
+    },
+    "quarterly": {}
+  },
+  "Financials": {
+    "Balance_Sheet": {
+      "currency_symbol": "USD",
+      "quarterly": {
+        "2026-09-30": {
+          "date": "2026-09-30",
+          "filing_date": "2026-11-05",
+          "currency_symbol": "USD",
+          "totalAssets": "840000000.00",
+          "totalLiab": "336000000.00"
+        }
+      },
+      "yearly": {
+        "2025-12-31": {
+          "date": "2025-12-31",
+          "filing_date": "2026-02-20",
+          "currency_symbol": "USD",
+          "totalAssets": "840000000.00",
+          "totalLiab": "336000000.00"
+        }
+      }
+    },
+    "Cash_Flow": {
+      "currency_symbol": "USD",
+      "quarterly": {
+        "2026-09-30": {
+          "date": "2026-09-30",
+          "filing_date": "2026-11-05",
+          "currency_symbol": "USD",
+          "totalCashFromOperatingActivities": "84000000.00"
+        }
+      },
+      "yearly": {
+        "2025-12-31": {
+          "date": "2025-12-31",
+          "filing_date": "2026-02-20",
+          "currency_symbol": "USD",
+          "totalCashFromOperatingActivities": "84000000.00"
+        }
+      }
+    },
+    "Income_Statement": {
+      "currency_symbol": "USD",
+      "quarterly": {
+        "2026-09-30": {
+          "date": "2026-09-30",
+          "filing_date": "2026-11-05",
+          "currency_symbol": "USD",
+          "totalRevenue": "420000000.00",
+          "netIncome": "42000000.00"
+        }
+      },
+      "yearly": {
+        "2025-12-31": {
+          "date": "2025-12-31",
+          "filing_date": "2026-02-20",
+          "currency_symbol": "USD",
+          "totalRevenue": "420000000.00",
+          "netIncome": "42000000.00"
+        }
+      }
+    }
+  }
+}

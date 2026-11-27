@@ -112,6 +112,16 @@ def eodhd_samples() -> Path:
 
 
 @pytest.fixture
+def fundamentals_samples() -> Path:
+    """Return the folder of the sample fundamentals payloads, ``tests/fixtures/eodhd_fundamentals``.
+
+    The files are made up in the provider's shape, named by exchange code and
+    symbol, and described in the folder's README.
+    """
+    return _FIXTURES / "eodhd_fundamentals"
+
+
+@pytest.fixture
 def eodhd_lists_dir(tmp_path: Path, eodhd_samples: Path) -> Path:
     """Return a temporary folder holding the sample EODHD lists as the load expects them.
 

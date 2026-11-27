@@ -9,12 +9,13 @@ Only what has been agreed is described as designed. Everything else is listed as
 | Component | Package | What it does | Status |
 |---|---|---|---|
 | Database | `pyvalue.db` | Opens the SQLite file, applies migrations, owns every SQL statement | Built: connections, migrations, the unit of work, and a repository for every table: `company`, `instrument`, `fund`, `holding`, `exchange`, `provider`, `provider_exchange`, `provider_symbol`, `listing` and `provider_listing`. A repository gets a method when a component first needs it |
-| Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load`, `pyvalue symbols download`, `pyvalue symbols load`, `pyvalue listings fill` |
+| Command line | `pyvalue.cli` | Thin commands that call the components | Built: `pyvalue db migrate`, `pyvalue universe load`, `pyvalue symbols download`, `pyvalue symbols load`, `pyvalue listings fill`, `pyvalue fundamentals download`. A command that runs for a while shows one progress bar, redrawn in place (`pyvalue.cli.progress`) |
 | Universe load | `pyvalue.universe` | Downloads the SEC holdings filings of VTI and VXUS and Vanguard's own holdings files, reads each fund through its sponsor's adapter, records the funds and the share lines that were loaded in `fund` and `holding`, and fills `company` and `instrument`, applying the decisions files on legal-entity identifiers, on company names, on securities kept out and on receipts read as their ordinary share (ADR 0016, ADR 0017, ADR 0021, ADR 0022, ADR 0006, ADR 0009 to ADR 0015, ADR 0023) | Built |
 | Settings | `pyvalue.config` | Reads `private/config.toml` | Built: the SEC contact line and the EODHD key |
 | Listings | `pyvalue.listings` | Keeps our exchanges, stores the provider's symbol lists, applies the automatic rule and the decisions file (ADR 0018, ADR 0019, ADR 0024, ADR 0025, ADR 0026, ADR 0027) | Built: the reader of our exchanges file; the symbols download, which keeps the provider's exchange list and symbol lists as files; the symbols load, which fills `exchange`, `provider` and `provider_exchange` from the two committed files and stores the saved symbol lists in `provider_symbol`; and the listing fill, which gives a security its listing by the rule of ADR 0019 or by a decision, and writes the securities it could not fill to a report. The first lists were downloaded on 2026-11-27 and the first pass of the agent was made the same day; `docs/listings.md` records what the listings hold |
+| Fundamentals | `pyvalue.fundamentals` | Downloads the provider's fundamentals payload of every line a listing is on, and keeps each as a file (ADR 0028) | Built: the download, which requests the payload of every provider line without a saved file, in batches on a few threads, inside the day's allowance; and the report of the listings without a payload. It reads the database and never writes it. Reading the payloads into tables is not designed yet |
 | Providers | `pyvalue.providers` | A provider's exchange codes and its client | Built: the reader of a provider's exchange file, and the EODHD client for its exchange list, its symbol lists, the fundamentals of one security and the account's daily allowance (ADR 0028). The first download was made on 2026-11-27, and the client read every list as it came (ADR 0027) |
-| Prices, fundamentals, metrics, screens, data-quality reports, the agent that decides listings | | | Not designed yet |
+| Prices, reading the fundamentals payloads into tables, metrics, screens, data-quality reports | | | Not designed yet |
 
 ## How the components fit together
 
@@ -23,6 +24,7 @@ flowchart LR
     cli["Command line<br/>pyvalue.cli"]
     universe["Universe load<br/>pyvalue.universe"]
     listings["Listings<br/>pyvalue.listings"]
+    fundamentals["Fundamentals<br/>pyvalue.fundamentals"]
     providers["Providers<br/>pyvalue.providers"]
     db["Database<br/>pyvalue.db"]
     file[("data/pyvalue.db")]
@@ -33,11 +35,14 @@ flowchart LR
     cli --> db
     cli --> universe
     cli --> listings
+    cli --> fundamentals
     universe --> db
     universe --> sec
     universe --> sponsor
     listings --> db
     listings --> providers
+    fundamentals --> db
+    fundamentals --> providers
     providers --> eodhd
     db --> file
 ```
@@ -62,14 +67,22 @@ The pattern for database access is Repository with Unit of Work (ADR 0008). The 
 
 ## The universe, as designed
 
-The data model and the steps are fixed by the records. Steps 1 to 3 are built, and so is the part of step 4 that applies the decisions. The lists of step 2 have not been downloaded yet, so no security has a listing. The agent of step 4 is not designed yet.
+The data model and the steps are fixed by the records. All four steps are built and have run on live lists: [`docs/listings.md`](listings.md) records what the listings held after the first download and the agent's first pass.
 
 | Step | What happens | Record |
 |---|---|---|
 | 1. Load | The SEC holdings filings of VTI and VXUS are read through a sponsor adapter, which adds ticker, SEDOL and Vanguard's own name for the security from Vanguard's own holdings file. That name is one of the things the receipt check reads. The lines fill `company` and `instrument`; the funds, and each line that was loaded, are recorded in `fund` and `holding`. A line that was not loaded is listed in an output file instead. Where a fund files a placeholder instead of a company name, a decisions file gives the name. A second lists securities that are kept out of the universe, among them every fund and property trust (ADR 0023), and a third reads a depositary receipt as its ordinary share. The file that chooses between legal-entity identifiers stays for the day two sponsors disagree | ADR 0016, ADR 0017, ADR 0021, ADR 0022, ADR 0006, ADR 0009 to ADR 0015, ADR 0020, ADR 0023 |
-| 2. Look up | The provider's exchange list and symbol lists are downloaded and kept as files. From the files, the common and preferred shares on our exchanges are stored in `provider_symbol`, one list as a whole at a time; our exchanges and the provider's codes for them come from two committed files. Downloading and loading are separate commands, so that nothing but the download ever contacts the provider | ADR 0018, ADR 0024 |
+| 2. Look up | The provider's exchange list and symbol lists are downloaded and kept as files. From the files, the common and preferred shares on our exchanges are stored in `provider_symbol`, one list as a whole at a time; our exchanges and the provider's codes for them come from two committed files. Downloading and loading are separate commands, so that the load never contacts the provider | ADR 0018, ADR 0024 |
 | 3. Fill | A listing is written when exactly one of the provider's lines in the security's home market carries its ISIN and the fund's ticker does not contradict it. A security whose market the provider does not serve gets none, and one whose symbol list is not stored yet waits. Every other security goes on a report | ADR 0019, ADR 0026 |
 | 4. Decide | An agent works through the report one reason at a time: Claude Code in a session of this repository, with no command of its own. It proposes a decision with its evidence, or leaves the security on the report, and the author approves each batch. The decisions are kept in a committed file, which the fill applies before the rule | ADR 0019, ADR 0026, ADR 0027 |
+
+## Fundamentals, as designed
+
+Only the download is designed. How the payloads are read into tables is the next decision.
+
+| Step | What happens | Record |
+|---|---|---|
+| Download | For every provider line that a listing is on and that has no saved payload, the provider's fundamentals are requested and the answer is kept as one compressed file. An answer gets a file only if it is a payload for the symbol that was asked for. The run takes the lines in batches of 500 on 8 threads; before each batch it asks the account what is left of the day's allowance and takes only what fits, 5,000 short of the limit. A saved payload is never overwritten: to fetch one again, a person sets its file aside. The listings without a payload are written to a report | ADR 0028 |
 
 ## Where things live
 
@@ -88,6 +101,8 @@ The data model and the steps are fixed by the records. Steps 1 to 3 are built, a
 | Vanguard's own holdings files | `data/vanguard/`, one file per fund, named by fund code (ADR 0016) | No |
 | The exchange reference files | `src/pyvalue/listings/reference/exchange.csv` for our exchanges and `src/pyvalue/providers/eodhd_exchange.csv` for the provider's codes, both shipped inside the package (ADR 0018). In the provider's file a row without a market leaves a code, or the lines with one venue label, out on purpose (ADR 0024) | Yes |
 | The provider's downloaded lists | `data/eodhd/`: `exchanges.json` and one `symbols_<CODE>.json` per exchange code, each the provider's answer as it arrived (ADR 0018, ADR 0024). `pyvalue symbols download` writes them and `pyvalue symbols load` reads them | No |
+| The fundamentals payloads | `data/eodhd/fundamentals/<CODE>/<SYMBOL>.json.gz`: one file per provider line a listing is on, the provider's answer as it arrived, gzip-compressed. `pyvalue fundamentals download` writes the missing ones and never replaces one. Outside a subscription they are the only copy (ADR 0028) | No |
+| The fundamentals download's report | `data/fundamentals/not_downloaded.csv`: the listings that have no saved payload, with the reason. Rewritten by every `pyvalue fundamentals download` | No |
 | Credentials and the SEC contact line | `private/config.toml` | No |
 | Table documentation | `docs/database/`, one file per table | Yes |
 | What the universe holds | `docs/universe.md`: the counts, the companies by country, how that compares with what is listed, what the review of 2026-11-26 found, and the points carried into the listing step. A record of 2026-11-26, not regenerated by a command | Yes |

@@ -26,10 +26,56 @@ class ProviderListing:
     provider_symbol: str
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderListingAddress:
+    """One row of the view ``provider_listing_address`` (ADR 0002).
+
+    The two parts a provider needs to address a listing: its own code for
+    the exchange the listing trades on, and its own symbol there.
+
+    Attributes:
+        provider_code: The provider.
+        listing_id: Our listing.
+        provider_exchange_code: The provider's code for the listing's
+            exchange.
+        provider_symbol: The provider's symbol for the listing, without any
+            exchange part.
+    """
+
+    provider_code: str
+    listing_id: int
+    provider_exchange_code: str
+    provider_symbol: str
+
+
 class ProviderListingRepository(Repository):
     """Every statement that reads or changes ``provider_listing``."""
 
     table: ClassVar[str] = "provider_listing"
+
+    def addresses_of_provider(self, provider_code: str) -> tuple[ProviderListingAddress, ...]:
+        """Return how one provider addresses each listing, ordered by listing.
+
+        A listing on an exchange the provider has no code for is not
+        returned: the provider cannot be asked about it.
+
+        Args:
+            provider_code: The provider whose addresses are wanted.
+        """
+        rows = self._execute(
+            "SELECT provider_code, listing_id, provider_exchange_code, provider_symbol "
+            "FROM provider_listing_address WHERE provider_code = ? ORDER BY listing_id",
+            (provider_code,),
+        ).fetchall()
+        return tuple(
+            ProviderListingAddress(
+                provider_code=str(provider),
+                listing_id=int(listing_id),
+                provider_exchange_code=str(exchange_code),
+                provider_symbol=str(symbol),
+            )
+            for provider, listing_id, exchange_code, symbol in rows
+        )
 
     def of_provider(self, provider_code: str) -> tuple[ProviderListing, ...]:
         """Return the symbols of one provider, ordered by listing.

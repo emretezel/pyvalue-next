@@ -1,11 +1,12 @@
 """The symbols download: the provider's lists into files.
 
-``pyvalue symbols download`` is the only thing in pyvalue that contacts the
-data provider (ADR 0024). It asks for the list of exchange codes and then for
-the symbol list of every code our exchange file gives a market, and keeps
-each answer as a file. It never opens the database: storing the lists is the
-load's job (``pyvalue.listings.symbols``), which reads these files and cannot
-reach the network.
+``pyvalue symbols download`` contacts the data provider (ADR 0024). It asks
+for the list of exchange codes and then for the symbol list of every code our
+exchange file gives a market, and keeps each answer as a file. It never opens
+the database: storing the lists is the load's job
+(``pyvalue.listings.symbols``), which reads these files and cannot reach the
+network. The one other thing that contacts the provider is the fundamentals
+download (``pyvalue.fundamentals.download``, ADR 0028).
 
 A subscription is bought for a month at a time, so what is saved here has to
 be enough to work with afterwards. Two rules protect a good file: an answer

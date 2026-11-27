@@ -1,0 +1,90 @@
+{
+  "General": {
+    "Code": "THT",
+    "Type": "Common Stock",
+    "Name": "Theta AG",
+    "Exchange": "XETRA",
+    "CurrencyCode": "EUR",
+    "CountryISO": "DE",
+    "ISIN": "DE00000T0019",
+    "PrimaryTicker": "THT.XETRA",
+    "FiscalYearEnd": "December",
+    "UpdatedAt": "2026-11-27"
+  },
+  "Highlights": {
+    "MarketCapitalization": 9240000000
+  },
+  "outstandingShares": {
+    "annual": {
+      "0": {
+        "date": "2025",
+        "dateFormatted": "2025-12-31",
+        "shares": 100000000
+      }
+    },
+    "quarterly": {}
+  },
+  "Financials": {
+    "Balance_Sheet": {
+      "currency_symbol": "EUR",
+      "quarterly": {
+        "2026-09-30": {
+          "date": "2026-09-30",
+          "filing_date": "2026-11-05",
+          "currency_symbol": "EUR",
+          "totalAssets": "4620000000.00",
+          "totalLiab": "1848000000.00"
+        }
+      },
+      "yearly": {
+        "2025-12-31": {
+          "date": "2025-12-31",
+          "filing_date": "2026-02-20",
+          "currency_symbol": "EUR",
+          "totalAssets": "4620000000.00",
+          "totalLiab": "1848000000.00"
+        }
+      }
+    },
+    "Cash_Flow": {
+      "currency_symbol": "EUR",
+      "quarterly": {
+        "2026-09-30": {
+          "date": "2026-09-30",
+          "filing_date": "2026-11-05",
+          "currency_symbol": "EUR",
+          "totalCashFromOperatingActivities": "462000000.00"
+        }
+      },
+      "yearly": {
+        "2025-12-31": {
+          "date": "2025-12-31",
+          "filing_date": "2026-02-20",
+          "currency_symbol": "EUR",
+          "totalCashFromOperatingActivities": "462000000.00"
+        }
+      }
+    },
+    "Income_Statement": {
+      "currency_symbol": "EUR",
+      "quarterly": {
+        "2026-09-30": {
+          "date": "2026-09-30",
+          "filing_date": "2026-11-05",
+          "currency_symbol": "EUR",
+          "totalRevenue": "2310000000.00",
+          "netIncome": "231000000.00"
+        }
+      },
+      "yearly": {
+        "2025-12-31": {
+          "date": "2025-12-31",
+          "filing_date": "2026-02-20",
+          "currency_symbol": "EUR",
+          "totalRevenue": "2310000000.00",
+          "netIncome": "231000000.00"
+        }
+      }
+    }
+  }
+}

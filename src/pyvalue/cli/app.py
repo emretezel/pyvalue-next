@@ -14,9 +14,12 @@ from pathlib import Path
 from types import MappingProxyType
 
 from pyvalue import __version__
+from pyvalue.cli.progress import ProgressBar
 from pyvalue.config import eodhd_api_key, sec_user_agent
 from pyvalue.db import DEFAULT_DATABASE_PATH, Database, migrate
 from pyvalue.errors import PyvalueError
+from pyvalue.fundamentals import DEFAULT_PAYLOADS_DIR, Status, Stop, download_fundamentals
+from pyvalue.fundamentals import DEFAULT_REPORT_DIR as FUNDAMENTALS_REPORT_DIR
 from pyvalue.listings import (
     DEFAULT_LISTS_DIR,
     DEFAULT_REPORT_DIR,
@@ -29,7 +32,7 @@ from pyvalue.listings import (
     fill_listings,
     load_symbols,
 )
-from pyvalue.providers.eodhd import PROVIDER_NAME
+from pyvalue.providers.eodhd import FUNDAMENTALS_REQUEST_COST, PROVIDER_NAME
 from pyvalue.universe import (
     DEFAULT_FILINGS_DIR,
     DEFAULT_OUTPUT_DIR,
@@ -302,6 +305,63 @@ def _listings_fill(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def _fundamentals_download(arguments: argparse.Namespace) -> int:
+    """Download the payloads that are missing and say what was done."""
+    database = Database(arguments.db)
+    # Drawn on the error stream, so the counts below stay clean when the
+    # output is sent to a file. It draws nothing unless that is a terminal.
+    bar = ProgressBar(sys.stderr)
+    try:
+        outcome = download_fundamentals(
+            database,
+            # Passed as a function: the key is read only if a request has to
+            # be made, and it goes to the download and nowhere else.
+            eodhd_api_key,
+            DEFAULT_PAYLOADS_DIR,
+            FUNDAMENTALS_REPORT_DIR,
+            progress=bar.update,
+        )
+    finally:
+        # Whatever happened, what is printed next starts on a line of its own.
+        bar.finish()
+
+    def count(status: Status) -> int:
+        return len(outcome.with_status(status))
+
+    print(f"Database: {database.path}")
+    print(f"Payloads folder: {DEFAULT_PAYLOADS_DIR}")
+    print(
+        f"Listings at {PROVIDER_NAME}: {outcome.listings:,}, on {len(outcome.lines):,} of its lines"
+    )
+    print(f"Already saved: {count(Status.ALREADY_SAVED):,}")
+    print(
+        f"Requested: {outcome.requests:,} "
+        f"({outcome.requests * FUNDAMENTALS_REQUEST_COST:,} of the daily allowance)"
+    )
+    print(f"  Saved: {count(Status.SAVED):,}")
+    print(f"  {PROVIDER_NAME} has nothing for the symbol: {count(Status.NOT_FOUND):,}")
+    print(f"  The answer is not a payload for the symbol: {count(Status.NOT_A_PAYLOAD):,}")
+    print(f"  The request failed: {count(Status.REQUEST_FAILED):,}")
+    print(f"Left for another day: {count(Status.NO_ALLOWANCE_LEFT):,}")
+    print(f"Not reached: {count(Status.RUN_STOPPED):,}")
+    if outcome.daily_limit is not None and outcome.allowance_left is not None:
+        print(f"Left of today's allowance: {outcome.allowance_left:,} of {outcome.daily_limit:,}")
+    print(f"Listings without a payload are listed in {outcome.report}")
+    if outcome.stopped is Stop.ALLOWANCE_USED_UP:
+        # Not a failure: the next run takes what is left.
+        print(
+            "The day's allowance is used up. Run the command again on a later day; "
+            f"{PROVIDER_NAME}'s day starts at midnight GMT"
+        )
+    elif outcome.stopped is not None:
+        print(
+            f"pyvalue: error: the run stopped: {outcome.stopped.value}: {outcome.stopped_detail}",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
 def _add_database_option(command: argparse.ArgumentParser) -> None:
     """Give a command the ``--db`` option every database command shares."""
     command.add_argument(
@@ -369,7 +429,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             f"Download {PROVIDER_NAME}'s list of exchange codes and the symbol list of every "
             f"code the exchange file gives a market, and keep them in {DEFAULT_LISTS_DIR}. This "
-            f"is the only command that contacts {PROVIDER_NAME}: it needs an active subscription "
+            f"command contacts {PROVIDER_NAME}: it needs an active subscription "
             "and the line api_key in the section [eodhd] of private/config.toml, and makes "
             "about 60 requests. A saved list is replaced, unless the new one is suspiciously "
             "short. The database is not touched; `pyvalue symbols load` stores the lists."
@@ -394,6 +454,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_database_option(listings_fill)
     listings_fill.set_defaults(run=_listings_fill)
+
+    fundamentals = groups.add_parser("fundamentals", help="keep the provider's fundamentals")
+    fundamentals_commands = fundamentals.add_subparsers(
+        dest="command", required=True, metavar="ACTION"
+    )
+    fundamentals_download = fundamentals_commands.add_parser(
+        "download",
+        help="download the fundamentals of every listing that has none saved (contacts EODHD)",
+        description=(
+            f"Ask {PROVIDER_NAME} for the fundamentals of every listing that has no saved "
+            f"payload, and keep each answer as one compressed file in {DEFAULT_PAYLOADS_DIR}. "
+            f"This command contacts {PROVIDER_NAME}: it needs an active subscription and the "
+            "line api_key in the section [eodhd] of private/config.toml. A request costs "
+            f"{FUNDAMENTALS_REQUEST_COST} of the daily allowance; the command asks the account "
+            "what is left before every batch and stops short of the allowance, so a later run "
+            "takes the rest. A saved payload is never overwritten: to fetch one again, set its "
+            "file aside. The database is read and not changed. The listings that have no "
+            f"payload afterwards are written to {FUNDAMENTALS_REPORT_DIR}."
+        ),
+    )
+    _add_database_option(fundamentals_download)
+    fundamentals_download.set_defaults(run=_fundamentals_download)
     return parser
 
 

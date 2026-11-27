@@ -5,7 +5,15 @@ Author: Emre Tezel
 
 import pytest
 
-from pyvalue.db import ConstraintError, Database, Exchange, Provider, ProviderListing
+from pyvalue.db import (
+    ConstraintError,
+    Database,
+    Exchange,
+    Provider,
+    ProviderExchange,
+    ProviderListing,
+    ProviderListingAddress,
+)
 
 
 @pytest.fixture
@@ -101,3 +109,54 @@ def test_add_refuses_a_row_the_schema_does_not_allow(
 
     with database.unit_of_work() as work, pytest.raises(ConstraintError, match="provider_listing"):
         work.provider_listings.add(row)
+
+
+# --- How a provider addresses a listing --------------------------------------------------------
+
+
+def test_an_address_is_the_providers_exchange_code_and_its_symbol(
+    listed: tuple[Database, int, int],
+) -> None:
+    """The exchange part comes from the exchange the listing trades on (ADR 0002)."""
+    database, hynix, berkshire = listed
+
+    with database.unit_of_work() as work:
+        work.provider_exchanges.add(ProviderExchange("eodhd", "XKRX", "KO"))
+        work.provider_exchanges.add(ProviderExchange("eodhd", "XNYS", "US"))
+        work.provider_listings.add(ProviderListing("eodhd", berkshire, "BRK-B"))
+        work.provider_listings.add(ProviderListing("eodhd", hynix, "000660"))
+
+    with database.unit_of_work() as work:
+        assert work.provider_listings.addresses_of_provider("eodhd") == (
+            ProviderListingAddress("eodhd", hynix, "KO", "000660"),
+            ProviderListingAddress("eodhd", berkshire, "US", "BRK-B"),
+        )
+
+
+def test_addresses_leave_other_providers_out(listed: tuple[Database, int, int]) -> None:
+    """Each provider has its own code for an exchange and its own symbol."""
+    database, hynix, _ = listed
+
+    with database.unit_of_work() as work:
+        work.provider_exchanges.add(ProviderExchange("eodhd", "XKRX", "KO"))
+        work.provider_exchanges.add(ProviderExchange("other", "XKRX", "KS"))
+        work.provider_listings.add(ProviderListing("eodhd", hynix, "000660"))
+        work.provider_listings.add(ProviderListing("other", hynix, "HYNIX"))
+
+    with database.unit_of_work() as work:
+        assert work.provider_listings.addresses_of_provider("other") == (
+            ProviderListingAddress("other", hynix, "KS", "HYNIX"),
+        )
+
+
+def test_a_listing_on_an_exchange_the_provider_has_no_code_for_has_no_address(
+    listed: tuple[Database, int, int],
+) -> None:
+    """Such a symbol row is inert: the provider cannot be asked about it (ADR 0002)."""
+    database, hynix, _ = listed
+
+    with database.unit_of_work() as work:
+        work.provider_listings.add(ProviderListing("eodhd", hynix, "000660"))
+
+    with database.unit_of_work() as work:
+        assert work.provider_listings.addresses_of_provider("eodhd") == ()
