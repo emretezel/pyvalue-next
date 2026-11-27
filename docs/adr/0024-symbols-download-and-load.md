@@ -1,6 +1,6 @@
 # ADR 0024: One command downloads the provider's symbol lists, another loads them
 
-- Status: Accepted. ADR 0027 settles what this record left open for a US share line without a venue: EODHD labels such a line `US`, and it is left out.
+- Status: Accepted. ADR 0027 settles what this record left open for a US share line without a venue: EODHD labels such a line `US`, and it is left out. On 2026-11-27 the author lifted the rule that a request to EODHD needs their word (`CLAUDE.md`, "Configuration & Data Notes"); the two commands stay as decided here.
 - Date: 2026-11-26
 - Changes: ADR 0018 in three points, listed under "What changes in ADR 0018". Its tables, its two files and its other rules stand.
 
