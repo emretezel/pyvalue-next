@@ -9,12 +9,15 @@ repositories of that unit of work.
 Author: Emre Tezel
 """
 
+from pyvalue.db.balance_sheet import BalanceSheet, BalanceSheetRepository
+from pyvalue.db.cash_flow_statement import CashFlowStatement, CashFlowStatementRepository
 from pyvalue.db.company import Company, CompanyRepository
 from pyvalue.db.connection import DEFAULT_DATABASE_PATH
 from pyvalue.db.errors import ConstraintError, DatabaseError
 from pyvalue.db.exchange import Exchange, ExchangeRepository
 from pyvalue.db.fund import Fund, FundRepository
 from pyvalue.db.holding import Holding, HoldingRepository
+from pyvalue.db.income_statement import IncomeStatement, IncomeStatementRepository
 from pyvalue.db.instrument import Instrument, InstrumentRepository
 from pyvalue.db.listing import Listing, ListingRepository
 from pyvalue.db.migrate import (
@@ -33,10 +36,15 @@ from pyvalue.db.provider_listing import (
     ProviderListingRepository,
 )
 from pyvalue.db.provider_symbol import ProviderSymbol, ProviderSymbolRepository
+from pyvalue.db.reporting_period import ReportingPeriod, ReportingPeriodRepository
 from pyvalue.db.unit_of_work import Database, UnitOfWork
 
 __all__ = [
     "DEFAULT_DATABASE_PATH",
+    "BalanceSheet",
+    "BalanceSheetRepository",
+    "CashFlowStatement",
+    "CashFlowStatementRepository",
     "Company",
     "CompanyRepository",
     "ConstraintError",
@@ -48,6 +56,8 @@ __all__ = [
     "FundRepository",
     "Holding",
     "HoldingRepository",
+    "IncomeStatement",
+    "IncomeStatementRepository",
     "Instrument",
     "InstrumentRepository",
     "Listing",
@@ -64,6 +74,8 @@ __all__ = [
     "ProviderRepository",
     "ProviderSymbol",
     "ProviderSymbolRepository",
+    "ReportingPeriod",
+    "ReportingPeriodRepository",
     "UnitOfWork",
     "load_migrations",
     "migrate",

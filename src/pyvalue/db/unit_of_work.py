@@ -14,12 +14,15 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Final
 
+from pyvalue.db.balance_sheet import BalanceSheetRepository
+from pyvalue.db.cash_flow_statement import CashFlowStatementRepository
 from pyvalue.db.company import CompanyRepository
 from pyvalue.db.connection import connect
 from pyvalue.db.errors import DatabaseError
 from pyvalue.db.exchange import ExchangeRepository
 from pyvalue.db.fund import FundRepository
 from pyvalue.db.holding import HoldingRepository
+from pyvalue.db.income_statement import IncomeStatementRepository
 from pyvalue.db.instrument import InstrumentRepository
 from pyvalue.db.listing import ListingRepository
 from pyvalue.db.migrate import require_current_schema
@@ -27,6 +30,7 @@ from pyvalue.db.provider import ProviderRepository
 from pyvalue.db.provider_exchange import ProviderExchangeRepository
 from pyvalue.db.provider_listing import ProviderListingRepository
 from pyvalue.db.provider_symbol import ProviderSymbolRepository
+from pyvalue.db.reporting_period import ReportingPeriodRepository
 
 
 class UnitOfWork:
@@ -47,6 +51,10 @@ class UnitOfWork:
         provider_symbols: The repository of the ``provider_symbol`` table.
         listings: The repository of the ``listing`` table.
         provider_listings: The repository of the ``provider_listing`` table.
+        reporting_periods: The repository of the ``reporting_period`` table.
+        income_statements: The repository of the ``income_statement`` table.
+        cash_flow_statements: The repository of the ``cash_flow_statement`` table.
+        balance_sheets: The repository of the ``balance_sheet`` table.
     """
 
     def __init__(self, connection: sqlite3.Connection) -> None:
@@ -67,6 +75,16 @@ class UnitOfWork:
         self.provider_listings: Final[ProviderListingRepository] = ProviderListingRepository(
             connection
         )
+        self.reporting_periods: Final[ReportingPeriodRepository] = ReportingPeriodRepository(
+            connection
+        )
+        self.income_statements: Final[IncomeStatementRepository] = IncomeStatementRepository(
+            connection
+        )
+        self.cash_flow_statements: Final[CashFlowStatementRepository] = CashFlowStatementRepository(
+            connection
+        )
+        self.balance_sheets: Final[BalanceSheetRepository] = BalanceSheetRepository(connection)
 
 
 class Database:

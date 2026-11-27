@@ -16,6 +16,10 @@ The pyvalue database is one SQLite file, `data/pyvalue.db` by default. Its schem
 | [`provider_exchange`](provider_exchange.md) | The code one provider uses for one of our exchanges | ADR 0002 |
 | [`provider_listing`](provider_listing.md) | The symbol one provider uses for one of our listings | ADR 0002 |
 | [`provider_symbol`](provider_symbol.md) | One share line of a provider's symbol list | ADR 0018, ADR 0025 |
+| [`reporting_period`](reporting_period.md) | A date a company's statements are drawn up to, with their currency | ADR 0029 |
+| [`income_statement`](income_statement.md) | A company's income statement for one period | ADR 0029 |
+| [`cash_flow_statement`](cash_flow_statement.md) | A company's cash-flow statement for one period | ADR 0029 |
+| [`balance_sheet`](balance_sheet.md) | A company's balance sheet on one date | ADR 0029 |
 | [`schema_migration`](schema_migration.md) | A migration that has been applied to this database | ADR 0007 |
 
 ## Views
@@ -38,6 +42,10 @@ erDiagram
     provider ||--o{ provider_listing : "has a symbol for"
     provider_exchange ||--o{ provider_symbol : "lists"
     listing ||--o{ provider_listing : "is named by"
+    company ||--o{ reporting_period : "reports to"
+    reporting_period ||--o{ income_statement : "has"
+    reporting_period ||--o{ cash_flow_statement : "has"
+    reporting_period ||--o| balance_sheet : "has"
 
     exchange {
         TEXT mic PK "ISO 10383 market code"
@@ -107,6 +115,28 @@ erDiagram
         TEXT provider_name "optional"
         TEXT provider_currency "required, as the provider gives it"
         TEXT isin "optional, the ISIN the provider gives"
+    }
+    reporting_period {
+        INTEGER company_id PK, FK "the company"
+        TEXT period_end PK "the date the statements are drawn up to"
+        TEXT currency "required, ISO 4217"
+    }
+    income_statement {
+        INTEGER company_id PK, FK "with period_end, the period"
+        TEXT period_end PK, FK "the last day of the period"
+        INTEGER months PK "3, 6, 9 or 12"
+        INTEGER revenue "optional, like every figure; eight figures"
+    }
+    cash_flow_statement {
+        INTEGER company_id PK, FK "with period_end, the period"
+        TEXT period_end PK, FK "the last day of the period"
+        INTEGER months PK "3, 6, 9 or 12"
+        INTEGER operating_cash_flow "optional, like every figure; five figures"
+    }
+    balance_sheet {
+        INTEGER company_id PK, FK "with period_end, the period"
+        TEXT period_end PK, FK "the day of the snapshot"
+        INTEGER total_assets "optional, like every figure; fifteen figures"
     }
     schema_migration {
         INTEGER version PK "the migration's number"

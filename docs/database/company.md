@@ -32,6 +32,7 @@ One row per legal entity that issues securities. Decided in ADR 0001. Created by
 | Direction | Table | Through | On delete |
 |---|---|---|---|
 | Referenced by | [`instrument`](instrument.md) | `instrument.company_id` | Refused while instruments remain |
+| Referenced by | [`reporting_period`](reporting_period.md) | `reporting_period.company_id` | Refused while reporting periods remain |
 
 ## Indexes
 

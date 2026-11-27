@@ -53,7 +53,8 @@ class Repository:
             The cursor of the statement.
 
         Raises:
-            ConstraintError: If the schema refuses the row.
+            ConstraintError: If the schema refuses the row, or a whole number
+                is too large for the database.
             DatabaseError: If the statement fails for any other reason, for
                 example because the unit of work has already ended.
         """
@@ -63,6 +64,11 @@ class Repository:
             # SQLite has already undone this one statement. The transaction is
             # still open, so the component decides whether the whole unit of
             # work fails (by letting this error escape) or carries on.
+            raise ConstraintError(f"the {self.table} table refused a row: {error}") from error
+        except OverflowError as error:
+            # A whole number beyond SQLite's 64-bit range never reaches the
+            # database: Python's own driver refuses it. It is a value the
+            # table cannot hold, so it is refused like one.
             raise ConstraintError(f"the {self.table} table refused a row: {error}") from error
         except sqlite3.Error as error:
             raise DatabaseError(f"cannot read or write {self.table}: {error}") from error
