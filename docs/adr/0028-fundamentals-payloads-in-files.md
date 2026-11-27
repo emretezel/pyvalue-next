@@ -1,6 +1,6 @@
 # ADR 0028: Fundamentals payloads are downloaded into files, one per listing
 
-- Status: Accepted
+- Status: Accepted. ADR 0029 settles the first point this record left open: the fiscal-year rows of the payloads are read into four tables.
 - Date: 2026-11-27
 - Changes: ADR 0024 in one point: `pyvalue symbols download` is no longer the only thing that contacts the provider. It settles what ADR 0002 and ADR 0018 left open on raw provider payloads. Everything else in the three records stands.
 

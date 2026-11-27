@@ -1,6 +1,6 @@
 # ADR 0002: Provider identifiers live in mapping tables
 
-- Status: Accepted. ADR 0018 adds a table for a provider's symbol list and one more unique key on `provider_exchange`; the three tables and the view stand. ADR 0028 settles what this record left open on raw provider payloads: they are kept in files, not in a table, and its download is the first code that reads the view.
+- Status: Accepted. ADR 0018 adds a table for a provider's symbol list and one more unique key on `provider_exchange`; the three tables and the view stand. ADR 0028 settles what this record left open on raw provider payloads: they are kept in files, not in a table, and its download is the first code that reads the view. ADR 0029 adds the tables a company's financial statements are stored in; they name no provider.
 - Date: 2026-11-20
 
 ## Decision
