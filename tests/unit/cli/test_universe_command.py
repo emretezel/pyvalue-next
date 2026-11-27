@@ -123,7 +123,8 @@ def test_a_database_that_holds_an_excluded_security_gives_one_line_and_status_on
         f"pyvalue: error: {Path('data') / 'pyvalue.db'} holds securities that a decision keeps "
         "out of the universe: US00000H0017. The load does not delete rows, so the database has "
         "to be rebuilt: set the file aside, run `pyvalue db migrate`, then "
-        "`pyvalue universe load`, `pyvalue symbols load` and `pyvalue listings fill`"
+        "`pyvalue universe load`, `pyvalue symbols load`, `pyvalue listings fill` and "
+        "`pyvalue fundamentals load`"
     ]
 
 

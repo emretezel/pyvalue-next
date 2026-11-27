@@ -12,14 +12,15 @@
     "UpdatedAt": "2026-11-27"
   },
   "Highlights": {
-    "MarketCapitalization": 1680000000
+    "MarketCapitalization": 2620000000,
+    "MostRecentQuarter": "2026-09-30"
   },
   "outstandingShares": {
     "annual": {
       "0": {
         "date": "2025",
         "dateFormatted": "2025-12-31",
-        "shares": 100000000
+        "shares": 50000000
       }
     },
     "quarterly": {}
@@ -30,19 +31,90 @@
       "quarterly": {
         "2026-09-30": {
           "date": "2026-09-30",
-          "filing_date": "2026-11-05",
+          "filing_date": "2026-09-30",
           "currency_symbol": "USD",
-          "totalAssets": "840000000.00",
-          "totalLiab": "336000000.00"
+          "totalAssets": "1620000000.00",
+          "totalLiab": "650000000.00",
+          "totalStockholderEquity": "970000000.00",
+          "liabilitiesAndStockholdersEquity": "1620000000.00",
+          "cash": "162000000.00",
+          "shortTermDebt": "81250000.00",
+          "longTermDebt": "243750000.00",
+          "shortLongTermDebtTotal": "325000000.00",
+          "totalCurrentAssets": "540000000.00",
+          "totalCurrentLiabilities": "216666666.00",
+          "nonCurrentLiabilitiesTotal": "433333334.00",
+          "commonStockSharesOutstanding": "50000000.00"
         }
       },
       "yearly": {
         "2025-12-31": {
           "date": "2025-12-31",
-          "filing_date": "2026-02-20",
+          "filing_date": "2025-12-31",
           "currency_symbol": "USD",
-          "totalAssets": "840000000.00",
-          "totalLiab": "336000000.00"
+          "totalAssets": "1600000000.00",
+          "totalLiab": "640000000.00",
+          "totalStockholderEquity": "960000000.00",
+          "liabilitiesAndStockholdersEquity": "1600000000.00",
+          "cash": "120000000.00",
+          "shortTermDebt": "0.00",
+          "longTermDebt": "0.00",
+          "shortLongTermDebtTotal": "0.00",
+          "totalCurrentAssets": "533333333.00",
+          "totalCurrentLiabilities": "213333333.00",
+          "nonCurrentLiabilitiesTotal": "426666667.00",
+          "commonStockSharesOutstanding": "50000000.00"
+        },
+        "2024-12-31": {
+          "date": "2024-12-31",
+          "filing_date": "2024-12-31",
+          "currency_symbol": "USD",
+          "totalAssets": "1550000000.00",
+          "totalLiab": "620000000.00",
+          "totalStockholderEquity": "930000000.00",
+          "liabilitiesAndStockholdersEquity": "1550000000.00",
+          "cash": "110000000.00",
+          "shortTermDebt": "0.00",
+          "longTermDebt": "0.00",
+          "shortLongTermDebtTotal": "0.00",
+          "totalCurrentAssets": "516666666.00",
+          "totalCurrentLiabilities": "206666666.00",
+          "nonCurrentLiabilitiesTotal": "413333334.00",
+          "commonStockSharesOutstanding": "50000000.00"
+        },
+        "2024-06-30": {
+          "date": "2024-06-30",
+          "filing_date": "2024-06-30",
+          "currency_symbol": "USD",
+          "totalAssets": "1520000000.00",
+          "totalLiab": "610000000.00",
+          "totalStockholderEquity": "910000000.00",
+          "liabilitiesAndStockholdersEquity": "1520000000.00",
+          "cash": "105000000.00",
+          "shortTermDebt": "0.00",
+          "longTermDebt": "0.00",
+          "shortLongTermDebtTotal": "0.00",
+          "totalCurrentAssets": "506666666.00",
+          "totalCurrentLiabilities": "203333333.00",
+          "nonCurrentLiabilitiesTotal": "406666667.00",
+          "commonStockSharesOutstanding": "50000000.00"
+        },
+        "2023-12-31": {
+          "date": "2023-12-31",
+          "filing_date": "2023-12-31",
+          "currency_symbol": "USD",
+          "totalAssets": "1500000000.00",
+          "totalLiab": "600000000.00",
+          "totalStockholderEquity": "900000000.00",
+          "liabilitiesAndStockholdersEquity": "1500000000.00",
+          "cash": "100000000.00",
+          "shortTermDebt": "0.00",
+          "longTermDebt": "0.00",
+          "shortLongTermDebtTotal": "0.00",
+          "totalCurrentAssets": "500000000.00",
+          "totalCurrentLiabilities": "200000000.00",
+          "nonCurrentLiabilitiesTotal": "400000000.00",
+          "commonStockSharesOutstanding": "50000000.00"
         }
       }
     },
@@ -51,17 +123,49 @@
       "quarterly": {
         "2026-09-30": {
           "date": "2026-09-30",
-          "filing_date": "2026-11-05",
+          "filing_date": "2026-09-30",
           "currency_symbol": "USD",
-          "totalCashFromOperatingActivities": "84000000.00"
+          "totalCashFromOperatingActivities": "26000000.00",
+          "capitalExpenditures": "6500000.00",
+          "depreciation": "3250000.00",
+          "dividendsPaid": null,
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "19500000.00"
         }
       },
       "yearly": {
         "2025-12-31": {
           "date": "2025-12-31",
-          "filing_date": "2026-02-20",
+          "filing_date": "2025-12-31",
           "currency_symbol": "USD",
-          "totalCashFromOperatingActivities": "84000000.00"
+          "totalCashFromOperatingActivities": "100000000.00",
+          "capitalExpenditures": "32000000.00",
+          "depreciation": "21000000.00",
+          "dividendsPaid": null,
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "68000000.00"
+        },
+        "2024-12-31": {
+          "date": "2024-12-31",
+          "filing_date": "2024-12-31",
+          "currency_symbol": "USD",
+          "totalCashFromOperatingActivities": "95000000.00",
+          "capitalExpenditures": "31000000.00",
+          "depreciation": "-40000000.00",
+          "dividendsPaid": null,
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "64000000.00"
+        },
+        "2023-12-31": {
+          "date": "2023-12-31",
+          "filing_date": "2023-12-31",
+          "currency_symbol": "USD",
+          "totalCashFromOperatingActivities": "90000000.00",
+          "capitalExpenditures": "30000000.00",
+          "depreciation": "20000000.00",
+          "dividendsPaid": null,
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "60000000.00"
         }
       }
     },
@@ -70,19 +174,80 @@
       "quarterly": {
         "2026-09-30": {
           "date": "2026-09-30",
-          "filing_date": "2026-11-05",
+          "filing_date": "2026-09-30",
           "currency_symbol": "USD",
-          "totalRevenue": "420000000.00",
-          "netIncome": "42000000.00"
+          "totalRevenue": "210000000.00",
+          "costOfRevenue": "105000000.00",
+          "grossProfit": "105000000.00",
+          "operatingIncome": "52500000.00",
+          "ebit": "52500000.00",
+          "incomeBeforeTax": "52500000.00",
+          "incomeTaxExpense": "10500000.00",
+          "taxProvision": "10500000.00",
+          "netIncome": "42000000.00",
+          "interestExpense": null
         }
       },
       "yearly": {
         "2025-12-31": {
           "date": "2025-12-31",
-          "filing_date": "2026-02-20",
+          "filing_date": "2025-12-31",
           "currency_symbol": "USD",
-          "totalRevenue": "420000000.00",
-          "netIncome": "42000000.00"
+          "totalRevenue": "800000000.00",
+          "costOfRevenue": "500000000.00",
+          "grossProfit": "350000000.00",
+          "operatingIncome": "175000000.00",
+          "ebit": "175000000.00",
+          "incomeBeforeTax": "175000000.00",
+          "incomeTaxExpense": "35000000.00",
+          "taxProvision": "35000000.00",
+          "netIncome": "140000000.00",
+          "interestExpense": null
+        },
+        "2024-12-31": {
+          "date": "2024-12-31",
+          "filing_date": "2024-12-31",
+          "currency_symbol": "USD",
+          "totalRevenue": "760000000.00",
+          "costOfRevenue": "440000000.00",
+          "grossProfit": "320000000.00",
+          "operatingIncome": "160000000.00",
+          "ebit": "160000000.00",
+          "incomeBeforeTax": "160000000.00",
+          "incomeTaxExpense": "32000000.00",
+          "taxProvision": "32000000.00",
+          "netIncome": "128000000.00",
+          "interestExpense": null
+        },
+        "2024-06-30": {
+          "date": "2024-06-30",
+          "filing_date": "2024-06-30",
+          "currency_symbol": "USD",
+          "totalRevenue": "350000000.00",
+          "costOfRevenue": "200000000.00",
+          "grossProfit": "150000000.00",
+          "operatingIncome": "75000000.00",
+          "ebit": "75000000.00",
+          "incomeBeforeTax": "75000000.00",
+          "incomeTaxExpense": "15000000.00",
+          "taxProvision": "15000000.00",
+          "netIncome": "60000000.00",
+          "interestExpense": null
+        },
+        "2023-12-31": {
+          "date": "2023-12-31",
+          "filing_date": "2023-12-31",
+          "currency_symbol": "USD",
+          "totalRevenue": "700000000.00",
+          "costOfRevenue": "400000000.00",
+          "grossProfit": "300000000.00",
+          "operatingIncome": "150000000.00",
+          "ebit": "150000000.00",
+          "incomeBeforeTax": "150000000.00",
+          "incomeTaxExpense": "30000000.00",
+          "taxProvision": "30000000.00",
+          "netIncome": "120000000.00",
+          "interestExpense": null
         }
       }
     }

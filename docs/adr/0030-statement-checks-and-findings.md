@@ -64,6 +64,7 @@ The name in the first column is what the report shows.
 |---|---|
 | A scale check compares like with like | It compares three years only when all three are in the same currency and both neighbours are at least 1,000,000. Tiny figures of companies without revenue jump for real |
 | A scale check reads what the provider reported | It runs before any figure is emptied, so one bad figure does not hide another |
+| A year left out as off in scale is no neighbour | The year after it is not compared with it, so the step back from a bad year is not reported as a step of its own |
 | The order is fixed | The chain of fiscal years first, then a period's currency, then the length of its income and cash-flow rows, then the scale check, then the figures, then the warnings on what is stored |
 | No clock | No check reads today's date. `stale_payload` measures against the data itself |
 | One finding per fact | A row left out by one check is not reported again by another |

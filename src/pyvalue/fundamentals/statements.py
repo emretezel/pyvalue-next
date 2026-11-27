@@ -97,23 +97,44 @@ class Period:
 
 
 @dataclass(frozen=True, slots=True)
-class StatementRow:
-    """One row to store.
+class FlowRow:
+    """An income or cash-flow statement to store: it covers a period.
 
     Attributes:
-        statement: The statement.
-        period_end: The last day of the period, or the day of a balance
-            sheet.
-        months: How many months the row covers, or ``None`` for a balance
-            sheet, which is a snapshot.
+        statement: ``Statement.INCOME`` or ``Statement.CASH_FLOW``.
+        period_end: The last day of the period.
+        months: How many months the row covers.
         figures: The figures, in whole units of the period's currency. A
             figure not reported, or emptied by a check, is absent.
     """
 
     statement: Statement
     period_end: date
-    months: int | None
+    months: int
     figures: Mapping[Figure, int]
+
+
+@dataclass(frozen=True, slots=True)
+class BalanceSheetRow:
+    """A balance sheet to store: a snapshot, so it has no length.
+
+    Attributes:
+        period_end: The day of the snapshot.
+        figures: The figures, in whole units of the period's currency. A
+            figure not reported, or emptied by a check, is absent.
+    """
+
+    period_end: date
+    figures: Mapping[Figure, int]
+
+    @property
+    def statement(self) -> Statement:
+        """The statement the row is of: always the balance sheet."""
+        return Statement.BALANCE_SHEET
+
+
+# One row to store.
+type StatementRow = FlowRow | BalanceSheetRow
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,6 +199,9 @@ class _Reader:
         for row in payload.reported.rows:
             self._rows.setdefault(row.period_end, {})[row.statement] = row
         self.findings: list[Finding] = []
+        # The rows left out as off in scale. They are no neighbour for the
+        # year after: the step back from a bad year is not news.
+        self._outliers: set[tuple[Statement, date]] = set()
 
     def _find(
         self,
@@ -281,7 +305,11 @@ class _Reader:
                 return None
             day = years[position].period_end
             row = self._rows[day].get(statement)
-            if row is None or currency.get(day) != currency[years[index].period_end]:
+            if (
+                row is None
+                or (statement, day) in self._outliers
+                or currency.get(day) != currency[years[index].period_end]
+            ):
                 return None
             amount = row.figures.get(figure)
             return None if amount is None else whole(amount)
@@ -428,6 +456,7 @@ class _Reader:
                         day,
                         _SCALE_FIGURE[statement],
                     )
+                    self._outliers.add((statement, day))
                     continue
             figures = self._clean(statement, day, _rounded(row))
             if not figures:
@@ -440,12 +469,14 @@ class _Reader:
                 continue
             self._warn(row, figures, before)
             stored.append(
-                StatementRow(
+                FlowRow(
                     statement=statement,
                     period_end=day,
-                    months=YEAR_MONTHS if statement in _FLOWS else None,
+                    months=YEAR_MONTHS,
                     figures=MappingProxyType(figures),
                 )
+                if statement in _FLOWS
+                else BalanceSheetRow(period_end=day, figures=MappingProxyType(figures))
             )
         return stored
 

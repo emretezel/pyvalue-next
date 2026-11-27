@@ -1,0 +1,21 @@
+isin,company,provider_exchange_code,provider_symbol,statement,period_end,check,outcome,figure,detail
+AU00000M0018,Mu Property Trust,AU,MUP,,,no_payload,warning,,data/eodhd/fundamentals/AU/MUP.json.gz is not there
+DE00000T0019,THETA AG,XETRA,THT,,,other_isin,warning,,the payload names DE00000T0027
+DE00000T0019,THETA AG,XETRA,THT,,2022-12-31,currencies_differ,left_out,,the statements are labelled EUR and USD
+DE00000T0019,THETA AG,XETRA,THT,,2023-12-31,stale_payload,warning,,the latest fiscal year ends 2023-12-31; the newest in the load ends 2025-12-31
+DE00000T0019,THETA AG,XETRA,THT,cash_flow_statement,2020-12-31,length_not_proven,left_out,,no fiscal year ends 350 to 380 days before it
+DE00000T0019,THETA AG,XETRA,THT,income_statement,2020-12-31,length_not_proven,left_out,,no fiscal year ends 350 to 380 days before it
+GB00000D0016,DELTA PLC,LSE,DLT,balance_sheet,2022-12-31,sub_unit_label,warning,,"labelled GBX, read as GBP with the amounts unchanged"
+GB00000D0016,DELTA PLC,LSE,DLT,balance_sheet,2024-12-31,scale_outlier,left_out,total_assets,total_assets 1280000 between 1250000000 the year before and 1310000000 the year after
+GB00000D0016,DELTA PLC,LSE,DLT,cash_flow_statement,2022-12-31,length_not_proven,left_out,,no fiscal year ends 350 to 380 days before it
+GB00000D0016,DELTA PLC,LSE,DLT,income_statement,2022-12-31,length_not_proven,left_out,,no fiscal year ends 350 to 380 days before it
+US00000A0014,ALPHA CORP,US,ALPH,cash_flow_statement,2022-12-31,length_not_proven,left_out,,no fiscal year ends 350 to 380 days before it
+US00000A0014,ALPHA CORP,US,ALPH,income_statement,2022-12-31,length_not_proven,left_out,,no fiscal year ends 350 to 380 days before it
+US00000A0014,ALPHA CORP,US,ALPH,income_statement,2024-12-31,zero_interest_with_debt,figure_left_empty,interest_expense,interest expense 0 with debt on the balance sheet
+US00000A0022,ALPHA CORP,US,ALPH-PA,income_statement,2025-12-31,payloads_disagree,warning,net_income,"223200000 here, 203200000 in the payload of US00000A0014, which is read"
+US00000A0022,ALPHA CORP,US,ALPH-PA,income_statement,2025-12-31,payloads_disagree,warning,revenue,"1300000000 here, 1250000000 in the payload of US00000A0014, which is read"
+US00000B0013,BETA INC,US,BETA,,2024-06-30,off_chain,left_out,,the date is not one of the company's fiscal years
+US00000B0013,BETA INC,US,BETA,cash_flow_statement,2023-12-31,length_not_proven,left_out,,no fiscal year ends 350 to 380 days before it
+US00000B0013,BETA INC,US,BETA,cash_flow_statement,2024-12-31,impossible_negative,figure_left_empty,depreciation_amortization,-40000000
+US00000B0013,BETA INC,US,BETA,income_statement,2023-12-31,length_not_proven,left_out,,no fiscal year ends 350 to 380 days before it
+US00000B0013,BETA INC,US,BETA,income_statement,2025-12-31,gross_profit_mismatch,warning,gross_profit,"revenue 800000000 minus cost of revenue 500000000, gross profit 350000000"

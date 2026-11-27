@@ -18,7 +18,15 @@ from pyvalue.cli.progress import ProgressBar
 from pyvalue.config import eodhd_api_key, sec_user_agent
 from pyvalue.db import DEFAULT_DATABASE_PATH, Database, migrate
 from pyvalue.errors import PyvalueError
-from pyvalue.fundamentals import DEFAULT_PAYLOADS_DIR, Status, Stop, download_fundamentals
+from pyvalue.fundamentals import (
+    DEFAULT_PAYLOADS_DIR,
+    OUTCOME_OF,
+    Outcome,
+    Status,
+    Stop,
+    download_fundamentals,
+    load_statements,
+)
 from pyvalue.fundamentals import DEFAULT_REPORT_DIR as FUNDAMENTALS_REPORT_DIR
 from pyvalue.listings import (
     DEFAULT_LISTS_DIR,
@@ -33,6 +41,7 @@ from pyvalue.listings import (
     load_symbols,
 )
 from pyvalue.providers.eodhd import FUNDAMENTALS_REQUEST_COST, PROVIDER_NAME
+from pyvalue.providers.statements import Statement
 from pyvalue.universe import (
     DEFAULT_FILINGS_DIR,
     DEFAULT_OUTPUT_DIR,
@@ -362,6 +371,47 @@ def _fundamentals_download(arguments: argparse.Namespace) -> int:
     return 0
 
 
+# What each outcome of a finding is called on the screen (ADR 0030).
+_OUTCOME_WORDS: Mapping[Outcome, str] = MappingProxyType(
+    {
+        Outcome.LEFT_OUT: "Left out",
+        Outcome.FIGURE_LEFT_EMPTY: "A figure left empty",
+        Outcome.WARNING: "Stored with a warning",
+    }
+)
+
+
+def _fundamentals_load(arguments: argparse.Namespace) -> int:
+    """Read the saved payloads into the statement tables and say what was done."""
+    database = Database(arguments.db)
+    # As for the download: drawn on the error stream, and only on a terminal.
+    bar = ProgressBar(sys.stderr)
+    try:
+        outcome = load_statements(
+            database, DEFAULT_PAYLOADS_DIR, FUNDAMENTALS_REPORT_DIR, progress=bar.update
+        )
+    finally:
+        bar.finish()
+    print(f"Database: {database.path}")
+    print(f"Payloads folder: {DEFAULT_PAYLOADS_DIR}")
+    print(f"Companies with a listing at {PROVIDER_NAME}: {outcome.companies:,}")
+    print(f"  With statements stored: {outcome.companies_stored:,}")
+    print(f"Reporting periods: {outcome.periods:,}")
+    print(f"  Income statements: {outcome.rows[Statement.INCOME]:,}")
+    print(f"  Cash-flow statements: {outcome.rows[Statement.CASH_FLOW]:,}")
+    print(f"  Balance sheets: {outcome.rows[Statement.BALANCE_SHEET]:,}")
+    print(f"Findings: {sum(outcome.findings.values()):,}")
+    for kind, words in _OUTCOME_WORDS.items():
+        found = {
+            check: count for check, count in outcome.findings.items() if OUTCOME_OF[check] is kind
+        }
+        print(f"  {words}: {sum(found.values()):,}")
+        for check, count in found.items():
+            print(f"    {check.value}: {count:,}")
+    print(f"The findings are listed in {outcome.report}")
+    return 0
+
+
 def _add_database_option(command: argparse.ArgumentParser) -> None:
     """Give a command the ``--db`` option every database command shares."""
     command.add_argument(
@@ -476,6 +526,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_database_option(fundamentals_download)
     fundamentals_download.set_defaults(run=_fundamentals_download)
+    fundamentals_load = fundamentals_commands.add_parser(
+        "load",
+        help="read the fiscal years of the saved payloads into the statement tables",
+        description=(
+            f"Read the payloads saved in {DEFAULT_PAYLOADS_DIR} and replace the statement "
+            "tables with each company's fiscal years: its income statement, cash-flow "
+            "statement and balance sheet, in the currency they were reported in. Every row "
+            "is checked; a row that cannot be used is left out, an impossible figure is "
+            "left empty, and everything found is written to "
+            f"{FUNDAMENTALS_REPORT_DIR}. This command never reaches the network. Running it "
+            "again gives the same tables and the same report. It refuses to run when fewer "
+            "than half of the listings have a saved payload."
+        ),
+    )
+    _add_database_option(fundamentals_load)
+    fundamentals_load.set_defaults(run=_fundamentals_load)
     return parser
 
 

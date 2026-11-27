@@ -16,10 +16,11 @@ from hypothesis import strategies as st
 
 from pyvalue.fundamentals.checks import Check, Finding
 from pyvalue.fundamentals.statements import (
+    BalanceSheetRow,
     CompanyStatements,
+    FlowRow,
     Payload,
     Period,
-    StatementRow,
     company_statements,
     whole,
 )
@@ -101,7 +102,14 @@ def _checks(result: CompanyStatements) -> list[tuple[Check, Statement | None, st
 
 def _stored(result: CompanyStatements) -> list[tuple[Statement, str, int | None]]:
     """Return each stored row as its statement, date and length."""
-    return [(row.statement, row.period_end.isoformat(), row.months) for row in result.rows]
+    return [
+        (
+            row.statement,
+            row.period_end.isoformat(),
+            row.months if isinstance(row, FlowRow) else None,
+        )
+        for row in result.rows
+    ]
 
 
 def test_every_year_is_stored_and_the_oldest_years_flows_are_left_out() -> None:
@@ -268,6 +276,22 @@ def test_total_assets_off_in_scale_from_both_neighbours_leave_the_balance_sheet_
     assert (_BALANCE, "2024-06-30", None) not in _stored(result)
     assert (_INCOME, "2024-06-30", 12) in _stored(result)
     assert (Check.SCALE_OUTLIER, _BALANCE, "2024-06-30") in _checks(result)
+
+
+def test_the_year_after_an_outlier_gets_no_step_warning_against_it() -> None:
+    """The step back from a bad year is not news: the outlier is no neighbour."""
+    rows = [
+        *_year("2022-06-30", total_assets=3_100_000_000),
+        *_year("2023-06-30", total_assets=3_098_302_000),
+        *_year("2024-06-30", total_assets=3_089_448),
+        *_year("2025-06-30", total_assets=3_150_309_364),
+    ]
+
+    result = _one(*rows)
+
+    assert [
+        (check, day) for check, _, day in _checks(result) if check.value.startswith("scale")
+    ] == [(Check.SCALE_OUTLIER, "2024-06-30")]
 
 
 def test_revenue_off_in_scale_leaves_the_income_statement_out() -> None:
@@ -517,10 +541,8 @@ def test_stored_rows_carry_their_figures_under_pyvalues_names() -> None:
     result = _one(_row(_BALANCE, "2025-12-31", shares_outstanding=7_453_000_000))
 
     assert result.rows == (
-        StatementRow(
-            statement=_BALANCE,
-            period_end=date(2025, 12, 31),
-            months=None,
-            figures={Figure.SHARES_OUTSTANDING: 7_453_000_000},
+        BalanceSheetRow(
+            period_end=date(2025, 12, 31), figures={Figure.SHARES_OUTSTANDING: 7_453_000_000}
         ),
     )
+    assert result.rows[0].statement is Statement.BALANCE_SHEET

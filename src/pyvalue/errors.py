@@ -9,10 +9,12 @@ Author: Emre Tezel
 # How a database is rebuilt, for the messages that ask for it. No load deletes
 # a row and no run changes a listing, so a database that no longer agrees with
 # the committed files is built again from them (ADR 0013, ADR 0024, ADR 0026).
-# Every such message gives the same steps, in the order they have to be run.
+# The statements are read again from the saved payloads, last, because a
+# rebuilt database gives the companies new ids (ADR 0029). Every such message
+# gives the same steps, in the order they have to be run.
 REBUILD_STEPS: str = (
     "set the file aside, run `pyvalue db migrate`, then `pyvalue universe load`, "
-    "`pyvalue symbols load` and `pyvalue listings fill`"
+    "`pyvalue symbols load`, `pyvalue listings fill` and `pyvalue fundamentals load`"
 )
 
 

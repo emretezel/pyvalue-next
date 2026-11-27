@@ -6,20 +6,21 @@
     "Exchange": "XETRA",
     "CurrencyCode": "EUR",
     "CountryISO": "DE",
-    "ISIN": "DE00000T0019",
+    "ISIN": "DE00000T0027",
     "PrimaryTicker": "THT.XETRA",
     "FiscalYearEnd": "December",
     "UpdatedAt": "2026-11-27"
   },
   "Highlights": {
-    "MarketCapitalization": 9240000000
+    "MarketCapitalization": 2620000000,
+    "MostRecentQuarter": "2026-09-30"
   },
   "outstandingShares": {
     "annual": {
       "0": {
-        "date": "2025",
-        "dateFormatted": "2025-12-31",
-        "shares": 100000000
+        "date": "2023",
+        "dateFormatted": "2023-12-31",
+        "shares": 20000000
       }
     },
     "quarterly": {}
@@ -30,19 +31,90 @@
       "quarterly": {
         "2026-09-30": {
           "date": "2026-09-30",
-          "filing_date": "2026-11-05",
+          "filing_date": "2026-09-30",
           "currency_symbol": "EUR",
-          "totalAssets": "4620000000.00",
-          "totalLiab": "1848000000.00"
+          "totalAssets": "970000000.00",
+          "totalLiab": "435000000.00",
+          "totalStockholderEquity": "535000000.00",
+          "liabilitiesAndStockholdersEquity": "970000000.00",
+          "cash": "97000000.00",
+          "shortTermDebt": "54375000.00",
+          "longTermDebt": "163125000.00",
+          "shortLongTermDebtTotal": "217500000.00",
+          "totalCurrentAssets": "323333333.00",
+          "totalCurrentLiabilities": "145000000.00",
+          "nonCurrentLiabilitiesTotal": "290000000.00",
+          "commonStockSharesOutstanding": "20000000.00"
         }
       },
       "yearly": {
-        "2025-12-31": {
-          "date": "2025-12-31",
-          "filing_date": "2026-02-20",
+        "2023-12-31": {
+          "date": "2023-12-31",
+          "filing_date": "2023-12-31",
           "currency_symbol": "EUR",
-          "totalAssets": "4620000000.00",
-          "totalLiab": "1848000000.00"
+          "totalAssets": "960000000.00",
+          "totalLiab": "430000000.00",
+          "totalStockholderEquity": "530000000.00",
+          "liabilitiesAndStockholdersEquity": "960000000.00",
+          "cash": "56000000.00",
+          "shortTermDebt": "25000000.00",
+          "longTermDebt": "75000000.00",
+          "shortLongTermDebtTotal": "100000000.00",
+          "totalCurrentAssets": "320000000.00",
+          "totalCurrentLiabilities": "143333333.00",
+          "nonCurrentLiabilitiesTotal": "286666667.00",
+          "commonStockSharesOutstanding": "20000000.00"
+        },
+        "2022-12-31": {
+          "date": "2022-12-31",
+          "filing_date": "2022-12-31",
+          "currency_symbol": "USD",
+          "totalAssets": "940000000.00",
+          "totalLiab": "420000000.00",
+          "totalStockholderEquity": "520000000.00",
+          "liabilitiesAndStockholdersEquity": "940000000.00",
+          "cash": "54000000.00",
+          "shortTermDebt": "25000000.00",
+          "longTermDebt": "75000000.00",
+          "shortLongTermDebtTotal": "100000000.00",
+          "totalCurrentAssets": "313333333.00",
+          "totalCurrentLiabilities": "140000000.00",
+          "nonCurrentLiabilitiesTotal": "280000000.00",
+          "commonStockSharesOutstanding": "20000000.00"
+        },
+        "2021-12-31": {
+          "date": "2021-12-31",
+          "filing_date": "2021-12-31",
+          "currency_symbol": null,
+          "totalAssets": "920000000.00",
+          "totalLiab": "410000000.00",
+          "totalStockholderEquity": "510000000.00",
+          "liabilitiesAndStockholdersEquity": "920000000.00",
+          "cash": "52000000.00",
+          "shortTermDebt": "25000000.00",
+          "longTermDebt": "75000000.00",
+          "shortLongTermDebtTotal": "100000000.00",
+          "totalCurrentAssets": "306666666.00",
+          "totalCurrentLiabilities": "136666666.00",
+          "nonCurrentLiabilitiesTotal": "273333334.00",
+          "commonStockSharesOutstanding": "20000000.00"
+        },
+        "2020-12-31": {
+          "date": "2020-12-31",
+          "filing_date": "2020-12-31",
+          "currency_symbol": "EUR",
+          "totalAssets": "900000000.00",
+          "totalLiab": "400000000.00",
+          "totalStockholderEquity": "500000000.00",
+          "liabilitiesAndStockholdersEquity": "900000000.00",
+          "cash": "50000000.00",
+          "shortTermDebt": "25000000.00",
+          "longTermDebt": "75000000.00",
+          "shortLongTermDebtTotal": "100000000.00",
+          "totalCurrentAssets": "300000000.00",
+          "totalCurrentLiabilities": "133333333.00",
+          "nonCurrentLiabilitiesTotal": "266666667.00",
+          "commonStockSharesOutstanding": "20000000.00"
         }
       }
     },
@@ -51,17 +123,60 @@
       "quarterly": {
         "2026-09-30": {
           "date": "2026-09-30",
-          "filing_date": "2026-11-05",
+          "filing_date": "2026-09-30",
           "currency_symbol": "EUR",
-          "totalCashFromOperatingActivities": "462000000.00"
+          "totalCashFromOperatingActivities": "17000000.00",
+          "capitalExpenditures": "4250000.00",
+          "depreciation": "2125000.00",
+          "dividendsPaid": null,
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "12750000.00"
         }
       },
       "yearly": {
-        "2025-12-31": {
-          "date": "2025-12-31",
-          "filing_date": "2026-02-20",
+        "2023-12-31": {
+          "date": "2023-12-31",
+          "filing_date": "2023-12-31",
           "currency_symbol": "EUR",
-          "totalCashFromOperatingActivities": "462000000.00"
+          "totalCashFromOperatingActivities": "66000000.00",
+          "capitalExpenditures": "23000000.00",
+          "depreciation": "18000000.00",
+          "dividendsPaid": null,
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "43000000.00"
+        },
+        "2022-12-31": {
+          "date": "2022-12-31",
+          "filing_date": "2022-12-31",
+          "currency_symbol": "EUR",
+          "totalCashFromOperatingActivities": "64000000.00",
+          "capitalExpenditures": "22000000.00",
+          "depreciation": "17000000.00",
+          "dividendsPaid": null,
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "42000000.00"
+        },
+        "2021-12-31": {
+          "date": "2021-12-31",
+          "filing_date": "2021-12-31",
+          "currency_symbol": null,
+          "totalCashFromOperatingActivities": "62000000.00",
+          "capitalExpenditures": "21000000.00",
+          "depreciation": "16000000.00",
+          "dividendsPaid": null,
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "41000000.00"
+        },
+        "2020-12-31": {
+          "date": "2020-12-31",
+          "filing_date": "2020-12-31",
+          "currency_symbol": "EUR",
+          "totalCashFromOperatingActivities": "60000000.00",
+          "capitalExpenditures": "20000000.00",
+          "depreciation": "15000000.00",
+          "dividendsPaid": null,
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "40000000.00"
         }
       }
     },
@@ -70,19 +185,80 @@
       "quarterly": {
         "2026-09-30": {
           "date": "2026-09-30",
-          "filing_date": "2026-11-05",
+          "filing_date": "2026-09-30",
           "currency_symbol": "EUR",
-          "totalRevenue": "2310000000.00",
-          "netIncome": "231000000.00"
+          "totalRevenue": "120000000.00",
+          "costOfRevenue": "60000000.00",
+          "grossProfit": "60000000.00",
+          "operatingIncome": "30000000.00",
+          "ebit": "30000000.00",
+          "incomeBeforeTax": "30000000.00",
+          "incomeTaxExpense": "6000000.00",
+          "taxProvision": "6000000.00",
+          "netIncome": "24000000.00",
+          "interestExpense": null
         }
       },
       "yearly": {
-        "2025-12-31": {
-          "date": "2025-12-31",
-          "filing_date": "2026-02-20",
+        "2023-12-31": {
+          "date": "2023-12-31",
+          "filing_date": "2023-12-31",
           "currency_symbol": "EUR",
-          "totalRevenue": "2310000000.00",
-          "netIncome": "231000000.00"
+          "totalRevenue": "460000000.00",
+          "costOfRevenue": "280000000.00",
+          "grossProfit": "180000000.00",
+          "operatingIncome": "90000000.00",
+          "ebit": "90000000.00",
+          "incomeBeforeTax": "90000000.00",
+          "incomeTaxExpense": "18000000.00",
+          "taxProvision": "18000000.00",
+          "netIncome": "72000000.00",
+          "interestExpense": null
+        },
+        "2022-12-31": {
+          "date": "2022-12-31",
+          "filing_date": "2022-12-31",
+          "currency_symbol": "EUR",
+          "totalRevenue": "440000000.00",
+          "costOfRevenue": "270000000.00",
+          "grossProfit": "170000000.00",
+          "operatingIncome": "85000000.00",
+          "ebit": "85000000.00",
+          "incomeBeforeTax": "85000000.00",
+          "incomeTaxExpense": "17000000.00",
+          "taxProvision": "17000000.00",
+          "netIncome": "68000000.00",
+          "interestExpense": null
+        },
+        "2021-12-31": {
+          "date": "2021-12-31",
+          "filing_date": "2021-12-31",
+          "currency_symbol": null,
+          "totalRevenue": "420000000.00",
+          "costOfRevenue": "260000000.00",
+          "grossProfit": "160000000.00",
+          "operatingIncome": "80000000.00",
+          "ebit": "80000000.00",
+          "incomeBeforeTax": "80000000.00",
+          "incomeTaxExpense": "16000000.00",
+          "taxProvision": "16000000.00",
+          "netIncome": "64000000.00",
+          "interestExpense": null
+        },
+        "2020-12-31": {
+          "date": "2020-12-31",
+          "filing_date": "2020-12-31",
+          "currency_symbol": "EUR",
+          "totalRevenue": "400000000.00",
+          "costOfRevenue": "250000000.00",
+          "grossProfit": "150000000.00",
+          "operatingIncome": "75000000.00",
+          "ebit": "75000000.00",
+          "incomeBeforeTax": "75000000.00",
+          "incomeTaxExpense": "15000000.00",
+          "taxProvision": "15000000.00",
+          "netIncome": "60000000.00",
+          "interestExpense": null
         }
       }
     }

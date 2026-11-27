@@ -12,7 +12,8 @@
     "UpdatedAt": "2026-11-27"
   },
   "Highlights": {
-    "MarketCapitalization": 2620000000
+    "MarketCapitalization": 2620000000,
+    "MostRecentQuarter": "2026-09-30"
   },
   "outstandingShares": {
     "annual": {
@@ -30,19 +31,90 @@
       "quarterly": {
         "2026-09-30": {
           "date": "2026-09-30",
-          "filing_date": "2026-11-05",
+          "filing_date": "2026-09-30",
           "currency_symbol": "GBP",
-          "totalAssets": "1310000000.00",
-          "totalLiab": "524000000.00"
+          "totalAssets": "1320000000.00",
+          "totalLiab": "530000000.00",
+          "totalStockholderEquity": "790000000.00",
+          "liabilitiesAndStockholdersEquity": "1320000000.00",
+          "cash": "132000000.00",
+          "shortTermDebt": "66250000.00",
+          "longTermDebt": "198750000.00",
+          "shortLongTermDebtTotal": "265000000.00",
+          "totalCurrentAssets": "440000000.00",
+          "totalCurrentLiabilities": "176666666.00",
+          "nonCurrentLiabilitiesTotal": "353333334.00",
+          "commonStockSharesOutstanding": "100000000.00"
         }
       },
       "yearly": {
         "2025-12-31": {
           "date": "2025-12-31",
-          "filing_date": "2026-02-20",
+          "filing_date": "2025-12-31",
           "currency_symbol": "GBP",
           "totalAssets": "1310000000.00",
-          "totalLiab": "524000000.00"
+          "totalLiab": "524000000.00",
+          "totalStockholderEquity": "786000000.00",
+          "liabilitiesAndStockholdersEquity": "1310000000.00",
+          "cash": "100000000.00",
+          "shortTermDebt": "50000000.00",
+          "longTermDebt": "150000000.00",
+          "shortLongTermDebtTotal": "200000000.00",
+          "totalCurrentAssets": "436666666.00",
+          "totalCurrentLiabilities": "174666666.00",
+          "nonCurrentLiabilitiesTotal": "349333334.00",
+          "commonStockSharesOutstanding": "100000000.00"
+        },
+        "2024-12-31": {
+          "date": "2024-12-31",
+          "filing_date": "2024-12-31",
+          "currency_symbol": "GBP",
+          "totalAssets": "1280000.00",
+          "totalLiab": "512000.00",
+          "totalStockholderEquity": "768000.00",
+          "liabilitiesAndStockholdersEquity": "1280000.00",
+          "cash": "98000.00",
+          "shortTermDebt": "50000.00",
+          "longTermDebt": "150000.00",
+          "shortLongTermDebtTotal": "200000.00",
+          "totalCurrentAssets": "426666.00",
+          "totalCurrentLiabilities": "170666.00",
+          "nonCurrentLiabilitiesTotal": "341334.00",
+          "commonStockSharesOutstanding": "100000000.00"
+        },
+        "2023-12-31": {
+          "date": "2023-12-31",
+          "filing_date": "2023-12-31",
+          "currency_symbol": "GBP",
+          "totalAssets": "1250000000.00",
+          "totalLiab": "500000000.00",
+          "totalStockholderEquity": "750000000.00",
+          "liabilitiesAndStockholdersEquity": "1250000000.00",
+          "cash": "95000000.00",
+          "shortTermDebt": "50000000.00",
+          "longTermDebt": "150000000.00",
+          "shortLongTermDebtTotal": "200000000.00",
+          "totalCurrentAssets": "416666666.00",
+          "totalCurrentLiabilities": "166666666.00",
+          "nonCurrentLiabilitiesTotal": "333333334.00",
+          "commonStockSharesOutstanding": "100000000.00"
+        },
+        "2022-12-31": {
+          "date": "2022-12-31",
+          "filing_date": "2022-12-31",
+          "currency_symbol": "GBX",
+          "totalAssets": "1200000000.00",
+          "totalLiab": "480000000.00",
+          "totalStockholderEquity": "720000000.00",
+          "liabilitiesAndStockholdersEquity": "1200000000.00",
+          "cash": "90000000.00",
+          "shortTermDebt": "50000000.00",
+          "longTermDebt": "150000000.00",
+          "shortLongTermDebtTotal": "200000000.00",
+          "totalCurrentAssets": "400000000.00",
+          "totalCurrentLiabilities": "160000000.00",
+          "nonCurrentLiabilitiesTotal": "320000000.00",
+          "commonStockSharesOutstanding": "100000000.00"
         }
       }
     },
@@ -51,17 +123,60 @@
       "quarterly": {
         "2026-09-30": {
           "date": "2026-09-30",
-          "filing_date": "2026-11-05",
+          "filing_date": "2026-09-30",
           "currency_symbol": "GBP",
-          "totalCashFromOperatingActivities": "131000000.00"
+          "totalCashFromOperatingActivities": "34000000.00",
+          "capitalExpenditures": "8500000.00",
+          "depreciation": "4250000.00",
+          "dividendsPaid": null,
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "25500000.00"
         }
       },
       "yearly": {
         "2025-12-31": {
           "date": "2025-12-31",
-          "filing_date": "2026-02-20",
+          "filing_date": "2025-12-31",
           "currency_symbol": "GBP",
-          "totalCashFromOperatingActivities": "131000000.00"
+          "totalCashFromOperatingActivities": "131000000.00",
+          "capitalExpenditures": "43000000.00",
+          "depreciation": "33000000.00",
+          "dividendsPaid": "18000000.00",
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "88000000.00"
+        },
+        "2024-12-31": {
+          "date": "2024-12-31",
+          "filing_date": "2024-12-31",
+          "currency_symbol": "GBP",
+          "totalCashFromOperatingActivities": "128000000.00",
+          "capitalExpenditures": "42000000.00",
+          "depreciation": "32000000.00",
+          "dividendsPaid": "17000000.00",
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "86000000.00"
+        },
+        "2023-12-31": {
+          "date": "2023-12-31",
+          "filing_date": "2023-12-31",
+          "currency_symbol": "GBP",
+          "totalCashFromOperatingActivities": "125000000.00",
+          "capitalExpenditures": "41000000.00",
+          "depreciation": "31000000.00",
+          "dividendsPaid": "16000000.00",
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "84000000.00"
+        },
+        "2022-12-31": {
+          "date": "2022-12-31",
+          "filing_date": "2022-12-31",
+          "currency_symbol": "GBX",
+          "totalCashFromOperatingActivities": "120000000.00",
+          "capitalExpenditures": "40000000.00",
+          "depreciation": "30000000.00",
+          "dividendsPaid": "15000000.00",
+          "salePurchaseOfStock": null,
+          "freeCashFlow": "80000000.00"
         }
       }
     },
@@ -70,19 +185,80 @@
       "quarterly": {
         "2026-09-30": {
           "date": "2026-09-30",
-          "filing_date": "2026-11-05",
+          "filing_date": "2026-09-30",
           "currency_symbol": "GBP",
-          "totalRevenue": "655000000.00",
-          "netIncome": "65000000.00"
+          "totalRevenue": "170000000.00",
+          "costOfRevenue": "85000000.00",
+          "grossProfit": "85000000.00",
+          "operatingIncome": "42500000.00",
+          "ebit": "42500000.00",
+          "incomeBeforeTax": "42500000.00",
+          "incomeTaxExpense": "8500000.00",
+          "taxProvision": "8500000.00",
+          "netIncome": "34000000.00",
+          "interestExpense": null
         }
       },
       "yearly": {
         "2025-12-31": {
           "date": "2025-12-31",
-          "filing_date": "2026-02-20",
+          "filing_date": "2025-12-31",
           "currency_symbol": "GBP",
           "totalRevenue": "655000000.00",
-          "netIncome": "65000000.00"
+          "costOfRevenue": "330000000.00",
+          "grossProfit": "325000000.00",
+          "operatingIncome": "162500000.00",
+          "ebit": "162500000.00",
+          "incomeBeforeTax": "162500000.00",
+          "incomeTaxExpense": "32500000.00",
+          "taxProvision": "32500000.00",
+          "netIncome": "130000000.00",
+          "interestExpense": null
+        },
+        "2024-12-31": {
+          "date": "2024-12-31",
+          "filing_date": "2024-12-31",
+          "currency_symbol": "GBP",
+          "totalRevenue": "640000000.00",
+          "costOfRevenue": "320000000.00",
+          "grossProfit": "320000000.00",
+          "operatingIncome": "160000000.00",
+          "ebit": "160000000.00",
+          "incomeBeforeTax": "160000000.00",
+          "incomeTaxExpense": "32000000.00",
+          "taxProvision": "32000000.00",
+          "netIncome": "128000000.00",
+          "interestExpense": null
+        },
+        "2023-12-31": {
+          "date": "2023-12-31",
+          "filing_date": "2023-12-31",
+          "currency_symbol": "GBP",
+          "totalRevenue": "620000000.00",
+          "costOfRevenue": "310000000.00",
+          "grossProfit": "310000000.00",
+          "operatingIncome": "155000000.00",
+          "ebit": "155000000.00",
+          "incomeBeforeTax": "155000000.00",
+          "incomeTaxExpense": "31000000.00",
+          "taxProvision": "31000000.00",
+          "netIncome": "124000000.00",
+          "interestExpense": null
+        },
+        "2022-12-31": {
+          "date": "2022-12-31",
+          "filing_date": "2022-12-31",
+          "currency_symbol": "GBX",
+          "totalRevenue": "600000000.00",
+          "costOfRevenue": "300000000.00",
+          "grossProfit": "300000000.00",
+          "operatingIncome": "150000000.00",
+          "ebit": "150000000.00",
+          "incomeBeforeTax": "150000000.00",
+          "incomeTaxExpense": "30000000.00",
+          "taxProvision": "30000000.00",
+          "netIncome": "120000000.00",
+          "interestExpense": null
         }
       }
     }
