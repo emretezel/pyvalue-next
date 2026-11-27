@@ -42,7 +42,7 @@ flowchart LR
     db --> file
 ```
 
-An arrow means "calls". Nothing calls back up the arrows. Six small modules are left out of the picture because everything may use them: `pyvalue.errors`, the base of pyvalue's own errors; `pyvalue.config`, the settings; `pyvalue.http`, the one function every download goes through; `pyvalue.identifiers`, the checks of an ISIN and of a legal-entity identifier; `pyvalue.csv_file`, the reader every committed file starts with and the writer of every generated one; and `pyvalue.decision_file`, what the decisions files share.
+An arrow means "calls". Nothing calls back up the arrows. Seven small modules are left out of the picture because everything may use them: `pyvalue.errors`, the base of pyvalue's own errors; `pyvalue.config`, the settings; `pyvalue.http`, the one function every download goes through; `pyvalue.identifiers`, the checks of an ISIN and of a legal-entity identifier; `pyvalue.csv_file`, the reader every committed file starts with and the writer of every generated one; `pyvalue.saved_file`, which keeps a downloaded answer as a file that is whole or absent; and `pyvalue.decision_file`, what the decisions files share.
 
 The pattern for database access is Repository with Unit of Work (ADR 0008). The working rules, with what to flag in review, are in the **Database Access** section of [`CLAUDE.md`](../CLAUDE.md).
 

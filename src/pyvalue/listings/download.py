@@ -16,7 +16,6 @@ that is already saved.
 Author: Emre Tezel
 """
 
-import contextlib
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -39,6 +38,7 @@ from pyvalue.providers.eodhd import (
     parse_symbol_list,
     symbol_list_url,
 )
+from pyvalue.saved_file import save_whole
 
 
 class DownloadStatus(Enum):
@@ -90,29 +90,6 @@ class SymbolsDownload:
         return tuple(each for each in self.lists if each.status is status)
 
 
-def _save(body: bytes, destination: Path) -> None:
-    """Keep an answer under its final name, replacing what was there.
-
-    The answer is written under a temporary name first, so a file with the
-    final name is always whole, even if the run is interrupted.
-
-    Raises:
-        ListingsError: If the file cannot be written.
-    """
-    partial = destination.with_name(destination.name + ".part")
-    try:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        partial.write_bytes(body)
-        partial.replace(destination)
-    except OSError as error:
-        raise ListingsError(f"cannot save {destination}: {error}") from error
-    finally:
-        # The temporary file must not stay, whatever happened. If it cannot be
-        # removed either, the error already on its way is the one to report.
-        with contextlib.suppress(OSError):
-            partial.unlink(missing_ok=True)
-
-
 def _saved_lines(path: Path) -> int | None:
     """Return how many lines the saved list has, or ``None`` if there is none to trust.
 
@@ -148,7 +125,7 @@ def _download_list(
     saved_before = _saved_lines(destination)
     if saved_before is not None and suspiciously_short(lines, saved_before):
         return ListDownload(code, DownloadStatus.REFUSED_AS_SHORT, lines, saved_before)
-    _save(body, destination)
+    save_whole(body, destination, ListingsError)
     return ListDownload(code, DownloadStatus.SAVED, lines, saved_before)
 
 
@@ -185,7 +162,7 @@ def download_symbols(
     url = exchange_list_url()
     body = fetch(url, api_key)
     offered = parse_exchange_list(body, url)
-    _save(body, lists_dir / EXCHANGE_LIST_FILE)
+    save_whole(body, lists_dir / EXCHANGE_LIST_FILE, ListingsError)
 
     wanted = theirs.codes_with_a_market()
     on_offer = set(offered)
