@@ -67,7 +67,7 @@ def ticker_key(text: str) -> str:
     """Return what is compared when two tickers are compared (ADR 0019).
 
     A fund and a provider write one ticker in different ways: ``NOVO B`` and
-    ``NOVO-B``, ``BRK.B`` and ``BRK-B``, ``700`` and ``0700``. The key puts
+    ``NOVO-B``, ``BBD.A`` and ``BBD-A``, ``700`` and ``0700``. The key puts
     the text in upper case, drops everything but letters and digits, and
     drops leading zeros.
 
@@ -311,11 +311,16 @@ def listing_ticker(security: Security, line: Line) -> str:
     """Return the ticker a listing on this line gets (ADR 0019, ADR 0026).
 
     The fund's ticker is how the exchange writes it more often than the
-    provider's symbol is (``BRK.B`` against ``BRK-B``). So it is taken, in
-    upper case, when every ticker the holding lines give equals the symbol
-    and they are spelled alike. In every other case the listing's ticker is
-    the symbol in upper case: a fund's ticker that does not equal the symbol
-    may belong to another market.
+    provider's symbol is: ``NOVO B`` against ``NOVO-B`` in Copenhagen,
+    ``BBD.A`` against ``BBD-A`` in Toronto. So it is taken, in upper case,
+    when every ticker the holding lines give equals the symbol and they are
+    spelled alike. In every other case the listing's ticker is the symbol in
+    upper case: a fund's ticker that does not equal the symbol may belong to
+    another market.
+
+    The spelling is the fund's, whatever it is. Vanguard writes a share class
+    in New York with a space as well, so Berkshire's B share is ``BRK B``
+    here, not ``BRK.B``.
 
     Args:
         security: The security.

@@ -16,7 +16,7 @@ One row per instrument that has a known primary exchange line. Decided in ADR 00
 
 | `listing_id` | `instrument_id` | `mic` | `ticker` | `currency` |
 |---|---|---|---|---|
-| 1 | 1 (Berkshire B, `US0846707026`) | `XNYS` | `BRK.B` | `USD` |
+| 1 | 1 (Berkshire B, `US0846707026`) | `XNYS` | `BRK B` | `USD` |
 | 2 | 2 (Alphabet A, `US02079K3059`) | `XNAS` | `GOOGL` | `USD` |
 | 3 | 3 (Alphabet C, `US02079K1079`) | `XNAS` | `GOOG` | `USD` |
 | 4 | 4 (SAP, `DE0007164600`) | `XETR` | `SAP` | `EUR` |
@@ -26,7 +26,7 @@ One row per instrument that has a known primary exchange line. Decided in ADR 00
 - **Primary listing only.** A row is the line on the market where the instrument has its primary listing. Because `instrument_id` is unique here, an instrument has at most one listing, so there is no primary/secondary status column.
 - **No listing is a missing row.** An instrument whose exchange and ticker are unknown has no row here. No column is left empty to say so.
 - **The company of a listing is reached through its instrument.** This table has no `company_id`.
-- **`ticker` is the fund's ticker where there is one**, in upper case: `BRK.B`, where the provider writes `BRK-B`. It is taken when every ticker the holding lines give equals the provider's symbol and they are spelled alike. In every other case it is the provider's symbol in upper case (ADR 0019, ADR 0026). The provider's symbol itself, exactly as given, is in [`provider_listing`](provider_listing.md).
+- **`ticker` is the fund's ticker where there is one**, in upper case, spelled as the fund spells it: `BRK B`, where the provider writes `BRK-B`. A ticker can therefore hold a space, a dot or an asterisk (`NOVO B`, `BBD.A`, `AC*`). It is taken when every ticker the holding lines give equals the provider's symbol and they are spelled alike. In every other case it is the provider's symbol in upper case (ADR 0019, ADR 0026). The provider's symbol itself, exactly as given, is in [`provider_listing`](provider_listing.md).
 - **`currency` is not a quote unit.** A London line is `GBP` even though its prices are quoted in pence. The fill turns the provider's sub-unit code into the currency.
 - **How a listing is filled** is set out in ADR 0019 and ADR 0026: the provider's one line in the security's home market that carries its ISIN, when the fund's ticker and currency do not contradict it, or the line a decision names.
 - **A run never changes a row.** A security that has a listing is skipped. A wrong listing is corrected by a decision and a rebuild of the database.

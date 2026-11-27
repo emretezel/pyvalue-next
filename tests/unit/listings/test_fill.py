@@ -178,13 +178,13 @@ def test_a_listing_and_the_providers_symbol_for_it_are_written(
     market: Database, tmp_path: Path
 ) -> None:
     """Berkshire: the fund's ticker in the listing, the provider's symbol beside it."""
-    ids = _hold(market, {_BERKSHIRE: [_held("VTI", "US", "USD", "BRK.B")]})
+    ids = _hold(market, {_BERKSHIRE: [_held("VTI", "US", "USD", "BRK B")]})
     _every_list_stored(market)
     _list(market, ("US", "BRK-B", "USD", _BERKSHIRE))
 
     outcome = _fill(market, tmp_path)
 
-    assert _listings(market) == [(ids[_BERKSHIRE], "XNYS", "BRK.B", "USD")]
+    assert _listings(market) == [(ids[_BERKSHIRE], "XNYS", "BRK B", "USD")]
     assert _symbols(market) == ["BRK-B"]
     assert outcome.securities == 1
     assert [each.decided for each in outcome.plan.fills] == [False]
@@ -196,7 +196,7 @@ def test_the_listing_and_the_symbol_row_belong_together(market: Database, tmp_pa
         market,
         {
             _HYNIX: [_held("VXUS", "KR", "KRW", "000660")],
-            _BERKSHIRE: [_held("VTI", "US", "USD", "BRK.B")],
+            _BERKSHIRE: [_held("VTI", "US", "USD", "BRK B")],
         },
     )
     _every_list_stored(market)
@@ -232,7 +232,7 @@ def test_the_scope_of_the_fund_decides_whether_a_us_coded_isin_is_a_receipt(
     ids = _hold(
         market,
         {
-            _BERKSHIRE: [_held("VTI", "US", "USD", "BRK.B")],
+            _BERKSHIRE: [_held("VTI", "US", "USD", "BRK B")],
             _DAQO: [_held("VXUS", "US", "USD", "DQ")],
         },
     )
@@ -415,7 +415,7 @@ def test_a_listing_that_contradicts_a_decision_stops_the_run_and_writes_nothing(
         market,
         {
             _HYNIX: [_held("VXUS", "KR", "KRW", "000660")],
-            _BERKSHIRE: [_held("VTI", "US", "USD", "BRK.B")],
+            _BERKSHIRE: [_held("VTI", "US", "USD", "BRK B")],
         },
     )
     _every_list_stored(market)

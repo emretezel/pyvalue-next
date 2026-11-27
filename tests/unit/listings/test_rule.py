@@ -304,11 +304,11 @@ def test_a_us_coded_isin_in_the_non_us_fund_is_not_filled() -> None:
 def test_a_us_coded_isin_in_the_us_fund_is_filled() -> None:
     """That is where a US share is expected."""
     isin = "US0846707026"
-    security = _security(isin, _held(isin, "US", "USD", "BRK.B", non_us_fund=False))
+    security = _security(isin, _held(isin, "US", "USD", "BRK B", non_us_fund=False))
 
     fill = _filled(judge(security, Lines([_line("US", "BRK-B", "US", "USD", isin)])))
 
-    assert (fill.ticker, fill.line.symbol) == ("BRK.B", "BRK-B")
+    assert (fill.ticker, fill.line.symbol) == ("BRK B", "BRK-B")
 
 
 def test_every_ticker_the_holding_lines_give_must_equal_the_symbol() -> None:
@@ -401,7 +401,7 @@ def test_the_funds_ticker_is_written_in_upper_case() -> None:
 def test_tickers_that_are_spelled_differently_give_way_to_the_symbol() -> None:
     """Two funds agree on the ticker but not on its spelling: neither is taken."""
     security = _security(
-        _HYNIX, _held(_HYNIX, "US", "USD", "BRK.B"), _held(_HYNIX, "US", "USD", "BRK/B")
+        _HYNIX, _held(_HYNIX, "US", "USD", "BRK B"), _held(_HYNIX, "US", "USD", "BRK.B")
     )
 
     assert listing_ticker(security, _line("US", "BRK-B", "US", "USD")) == "BRK-B"

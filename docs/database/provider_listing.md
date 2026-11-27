@@ -14,7 +14,7 @@ One row says: this provider uses this symbol for this listing of ours. Decided i
 
 | `listing_id` | `provider_code` | `provider_symbol` | Read as |
 |---|---|---|---|
-| 1 (Berkshire B, ticker `BRK.B`) | `eodhd` | `BRK-B` | EODHD calls Berkshire's B share `BRK-B` |
+| 1 (Berkshire B, ticker `BRK B`) | `eodhd` | `BRK-B` | EODHD calls Berkshire's B share `BRK-B` |
 | 2 (Alphabet A, ticker `GOOGL`) | `eodhd` | `GOOGL` | EODHD calls Alphabet's A share `GOOGL` |
 | 4 (SAP, ticker `SAP`) | `eodhd` | `SAP` | EODHD calls SAP `SAP` |
 
