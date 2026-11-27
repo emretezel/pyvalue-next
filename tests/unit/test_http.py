@@ -22,7 +22,7 @@ from pyvalue.http import _NoRedirect, fetch_https
 from pyvalue.providers import ProviderError
 from pyvalue.providers.eodhd import (
     EODHD_HOST,
-    ListNotFoundError,
+    NotFoundError,
     exchange_list_url,
     fetch_from_eodhd,
     symbol_list_url,
@@ -571,7 +571,7 @@ def test_a_list_that_is_not_there_has_an_error_of_its_own(
     """EODHD answers "not found" for an exchange that is not in the subscription."""
     _install(monkeypatch, _answered(404))
 
-    with pytest.raises(ListNotFoundError, match="cannot download https://eodhd.com/") as raised:
+    with pytest.raises(NotFoundError, match="cannot download https://eodhd.com/") as raised:
         fetch_from_eodhd(symbol_list_url("KO"), _KEY)
 
     assert _KEY not in str(raised.value)
@@ -588,7 +588,7 @@ def test_a_refused_request_is_a_provider_error_without_the_key(
     with pytest.raises(ProviderError, match="cannot download https://eodhd.com/") as raised:
         fetch_from_eodhd(symbol_list_url("KO"), _KEY)
 
-    assert not isinstance(raised.value, ListNotFoundError)
+    assert not isinstance(raised.value, NotFoundError)
     assert _KEY not in str(raised.value)
     assert _KEY_SENT not in str(raised.value)
     assert raised.value.__cause__ is None

@@ -32,7 +32,7 @@ from pyvalue.providers import ExchangeCodes, ProviderError, packaged_exchange_co
 from pyvalue.providers.eodhd import (
     EXCHANGE_FILE,
     Fetch,
-    ListNotFoundError,
+    NotFoundError,
     exchange_list_url,
     fetch_from_eodhd,
     parse_exchange_list,
@@ -139,7 +139,7 @@ def _download_list(
     url = symbol_list_url(code)
     try:
         body = fetch(url, api_key)
-    except ListNotFoundError:
+    except NotFoundError:
         return ListDownload(code, DownloadStatus.NOT_IN_SUBSCRIPTION, None, None)
     # Read before it is kept: an error page or a changed shape must not get a
     # final name. The address in the message carries no key.

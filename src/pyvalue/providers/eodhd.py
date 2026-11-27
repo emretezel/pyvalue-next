@@ -1,8 +1,10 @@
-"""EODHD: its two list requests, and how their answers are read.
+"""EODHD: its requests, and how their answers are read.
 
 EODHD names a security ``SYMBOL.EXCHANGE``, both parts its own. Two requests
 give what pyvalue needs to find a security there (ADR 0018): the list of
-exchange codes it offers, and the list of symbols under one code.
+exchange codes it offers, and the list of symbols under one code. A third
+gives the fundamentals of one security, and a fourth says how much of the
+day's allowance the account has used (ADR 0028).
 
 The API key travels in the address, as EODHD requires. So every request goes
 through ``pyvalue.http``, which sends it to ``eodhd.com`` only, never along a
@@ -19,6 +21,11 @@ readers took all 59 symbol lists as they came. A line also carries a
 change of shape shows as a message that names the field, instead of as lines
 that silently lack a value.
 
+A fundamentals payload is not read here beyond the one thing the download
+has to know before it keeps an answer: that it is a payload, and for the
+symbol that was asked for. The account answer names the account holder, so
+its reader takes the three values of the allowance and nothing else.
+
 Author: Emre Tezel
 """
 
@@ -27,6 +34,7 @@ import re
 import urllib.parse
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import date
 from types import MappingProxyType
 
 from pyvalue.http import fetch_https
@@ -59,16 +67,21 @@ _SUB_UNITS: Mapping[str, str] = MappingProxyType({"GBX": "GBP", "ZAC": "ZAR", "I
 # The shape of an ISO 4217 code, which is what a listing's currency has to be.
 _CURRENCY: re.Pattern[str] = re.compile(r"[A-Z]{3}")
 
-# What fetches a list: (address without the key, the key) -> the bytes of the
-# answer. A parameter of this type lets tests stand in for the network.
+# What one fundamentals request costs of the daily allowance. Measured on
+# 2026-11-27: the account's counter rose by ten for each (ADR 0028).
+FUNDAMENTALS_REQUEST_COST: int = 10
+
+# What fetches a document: (address without the key, the key) -> the bytes of
+# the answer. A parameter of this type lets tests stand in for the network.
 type Fetch = Callable[[str, str], bytes]
 
 
-class ListNotFoundError(ProviderError):
-    """EODHD has no list at the address.
+class NotFoundError(ProviderError):
+    """EODHD has nothing at the address.
 
     It answers so for the symbol list of an exchange that is not in the
-    subscription (ADR 0024).
+    subscription (ADR 0024), and for the fundamentals of a symbol it has none
+    for (ADR 0028).
     """
 
 
@@ -96,6 +109,35 @@ class SymbolLine:
     currency: str | None
     kind: str | None
     isin: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class Allowance:
+    """How much of a day's requests the account has used, as EODHD counts it.
+
+    Attributes:
+        daily_limit: What the account may use in one day.
+        used: What it has used on ``counted_on``.
+        counted_on: The day the count belongs to. EODHD's day starts at
+            midnight GMT, and the count stays as it was until the first
+            request of a new day.
+    """
+
+    daily_limit: int
+    used: int
+    counted_on: date
+
+    def left(self, today: date) -> int:
+        """Return what is left of the day's allowance, never less than nothing.
+
+        A count from an earlier day says nothing about today: the whole
+        allowance is left.
+
+        Args:
+            today: Today's date by GMT.
+        """
+        used_today = self.used if self.counted_on >= today else 0
+        return max(0, self.daily_limit - used_today)
 
 
 def currency_of(provider_currency: str) -> str | None:
@@ -136,8 +178,27 @@ def symbol_list_url(provider_exchange_code: str) -> str:
     return f"https://{EODHD_HOST}/api/exchange-symbol-list/{code}?fmt=json"
 
 
+def fundamentals_url(provider_exchange_code: str, provider_symbol: str) -> str:
+    """Return the address of the fundamentals of one security, without the key.
+
+    Args:
+        provider_exchange_code: EODHD's exchange code, such as ``US``.
+        provider_symbol: EODHD's symbol under that code, such as ``BRK-B``.
+    """
+    # Both parts are escaped: a symbol can hold a character that would change
+    # the address, as the ``&`` of ``PE&OLES`` would.
+    symbol = urllib.parse.quote(provider_symbol, safe="")
+    code = urllib.parse.quote(provider_exchange_code, safe="")
+    return f"https://{EODHD_HOST}/api/fundamentals/{symbol}.{code}?fmt=json"
+
+
+def account_url() -> str:
+    """Return the address that says what the account has used today, without the key."""
+    return f"https://{EODHD_HOST}/api/user?fmt=json"
+
+
 def fetch_from_eodhd(url: str, api_key: str) -> bytes:
-    """Fetch one list from ``eodhd.com``.
+    """Fetch one document from ``eodhd.com``.
 
     Args:
         url: An ``https://eodhd.com/`` address, without the key.
@@ -148,7 +209,7 @@ def fetch_from_eodhd(url: str, api_key: str) -> bytes:
         The answer's bytes, decompressed.
 
     Raises:
-        ListNotFoundError: If EODHD answers that it has no such list.
+        NotFoundError: If EODHD answers that it has nothing at the address.
         ProviderError: If the address is not on ``eodhd.com`` over HTTPS, or
             the download fails for any other reason, such as a key that is
             not accepted.
@@ -159,27 +220,37 @@ def fetch_from_eodhd(url: str, api_key: str) -> bytes:
         {"User-Agent": _CLIENT_NAME, "Accept": "application/json"},
         ProviderError,
         secret_query={"api_token": api_key},
-        not_found=ListNotFoundError,
+        not_found=NotFoundError,
     )
 
 
-def _entries(body: bytes, source: str, what: str) -> list[dict[str, object]]:
-    """Read an answer as a list of objects, or say that it is not one.
+def _json(body: bytes, source: str, what: str) -> object:
+    """Read an answer as JSON, or say that it is not what was expected.
 
     Args:
         body: The answer, or a saved file, as bytes.
         source: What to call it in a message.
-        what: The kind of list expected, for the message.
+        what: The kind of answer expected, for the message.
 
     Raises:
-        ProviderError: If the bytes are not JSON, not a list, or hold an
-            element that is not an object.
+        ProviderError: If the bytes are not JSON.
     """
     try:
         document: object = json.loads(body)
     except ValueError as error:
         # The parser's message gives a position, never the content.
         raise ProviderError(f"{source} is not {what}: {error}") from error
+    return document
+
+
+def _entries(body: bytes, source: str, what: str) -> list[dict[str, object]]:
+    """Read an answer as a list of objects, or say that it is not one.
+
+    Raises:
+        ProviderError: If the bytes are not JSON, not a list, or hold an
+            element that is not an object.
+    """
+    document = _json(body, source, what)
     if not isinstance(document, list):
         # An error from EODHD arrives as an object or a text, not as a list.
         raise ProviderError(f"{source} is not {what}: it is not a list")
@@ -265,3 +336,88 @@ def parse_symbol_list(body: bytes, source: str) -> tuple[SymbolLine, ...]:
             )
         )
     return tuple(lines)
+
+
+def _document(body: bytes, source: str, what: str) -> dict[str, object]:
+    """Read an answer as one JSON object, or say that it is not one.
+
+    Raises:
+        ProviderError: If the bytes are not JSON, or not an object.
+    """
+    document = _json(body, source, what)
+    if not isinstance(document, dict):
+        raise ProviderError(f"{source} is not {what}: it is not an object")
+    return document
+
+
+def check_fundamentals(body: bytes, source: str, provider_symbol: str) -> None:
+    """Make sure an answer is the fundamentals payload of one symbol.
+
+    This is all the download needs to know before it keeps an answer
+    (ADR 0028): an error page or a payload for another symbol must not get a
+    file. What the payload holds is not judged.
+
+    Args:
+        body: The answer, or a saved payload, as bytes.
+        source: What to call it in a message.
+        provider_symbol: The symbol that was asked for.
+
+    Raises:
+        ProviderError: If it is not a JSON object whose ``General.Code`` is
+            the symbol.
+    """
+    what = "an EODHD fundamentals payload"
+    general = _document(body, source, what).get("General")
+    if not isinstance(general, dict):
+        raise ProviderError(f"{source} is not {what}: it has no General section")
+    code = general.get("Code")
+    if code != provider_symbol:
+        raise ProviderError(
+            f"{source} is not {what} for {provider_symbol}: its General.Code is {code!r}"
+        )
+
+
+def _whole_number(document: dict[str, object], field: str, source: str, what: str) -> int:
+    """Return one field of an answer as a whole number that is not negative.
+
+    Raises:
+        ProviderError: If the field is missing or is anything else. The
+            message names the field and never its value.
+    """
+    value = document.get(field)
+    # A bool is an int in Python, and it is not a count.
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ProviderError(f"{source} is not {what}: the field {field} is not a count")
+    return value
+
+
+def parse_allowance(body: bytes, source: str) -> Allowance:
+    """Read what the account has used of its daily allowance.
+
+    The answer also names the account holder. Three values are read and
+    nothing else, and no message quotes a value of the answer.
+
+    Args:
+        body: The answer as bytes.
+        source: What to call it in a message.
+
+    Returns:
+        The daily limit, the count and the day the count belongs to.
+
+    Raises:
+        ProviderError: If it is not an object with the three values.
+    """
+    what = "an EODHD account answer"
+    document = _document(body, source, what)
+    counted_on = document.get("apiRequestsDate")
+    try:
+        day = date.fromisoformat(counted_on) if isinstance(counted_on, str) else None
+    except ValueError:
+        day = None
+    if day is None:
+        raise ProviderError(f"{source} is not {what}: the field apiRequestsDate is not a date")
+    return Allowance(
+        daily_limit=_whole_number(document, "dailyRateLimit", source, what),
+        used=_whole_number(document, "apiRequests", source, what),
+        counted_on=day,
+    )

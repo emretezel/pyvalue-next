@@ -1,13 +1,14 @@
-"""Tests for ``pyvalue.providers.eodhd``: reading EODHD's two lists.
+"""Tests for ``pyvalue.providers.eodhd``: its addresses and how its answers are read.
 
 The requests themselves are tested in ``tests/unit/test_http.py``, with the
-other fetches. The sample answers are made up in the shape EODHD documents
-(``tests/fixtures/eodhd``); nothing here has been seen live.
+other fetches. The sample answers are made up in the shape EODHD gives
+(``tests/fixtures/eodhd``); none was downloaded.
 
 Author: Emre Tezel
 """
 
 import json
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -17,10 +18,16 @@ from hypothesis import strategies as st
 from pyvalue.providers import ProviderError
 from pyvalue.providers.eodhd import (
     EXCHANGE_FILE,
+    FUNDAMENTALS_REQUEST_COST,
     PROVIDER_CODE,
     PROVIDER_NAME,
+    Allowance,
     SymbolLine,
+    account_url,
+    check_fundamentals,
     currency_of,
+    fundamentals_url,
+    parse_allowance,
     parse_exchange_list,
     parse_symbol_list,
 )
@@ -237,3 +244,217 @@ def test_reading_a_currency_that_was_read_changes_nothing(code: str) -> None:
     currency = currency_of(code)
 
     assert currency is None or currency_of(currency) == currency
+
+
+# --- The fundamentals of one security ------------------------------------------------------------
+
+# The section of a payload that says what it is about. A live payload also
+# carries the statements, which the download keeps and does not read.
+_GENERAL: dict[str, object] = {
+    "Code": "ALFA",
+    "Name": "Alpha Corp",
+    "Exchange": "NYSE",
+    "ISIN": None,
+}
+
+
+def _payload(**general: object) -> bytes:
+    """Return a payload whose ``General`` section has the given values changed."""
+    return json.dumps({"General": {**_GENERAL, **general}, "Financials": {}}).encode()
+
+
+def test_a_fundamentals_request_names_the_symbol_and_the_exchange_code() -> None:
+    """EODHD names a security ``SYMBOL.EXCHANGE``, both parts its own."""
+    assert fundamentals_url("US", "BRK-B") == "https://eodhd.com/api/fundamentals/BRK-B.US?fmt=json"
+
+
+def test_a_symbol_cannot_change_the_address() -> None:
+    """One listed symbol holds an ``&``, which would start a second query part."""
+    assert (
+        fundamentals_url("MX", "PE&OLES")
+        == "https://eodhd.com/api/fundamentals/PE%26OLES.MX?fmt=json"
+    )
+    assert "/api/fundamentals/A%2FB%3Fx.US?" in fundamentals_url("US", "A/B?x")
+
+
+@given(
+    code=st.text(min_size=1, max_size=8),
+    symbol=st.text(min_size=1, max_size=12),
+)
+def test_a_fundamentals_address_always_stays_under_one_path(code: str, symbol: str) -> None:
+    """Whatever the two parts hold, the address has one path segment for them and one query."""
+    address = fundamentals_url(code, symbol)
+
+    prefix = "https://eodhd.com/api/fundamentals/"
+    assert address.startswith(prefix)
+    assert address.endswith("?fmt=json")
+    middle = address[len(prefix) : -len("?fmt=json")]
+    assert not set(middle) & set("/?#&= ")
+
+
+def test_the_account_request_has_one_address() -> None:
+    """It is the request that says what the account has used today."""
+    assert account_url() == "https://eodhd.com/api/user?fmt=json"
+
+
+def test_a_fundamentals_request_costs_ten_of_the_allowance() -> None:
+    """Measured on 2026-11-27 (ADR 0028). The download's arithmetic rests on it."""
+    assert FUNDAMENTALS_REQUEST_COST == 10
+
+
+def test_a_payload_for_the_symbol_is_accepted() -> None:
+    """Nothing is returned: the check only has to pass."""
+    check_fundamentals(_payload(), "the answer", "ALFA")
+
+
+def test_a_payload_without_statements_is_still_a_payload() -> None:
+    """What a payload holds is not judged by the download (ADR 0028)."""
+    check_fundamentals(json.dumps({"General": {"Code": "ALFA"}}).encode(), "the answer", "ALFA")
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        (b"<html>Service unavailable</html>", "the answer is not an EODHD fundamentals payload"),
+        (b"[]", "it is not an object"),
+        (b'"Not Found"', "it is not an object"),
+        (b"{}", "it has no General section"),
+        (b'{"General": "ALFA"}', "it has no General section"),
+        (b'{"General": {}}', "its General.Code is None"),
+        (b'{"General": {"Code": "BETA"}}', "for ALFA: its General.Code is 'BETA'"),
+        (b'{"General": {"Code": "alfa"}}', "for ALFA: its General.Code is 'alfa'"),
+    ],
+    ids=["a page", "a list", "a text", "empty", "no section", "no code", "another", "other case"],
+)
+def test_an_answer_that_is_not_the_payload_of_the_symbol_is_refused(
+    body: bytes, message: str
+) -> None:
+    """An error page, or a payload for another symbol, must never get a file."""
+    with pytest.raises(ProviderError, match=message):
+        check_fundamentals(body, "the answer", "ALFA")
+
+
+# --- The account's allowance ---------------------------------------------------------------------
+
+# An account answer in the shape seen live. The holder is made up; the reader
+# must let nothing of the first two fields out.
+_HOLDER: str = "Ada Example"
+_ADDRESS: str = "ada@example.invalid"
+_ACCOUNT: dict[str, object] = {
+    "name": _HOLDER,
+    "email": _ADDRESS,
+    "subscriptionType": "monthly",
+    "apiRequests": 65,
+    "apiRequestsDate": "2026-11-27",
+    "dailyRateLimit": 100000,
+    "extraLimit": 74094,
+}
+
+
+def _account(**changed: object) -> bytes:
+    """Return an account answer with the given fields changed; ``...`` removes one."""
+    fields = {**_ACCOUNT, **changed}
+    return json.dumps({name: value for name, value in fields.items() if value is not ...}).encode()
+
+
+def test_the_allowance_is_three_values_of_the_account_answer() -> None:
+    """The daily limit, the count and the day the count belongs to."""
+    assert parse_allowance(_account(), "the answer") == Allowance(
+        daily_limit=100000, used=65, counted_on=date(2026, 11, 27)
+    )
+
+
+def test_nothing_about_the_account_holder_leaves_the_reader() -> None:
+    """The answer names a person. The allowance carries no text at all."""
+    allowance = parse_allowance(_account(), "the answer")
+
+    assert _HOLDER not in repr(allowance)
+    assert _ADDRESS not in repr(allowance)
+    assert {type(value) for value in (allowance.daily_limit, allowance.used)} == {int}
+
+
+@pytest.mark.parametrize(
+    ("changed", "message"),
+    [
+        ({"dailyRateLimit": ...}, "the field dailyRateLimit is not a count"),
+        ({"dailyRateLimit": "100000"}, "the field dailyRateLimit is not a count"),
+        ({"dailyRateLimit": True}, "the field dailyRateLimit is not a count"),
+        ({"apiRequests": ...}, "the field apiRequests is not a count"),
+        ({"apiRequests": -1}, "the field apiRequests is not a count"),
+        ({"apiRequests": 6.5}, "the field apiRequests is not a count"),
+        ({"apiRequestsDate": ...}, "the field apiRequestsDate is not a date"),
+        ({"apiRequestsDate": "yesterday"}, "the field apiRequestsDate is not a date"),
+        ({"apiRequestsDate": 20261127}, "the field apiRequestsDate is not a date"),
+    ],
+    ids=[
+        "no limit",
+        "limit as text",
+        "limit as a flag",
+        "no count",
+        "negative count",
+        "fraction",
+        "no date",
+        "a word for a date",
+        "a number for a date",
+    ],
+)
+def test_an_account_answer_of_another_shape_is_refused_without_quoting_it(
+    changed: dict[str, object], message: str
+) -> None:
+    """The message names the field and never a value: the answer holds personal details."""
+    with pytest.raises(ProviderError, match=message) as raised:
+        parse_allowance(_account(**changed), "the answer")
+
+    assert _HOLDER not in str(raised.value)
+    assert _ADDRESS not in str(raised.value)
+    assert "yesterday" not in str(raised.value)
+
+
+@pytest.mark.parametrize("body", [b"Unauthenticated", b"[]", b'"text"'])
+def test_an_account_answer_that_is_not_an_object_is_refused(body: bytes) -> None:
+    """A refusal can arrive as plain text."""
+    with pytest.raises(ProviderError, match="the answer is not an EODHD account answer"):
+        parse_allowance(body, "the answer")
+
+
+def test_what_was_used_today_is_taken_off_the_daily_limit() -> None:
+    """The count belongs to today, so it counts."""
+    allowance = Allowance(daily_limit=100000, used=265, counted_on=date(2026, 11, 27))
+
+    assert allowance.left(date(2026, 11, 27)) == 99735
+
+
+def test_a_count_from_an_earlier_day_says_nothing_about_today() -> None:
+    """EODHD's counter stays as it was until the first request of a new day."""
+    allowance = Allowance(daily_limit=100000, used=83355, counted_on=date(2026, 11, 27))
+
+    assert allowance.left(date(2026, 11, 28)) == 100000
+
+
+def test_a_count_dated_ahead_of_our_clock_still_counts() -> None:
+    """A clock that runs behind must not hand out a second day's allowance."""
+    allowance = Allowance(daily_limit=100000, used=83355, counted_on=date(2026, 11, 28))
+
+    assert allowance.left(date(2026, 11, 27)) == 16645
+
+
+def test_an_account_that_used_more_than_its_limit_has_nothing_left() -> None:
+    """EODHD goes on counting once it draws on the extra reserve."""
+    allowance = Allowance(daily_limit=100000, used=100420, counted_on=date(2026, 11, 27))
+
+    assert allowance.left(date(2026, 11, 27)) == 0
+
+
+@given(
+    daily_limit=st.integers(min_value=0, max_value=10**7),
+    used=st.integers(min_value=0, max_value=10**7),
+    days_apart=st.integers(min_value=-3, max_value=3),
+)
+def test_what_is_left_is_never_negative_and_never_more_than_the_limit(
+    daily_limit: int, used: int, days_apart: int
+) -> None:
+    """Whatever the account says, the answer is an amount that can be spent."""
+    day = date(2026, 11, 27)
+    allowance = Allowance(daily_limit=daily_limit, used=used, counted_on=day)
+
+    assert 0 <= allowance.left(day + timedelta(days=days_apart)) <= daily_limit

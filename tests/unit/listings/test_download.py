@@ -14,7 +14,7 @@ import pytest
 
 from pyvalue.listings import DownloadStatus, ListingsError, SymbolsDownload, download_symbols
 from pyvalue.providers import ExchangeCodes, ProviderError
-from pyvalue.providers.eodhd import ListNotFoundError, exchange_list_url, symbol_list_url
+from pyvalue.providers.eodhd import NotFoundError, exchange_list_url, symbol_list_url
 
 # Stands in for an API key.
 _KEY: str = "sample-api-key-0123456789"
@@ -204,7 +204,7 @@ def test_a_list_that_is_not_in_the_subscription_is_reported_and_the_rest_goes_on
 ) -> None:
     """EODHD answers "not found" for an exchange outside the plan."""
     lists = tmp_path / "eodhd"
-    provider.answers[symbol_list_url("LSE")] = ListNotFoundError("cannot download: not found")
+    provider.answers[symbol_list_url("LSE")] = NotFoundError("cannot download: not found")
 
     outcome = _download(provider, lists, sample_codes)
 
