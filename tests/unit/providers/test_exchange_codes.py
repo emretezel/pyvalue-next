@@ -196,12 +196,26 @@ def test_the_shipped_file_maps_the_us_code_by_label() -> None:
 
 
 @pytest.mark.parametrize(
-    "label", ["PINK", "OTCQB", "OTCQX", "OTCGREY", "OTCCE", "OTCMKTS", "OTCBB"]
+    "label",
+    ["PINK", "OTCQB", "OTCQX", "OTCGREY", "OTCCE", "OTCMKTS", "OTCBB", "OTC", "OTCPK"],
 )
 def test_the_shipped_file_leaves_us_over_the_counter_lines_out(label: str) -> None:
-    """Decided by the author on 2026-11-26 (ADR 0024)."""
+    """Decided by the author on 2026-11-26 (ADR 0024).
+
+    The last two labels were first seen on the live list of 2026-11-27 (ADR 0027).
+    """
     assert (
         packaged_exchange_codes("eodhd_exchange.csv").market_of("US", label) is VenueStatus.LEFT_OUT
+    )
+
+
+def test_the_shipped_file_leaves_us_lines_without_a_venue_out() -> None:
+    """EODHD labels a line whose venue it does not state with the code itself (ADR 0027).
+
+    No exchange of ours can be named for such a line, so it is not stored.
+    """
+    assert (
+        packaged_exchange_codes("eodhd_exchange.csv").market_of("US", "US") is VenueStatus.LEFT_OUT
     )
 
 

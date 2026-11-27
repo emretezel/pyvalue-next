@@ -25,7 +25,7 @@ There is no row for Tokyo (`XJPX`): no provider serves it, and a market no provi
 ## Notes
 
 - **`mic` is the primary key** because it is an international standard and stable.
-- **Germany has one exchange, Xetra.** The regional exchanges get no row (ADR 0018). US over-the-counter trading gets none either (ADR 0024).
+- **Germany has one exchange, Xetra.** The regional exchanges get no row (ADR 0018). US over-the-counter trading gets none either (ADR 0024), and a US line whose venue the provider does not state is not stored (ADR 0027).
 - **Which code a market gets.** A row uses the ISO operating code by default: AIM is stored as London (`XLON`). A segment code gets its own row only where two separate listing markets share one operating code, as KOSDAQ (`XKOS`) does under Korea Exchange.
 
 ## Relationships

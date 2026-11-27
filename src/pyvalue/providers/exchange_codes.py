@@ -9,7 +9,8 @@ what is left out on purpose (ADR 0024):
 - a row without a label and without a market leaves a whole code out, such as
   Germany's regional exchanges;
 - a row with a label and without a market leaves the lines with that label
-  out, such as US over-the-counter lines.
+  out, such as US over-the-counter lines, and the US lines EODHD gives no
+  venue, which it labels with the code itself (ADR 0027).
 
 The file is shipped inside the package. It knows nothing of the ``exchange``
 table: that the markets it names are ours is checked by the component that
