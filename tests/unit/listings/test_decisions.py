@@ -182,7 +182,8 @@ def test_a_missing_file_is_refused(tmp_path: Path) -> None:
 def test_the_decisions_shipped_with_the_package_are_valid() -> None:
     """The real file is read with the same checks on every test run.
 
-    It holds no row until the rule has run on live lists (ADR 0019).
+    Its first rows are the decisions of the first pass on live lists, of
+    2026-11-27 (ADR 0027).
     """
     decisions = packaged_listing_decisions()
 

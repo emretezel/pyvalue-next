@@ -452,13 +452,21 @@ def test_lines_whose_currency_cannot_be_read_are_counted_by_code(
     assert _listings(market) == []
 
 
-def test_without_decisions_given_the_shipped_file_is_used(market: Database, tmp_path: Path) -> None:
-    """It holds no row for a made-up security, so the rule decides."""
-    ids = _hold(market, {_HYNIX: [_held("VXUS", "KR", "KRW", "000660")]})
+def test_without_decisions_given_the_shipped_file_is_used(
+    market: Database, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A caller that gives no decisions gets the ones shipped with pyvalue.
+
+    The shipped file holds decisions on real securities, so the test puts its
+    own in its place: one that the rule would never arrive at.
+    """
+    _hold(market, {_HYNIX: [_held("VXUS", "KR", "KRW", "000660")]})
     _every_list_stored(market)
     _list(market, ("KO", "000660", "KRW", _HYNIX))
+    shipped = (_decision(_HYNIX, None),)
+    monkeypatch.setattr("pyvalue.listings.fill.packaged_listing_decisions", lambda: shipped)
 
     outcome = fill_listings(market, report_dir=tmp_path)
 
-    assert _listings(market) == [(ids[_HYNIX], "XKRX", "000660", "KRW")]
-    assert outcome.plan.unknown_decisions == ()
+    assert [security.isin for security in outcome.plan.decided_none] == [_HYNIX]
+    assert _listings(market) == []

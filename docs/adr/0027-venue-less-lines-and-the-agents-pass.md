@@ -1,6 +1,6 @@
 # ADR 0027: Lines without a venue are left out, and the agent's pass is a session the author approves batch by batch
 
-- Status: Accepted
+- Status: Accepted. The currency guard does not hold for a receipt read as its ordinary share (ADR 0015): its holding line shows the receipt's currency, so the share's own line may trade in another. Decided by the author on 2026-11-27 for James Hardie, whose ordinary share trades in New York in US dollars while the fund holds the Australian depositary interest.
 - Date: 2026-11-27
 - Changes: ADR 0019 in one point: the agent may leave a security undecided. It settles what ADR 0019 left open on how the agent is run, and what ADR 0024 left open on a US share line without a venue. Everything else in both records stands.
 

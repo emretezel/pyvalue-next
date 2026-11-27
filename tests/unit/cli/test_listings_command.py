@@ -103,9 +103,13 @@ def _seed(path: Path) -> None:
 def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Return a temporary working folder whose database holds the three sample securities.
 
-    There is no ``private`` folder: the command needs no setting.
+    There is no ``private`` folder: the command needs no setting. The command
+    reads no decision unless a test gives some (``_decide``): the file shipped
+    with pyvalue holds decisions on real securities, which are no part of
+    these tests.
     """
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("pyvalue.listings.fill.packaged_listing_decisions", lambda: ())
     assert main(["db", "migrate"]) == 0
     _seed(tmp_path / "data" / "pyvalue.db")
     return tmp_path
