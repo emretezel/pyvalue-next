@@ -13,10 +13,11 @@ EODHD also has its own codes for currencies: a market quoted in a sub-unit
 carries the sub-unit's code. ``currency_of`` turns such a code into the
 currency (ADR 0019).
 
-Nothing has been seen live yet (ADR 0024): the shape below is EODHD's
-documentation and what the legacy client read. The readers are strict on
-purpose, so that a difference shows at the first live download as a message
-that names the field, instead of as lines that silently lack a value.
+The shape below was confirmed on the live lists of 2026-11-27 (ADR 0027): the
+readers took all 59 symbol lists as they came. A line also carries a
+``Country``, which is not read. The readers are strict on purpose, so that a
+change of shape shows as a message that names the field, instead of as lines
+that silently lack a value.
 
 Author: Emre Tezel
 """

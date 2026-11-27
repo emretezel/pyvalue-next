@@ -1,8 +1,8 @@
 # Sample EODHD lists
 
-Made-up answers in the shape EODHD documents for its two list requests, and a small pair of exchange files that goes with them. Nothing here was downloaded: the legacy project kept no raw answer, and no request is made to EODHD without the author asking for it (ADR 0024). The companies do not exist; every ISIN has a correct check digit unless the table says otherwise.
+Made-up answers in the shape EODHD documents for its two list requests, and a small pair of exchange files that goes with them. Nothing here was downloaded: the files were written before any request had been made to EODHD. The companies do not exist; every ISIN has a correct check digit unless the table says otherwise.
 
-The shape is confirmed at the first live download. Until then these files are what the readers were written for.
+The shape was confirmed at the first live download, on 2026-11-27: the readers took every live list as it came (ADR 0027). A live line also carries a `Country`, which is not read.
 
 ## Files
 
