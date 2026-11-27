@@ -193,7 +193,7 @@ The payload has no field that says how long a period is. The load works it out f
 | 2. The latest year | The latest date is the end of the latest fiscal year |
 | 3. The year before | The date 350 to 380 days earlier ends the year before. Of two such dates the one nearest to 365 days is taken, and of two equally near the later |
 | 4. A proven year | A year is **proven** when step 3 finds the year before it. Its income and cash-flow rows are then known to cover 12 months |
-| 5. A break | When step 3 finds no date, the year is **not proven**, and the walk goes on from the nearest earlier date |
+| 5. A break | When step 3 finds no date, the year is **not proven**, and the walk goes on from the nearest date at least 85 days earlier. A date closer than that is a second row for the same year end, a few days off |
 | 6. The window | The first 12 years of the walk are the company's fiscal years. Any other yearly date after the oldest of them is off the chain and is not stored |
 
 What is stored for a fiscal year:
@@ -215,7 +215,7 @@ A period has one currency, for all its statements.
 | The period's rows carry one currency label between them | That currency |
 | They carry two | None: the period is not stored, and reported |
 | They carry none, and the company's other fiscal years all have the same currency | That currency |
-| They carry none, the other years settle nothing, and the three statements name one currency in their own header | That currency |
+| They carry none, no row of any fiscal year carries a label, and the three statements name one currency in their own header | That currency |
 | Otherwise | None: the period is not stored, and reported |
 
 ### A company with several listed securities
